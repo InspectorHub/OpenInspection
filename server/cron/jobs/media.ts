@@ -24,7 +24,7 @@ const PENDING_ATTACHMENT_INTERVAL_MS = 60 * 60 * 1000;
  * Inspections examined per orphan-sweep invocation.
  *
  * UNMEASURED. It is a reasoned starting point, not a tuned value: the cost per
- * inspection is two R2 prefix lists (its own prefix and the folder of its message attachments) plus one to three D1 reads, and - only for
+ * inspection is three R2 prefix lists (its own prefix, the photos folder of the current layout, and the folder of its message attachments) plus one to three D1 reads, and - only for
  * inspections that actually hold objects - a report-blob parse, which is the
  * expensive part and the one whose size varies most. Nobody has yet run this
  * against a real deployment and read the CPU back, so treat it as the number to

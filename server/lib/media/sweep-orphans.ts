@@ -75,19 +75,25 @@ export async function sweepOrphanedMedia(
     // table, retention rules and refresh path. They are referenced by `report_pdfs`, not by anything this sweep reads, so listing
     // them here would call every stored PDF an orphan and delete it once the grace window passed, leaving a row that says "ready"
     // for a file that is gone.
+    // Two layouts hold photos. The older one writes directly under `{tenant}/{inspection}/` (covers, pool files, placed photos); the
+    // current one writes under `{tenant}/inspections/{inspection}/photos/`. Only the photos folder of the current layout is listed,
+    // never its parent: that folder also holds videos, documents, agreement files and Word exports, which the live set below does
+    // not know and which would be called orphans and deleted.
     const objectKeys: string[] = [];
-    let cursor: string | undefined = undefined;
-    do {
-      const list: R2Objects = await r2.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) });
-      for (const o of list.objects) if (!o.key.startsWith(`${prefix}reports/`)) objectKeys.push(o.key);
-      cursor = list.truncated ? list.cursor : undefined;
-    } while (cursor);
+    for (const listPrefix of [prefix, r2Keys.inspectionPhotosPrefix(insp.tenantId, insp.id)]) {
+      let pageCursor: string | undefined = undefined;
+      do {
+        const list: R2Objects = await r2.list({ prefix: listPrefix, limit: 1000, ...(pageCursor ? { cursor: pageCursor } : {}) });
+        for (const o of list.objects) if (!o.key.startsWith(`${prefix}reports/`)) objectKeys.push(o.key);
+        pageCursor = list.truncated ? list.cursor : undefined;
+      } while (pageCursor);
+    }
 
     // Files uploaded for this inspection's messages. They are live only while a message carries the descriptor; one uploaded and
     // never sent is referenced by nothing, and goes the same way an unplaced photo does: recorded, then deleted after the grace.
     const attachmentKeys: string[] = [];
     const attachmentPrefix = r2Keys.messageAttachmentPrefix(insp.tenantId, insp.id);
-    cursor = undefined;
+    let cursor: string | undefined = undefined;
     do {
       const list: R2Objects = await r2.list({ prefix: attachmentPrefix, limit: 1000, ...(cursor ? { cursor } : {}) });
       for (const o of list.objects) attachmentKeys.push(o.key);

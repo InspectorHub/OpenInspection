@@ -1,0 +1,108 @@
+/**
+ * The orphan sweep and the current storage layout.
+ *
+ * Photos are written under `{tenant}/inspections/{inspection}/photos/`. The sweep used to list only the older `{tenant}/{inspection}/`
+ * prefix, so a photo uploaded and never placed (or removed from the report) in the current layout was never recorded and never freed.
+ * It now reads the photos folder too, and ONLY that folder: its parent also holds videos, documents, agreement files and Word exports,
+ * none of which the live set knows about.
+ */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createTestDb, setupSchema } from '../db';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import * as schema from '../../../server/lib/db/schema';
+
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
+import { sweepOrphanedMedia } from '../../../server/lib/media/sweep-orphans';
+import { ORPHAN_GRACE_MS } from '../../../server/lib/media/orphan-gc';
+
+const T = 't1';
+const I = 'i1';
+const NOW = Date.parse('2026-11-04T00:00:00.000Z');
+const PHOTOS = `${T}/inspections/${I}/photos/`;
+const PLACED = `${PHOTOS}placed.jpg`;
+const ANNOTATED = `${PHOTOS}placed.annotated.png`;
+const FROZEN_ONLY = `${PHOTOS}frozen-only.jpg`;
+const STRAY = `${PHOTOS}stray.jpg`;
+const VIDEO = `${T}/inspections/${I}/videos/clip.mp4`;
+const DOCUMENT = `${T}/inspections/${I}/documents/d1-contract.pdf`;
+const AGREEMENT = `${T}/inspections/${I}/agreements/e1/signed.pdf`;
+const EXPORT = `${T}/inspections/${I}/exports/x1.docx`;
+
+function makeR2(byPrefix: Record<string, string[]>) {
+    return {
+        list: vi.fn(async (opts: { prefix?: string }) => ({
+            objects: (byPrefix[opts.prefix ?? ''] ?? []).map((key) => ({ key })),
+            truncated: false,
+            cursor: undefined,
+        })),
+        delete: vi.fn(async (_key: string) => undefined),
+    };
+}
+
+describe('sweepOrphanedMedia - current photo layout', () => {
+    let db: BetterSQLite3Database<typeof schema>;
+    const sweep = (r2: ReturnType<typeof makeR2>, now: number) =>
+        sweepOrphanedMedia(testD1.binding, r2 as unknown as R2Bucket, now, { limit: 10, afterInspectionId: null });
+    const recorded = async () => (await db.select().from(schema.orphanedMedia)).map((r) => r.r2Key).sort();
+    // The folder as the bucket holds it: everything the current layout writes for this inspection, listed by exact prefix.
+    const bucket = () => makeR2({
+        [PHOTOS]: [PLACED, ANNOTATED, FROZEN_ONLY, STRAY],
+        [`${T}/inspections/${I}/`]: [PLACED, ANNOTATED, FROZEN_ONLY, STRAY, VIDEO, DOCUMENT, AGREEMENT, EXPORT],
+    });
+
+    beforeEach(async () => {
+        const setup = createTestDb();
+        db = setup.db;
+        await setupSchema(setup.sqlite);
+        testD1.use(db);
+        await db.insert(schema.tenants).values([{ id: T, slug: 'acme', createdAt: new Date(NOW) }]);
+        await db.insert(schema.inspections).values({ id: I, tenantId: T, propertyAddress: '1 Main', date: '2026-11-01', createdAt: new Date(NOW) });
+        await db.insert(schema.inspectionResults).values({
+            id: 'r1', tenantId: T, inspectionId: I, lastSyncedAt: new Date(NOW),
+            data: { 'sec:item': { photos: [{ key: PLACED, annotatedKey: ANNOTATED }] } },
+        });
+        // A published version shows one more photo that the working copy no longer has.
+        await db.insert(schema.reportVersions).values({
+            id: 'v1', tenantId: T, inspectionId: I, versionNumber: 1, publishedAt: new Date(NOW), publishedBy: 'u',
+            snapshotJson: JSON.stringify({ data: { 'sec:item': { photos: [{ key: FROZEN_ONLY }] } }, units: [], inspection: {} }),
+        });
+    });
+
+    it('records only the photo nothing shows, deletes it after the grace window, and keeps placed, annotated and published-version photos', async () => {
+        const first = bucket();
+        expect((await sweep(first, NOW)).reaped).toBe(0);
+        expect(await recorded()).toEqual([STRAY]);
+        expect(first.delete).not.toHaveBeenCalled();
+
+        const early = bucket();
+        await sweep(early, NOW + ORPHAN_GRACE_MS - 1);
+        expect(early.delete).not.toHaveBeenCalled();
+
+        const late = bucket();
+        expect((await sweep(late, NOW + ORPHAN_GRACE_MS)).reaped).toBe(1);
+        expect(late.delete.mock.calls.map((c) => c[0])).toEqual([STRAY]);
+        expect(await recorded()).toEqual([]);
+    });
+
+    it('never lists, records or deletes the videos, documents, agreement files and exports that share the inspection folder', async () => {
+        const r2 = bucket();
+        await sweep(r2, NOW);
+        const late = bucket();
+        await sweep(late, NOW + ORPHAN_GRACE_MS * 2);
+        // The photos folder was listed (control: the empty result below is the choice of prefix, not an unlisted folder) and its parent never was.
+        const listed = late.list.mock.calls.map((c) => (c[0] as { prefix?: string }).prefix);
+        expect(listed).toContain(PHOTOS);
+        expect(listed).not.toContain(`${T}/inspections/${I}/`);
+        const gone = late.delete.mock.calls.map((c) => c[0]);
+        for (const kept of [VIDEO, DOCUMENT, AGREEMENT, EXPORT]) expect(gone).not.toContain(kept);
+        expect(await recorded()).not.toEqual(expect.arrayContaining([VIDEO]));
+    });
+
+    it('still reaches a photo of the older layout through the older prefix', async () => {
+        const legacyStray = `${T}/${I}/stray-old.jpg`;
+        const listing = { [`${T}/${I}/`]: [legacyStray] };
+        await sweep(makeR2(listing), NOW);
+        expect(await recorded()).toEqual([legacyStray]);
+    });
+});

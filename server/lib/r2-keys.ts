@@ -36,6 +36,9 @@ export const r2Keys = {
     `_platform/statutory-forms/${formId}/${encodeURIComponent(version)}.pdf`,
   inspectionPhoto: (t: string, i: string, mediaId: string, ext: string) =>
     `${t}/inspections/${i}/photos/${mediaId}.${ext}`,
+  /** The folder `inspectionPhoto` and its annotated and cropped variants write into: the part of the current layout the orphan sweep reads. */
+  inspectionPhotosPrefix: (t: string, i: string) =>
+    `${t}/inspections/${i}/photos/`,
   inspectionPhotoAnnotated: (t: string, i: string, mediaId: string) =>
     `${t}/inspections/${i}/photos/${mediaId}.annotated.png`,
   inspectionPhotoCropped: (t: string, i: string, mediaId: string) =>
