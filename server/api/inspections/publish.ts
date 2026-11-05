@@ -216,7 +216,7 @@ const publishRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "publishInspection",
-    description: "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (recorded with the optional summary; a report whose frozen copy would exceed 1 MB is refused with 413 before anything is published; the snapshot write is retried once and a second failure is logged as an error without failing the publish), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version, except when nothing has changed: if the results, the report status and the summary are the same as in the latest version and no translation is requested, the call answers 200 in the same shape without publishing again (no new version, automation, audit entry, translation, PDF or ISN sync; isnSync is null). Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
+    description: "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules on a first publish, so any client or agent notification is decided by those rules; a first publish close to a sibling report's delivery may be coalesced into that notification. A re-publish of a report that was opened with edit-again (clients still read its last version) is an amendment: it fires the report.amended rules only when notifyClient is true (default false). The choice covers every report-updated rule, not just the client's: with false none fire (the client's, the buyer's agent's, any custom or in-app one) and the report's notified-at stamp is left untouched, so an API or MCP caller that omits notifyClient on an amendment sends no report-updated notices. The response does not say whether notices were suppressed. A republish after a retract is a fresh delivery and is decided by the rules as a first publish is. Also applies the automatic signature if one is configured, saves a frozen version snapshot (recorded with the optional summary; a report whose frozen copy would exceed 1 MB is refused with 413 before anything is published; the snapshot write is retried once and a second failure is logged as an error without failing the publish), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version, except when nothing has changed: if the results, the report status and the summary are the same as in the latest version and no translation is requested, the call answers 200 in the same shape without publishing again (no new version, automation, audit entry, translation, PDF or ISN sync; isnSync is null). Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
 }, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
@@ -366,6 +366,7 @@ publishRoutes.openapi(publishRoute, async (c) => {
         requireSignature: body.requireSignature,
         requirePayment: body.requirePayment,
         sendAgreementCopy: body.sendAgreementCopy,
+        notifyClient: body.notifyClient,
         ...(body.recipients ? { recipients: body.recipients } : {}),
         ...(body.reportId ? { reportId: body.reportId } : {}),
         actor: { userId: c.get('user').sub, role: c.get('userRole') },
@@ -380,7 +381,7 @@ publishRoutes.openapi(publishRoute, async (c) => {
             throw err;
         }
     }
-    const result = await service.publishInspection(id, tenantId, publishOptions);
+    const { amendment, ...result } = await service.publishInspection(id, tenantId, publishOptions);
     // The published report takes no edits: open sockets of its document are closed with 4409 (inspection-doc-lock).
     await setCollabDocLocks(c.env, getDrizzle(c), tenantId, id, true, body.reportId ? { reportId: body.reportId } : { primary: true });
 
@@ -392,15 +393,11 @@ publishRoutes.openapi(publishRoute, async (c) => {
     // `return`: everything between is best-effort follow-on work, and the
     // PDF pipeline's slug/hash/footer lookups are awaited outside a try — a
     // throw there would drop the row for a publish that already happened.
-    // F79 — says WHAT was published, deliberately not WHO was told. It used to
-    // copy `notifyClient`/`notifyAgent` out of the body and nothing honoured
-    // them: delivery is the workspace's `report.published` automation rules'
-    // decision, so a publish marked "notify nobody" was RECORDED as such while
-    // every rule fired and the mail went out. An always-guessed field is worse
-    // than an absent one; who was told is in the automation logs and delivery rows.
+    // Says WHAT was published and, for an amendment, the publisher's notify choice (honoured: it decides whether the
+    // report-updated rules fire). Who was actually told is in the automation logs and delivery rows.
     auditFromContext(c, 'inspection.published', 'inspection', {
         entityId: id,
-        metadata: { reportId: body.reportId },
+        metadata: { reportId: body.reportId, amendment, ...(amendment ? { notifyClient: body.notifyClient } : {}) },
     });
 
     // #23 — the courtesy translation, when the publisher asked for one on

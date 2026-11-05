@@ -25,6 +25,8 @@ export interface PublishFlowOptions {
 export interface PublishExtras {
   /** The revision reason, already trimmed; absent for a first publish or a blank box. */
   summary?: string;
+  /** Republish only: true when the inspector chose to notify the client of the update. Absent means no. */
+  notifyClient?: boolean;
 }
 
 export interface PublishFlow {
@@ -73,6 +75,7 @@ export function usePublishFlow(inspectionId: string, options: PublishFlowOptions
       autoSignOnPublish: autoSign,
       ...(markComplete ? { markComplete: true } : {}),
       ...(extras.summary ? { summary: extras.summary } : {}),
+      ...(extras.notifyClient ? { notifyClient: true } : {}),
     });
     if (isIgnored(result)) return;
     if (result.ok) {

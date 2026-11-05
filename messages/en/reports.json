@@ -327,5 +327,8 @@
   "report_publish_receipt_title": "Report published",
   "report_publish_receipt_nothing_sent": "The report is final and a new version is recorded. Nothing has been emailed by this step.",
   "report_publish_receipt_goto": "Go to the inspection",
-  "report_publish_checking": "Checking…"
+  "report_publish_checking": "Checking…",
+  "report_publish_body_delivery_amendment": "It does not send the report itself. The report-updated notices (to the client and to anyone else your automations tell) go out only if you tick the box below — to put the report in someone's inbox now, send it from the inspection.",
+  "report_publish_receipt_amendment_notified": "The report-updated notices were queued. They go out through your automations on the next delivery pass.",
+  "report_publish_receipt_amendment_not_notified": "No report-updated notices were sent for this update."
 }

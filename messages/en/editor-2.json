@@ -233,5 +233,6 @@
   "editor_savetpl_body_new": "Creates a new template from this inspection's current structure. It becomes available for future inspections; this inspection is unchanged.",
   "editor_savetpl_body_back": "Overwrites the source template with this inspection's current structure. Future inspections created from it pick up the change; already-published reports keep their frozen snapshot.",
   "editor_savetpl_name_label": "Template name",
-  "editor_savetpl_name_placeholder": "Custom Template"
+  "editor_savetpl_name_placeholder": "Custom Template",
+  "editor_publish_notify_client": "Send the report-updated notices"
 }

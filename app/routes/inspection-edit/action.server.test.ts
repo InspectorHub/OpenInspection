@@ -195,6 +195,15 @@ describe('editor action — the revision reason travels with the publish', () =>
         });
     });
 
+    it('forwards notifyClient only when the form says "true"', async () => {
+        await post({ intent: 'publish', notifyClient: 'true' });
+        expect(publishPost).toHaveBeenLastCalledWith({ param: { id: 'insp-1' }, json: { notifyClient: true } });
+        await post({ intent: 'publish', notifyClient: 'false' });
+        expect(publishPost).toHaveBeenLastCalledWith({ param: { id: 'insp-1' }, json: {} });
+        await post({ intent: 'publish' });
+        expect(publishPost).toHaveBeenLastCalledWith({ param: { id: 'insp-1' }, json: {} });
+    });
+
     it('still orders the auto-sign write before the publish that carries a reason', async () => {
         calls.length = 0;
         completePost.mockImplementation(async () => { calls.push('complete'); return new Response(null, { status: 200 }); });

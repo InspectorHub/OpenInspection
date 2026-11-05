@@ -90,6 +90,18 @@ describe('usePublishFlow.publish', () => {
     expect(cmds[1]).toEqual({ type: 'publish', autoSignOnPublish: false });
   });
 
+  it('carries notifyClient only when the inspector chose it', async () => {
+    const { hook, cmds, answer } = setup();
+    act(() => { void hook.result.current.publish(false, { notifyClient: true }, false); });
+    await flush();
+    answer(0, { ok: true });
+    await flush();
+    act(() => { void hook.result.current.publish(false, {}, false); });
+    await flush();
+    expect(cmds[0]).toEqual({ type: 'publish', autoSignOnPublish: false, notifyClient: true });
+    expect('notifyClient' in cmds[1]).toBe(false);
+  });
+
   it('on success: closes the dialog, reloads the editor data once, and shows no error', async () => {
     const { fake, hook, calls, answer } = setup();
     act(() => { void hook.result.current.publish(false, {}, false); });

@@ -22,8 +22,10 @@ export type FieldCommand =
    * `markComplete` absent or false skips the complete call. `autoSignOnPublish`
    * ABSENT means "do not touch the stored flag" (the action only PATCHes it when
    * the form field is present), so a host that has no such toggle must omit it.
+   * `notifyClient` is the republish choice: true asks the server to raise the report-updated notice for an
+   * amendment. Absent means no; it is meaningless on a first publish.
    */
-  | { type: 'publish'; markComplete?: boolean; autoSignOnPublish?: boolean; summary?: string }
+  | { type: 'publish'; markComplete?: boolean; autoSignOnPublish?: boolean; summary?: string; notifyClient?: boolean }
   /** The body is relayed unchanged to the property-facts PATCH; its keys belong to PropertyInfoForm (Task 5). */
   | { type: 'save-property-facts'; payload: Record<string, unknown> }
   /** Read-only lookup: nothing is persisted. See `CommandDataMap['autofill-property-facts']`. */

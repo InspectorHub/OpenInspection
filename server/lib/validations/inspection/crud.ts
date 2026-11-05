@@ -303,14 +303,10 @@ const PublishRecipientSchema = z.object({
   channels:  z.array(z.enum(['email', 'text'])).default([]).describe('Channels to deliver through; empty skips the recipient. Accepted but not used by the publish route.'),
 }).openapi('PublishRecipient');
 
-// F79 — there are deliberately NO `notifyClient` / `notifyAgent` fields here.
-// They were accepted, defaulted to true, passed down, and read by nothing: who
-// receives a published report is decided by the workspace's `report.published`
-// automation rules. Having them on the wire is what let the publish audit row
-// state a notification decision the rules had already made differently. Zod
-// strips unknown keys, so a client still posting them is accepted and the flags
-// ignored — no 400, no contract break. Do not re-add them to give the UI
-// something to bind to; the UI now names the automation rules instead.
+// F79 — `notifyClient` / `notifyAgent` used to be accepted here, defaulted to true and read by nothing, so a publish
+// marked "notify nobody" was recorded as such while every rule fired. That is why they were removed. `notifyClient` is back
+// with a narrower meaning that IS honoured: it applies to an amendment only (see the field below). `notifyAgent` is still
+// not a field: who else is told is the workspace's automation rules' call.
 export const PublishInspectionSchema = z.object({
   theme: z.enum(['modern', 'classic', 'minimal']).default('modern').describe('Report theme. Accepted but not used: the publish route ignores it.'),
   requireSignature: z.boolean().default(false).describe('Signature requirement flag. Accepted but not used: the publish route ignores it.'),
@@ -333,6 +329,9 @@ export const PublishInspectionSchema = z.object({
   // each with its own version chain. Omitted = the order's primary report,
   // which is what every caller predating multi-report delivery means.
   reportId: z.string().min(1).optional().describe('Report to publish; defaults to the inspection primary report.'),
+  // The publisher's choice at REPUBLISH. Default false, so an amendment tells nobody unless asked. It is read by the
+  // publish service and changes nothing about a first publish.
+  notifyClient: z.boolean().default(false).describe('Amendments only (a re-publish of a report reopened with edit-again): true fires the report-updated notification rules for this publish (every one of them: the client rule, the buyer agent rule, custom and in-app rules), false (the default) fires none. Ignored on a first publish and on a republish after a retract, where the report.published rules decide as before.'),
   // #23 — the per-publish courtesy-translation opt-in. A locale, or absent.
   //
   // Absent is the DEFAULT and means "no", because producing a translation
