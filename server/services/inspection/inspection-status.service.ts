@@ -1,5 +1,5 @@
-import { eq, and } from 'drizzle-orm';
-import { inspections, reports } from '../../lib/db/schema';
+import { eq, and, desc } from 'drizzle-orm';
+import { inspections, reports, reportVersions } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { fireAutomation } from './shared';
 import { INSPECTION_STATUS, type InspectionStatus } from '../../lib/status/inspection-status';
@@ -141,7 +141,13 @@ export class InspectionStatusService extends InspectionSubService {
         // Already being edited again: the same answer, so a double tap or a retried request is harmless.
         if (row.status !== REPORT_STATUS.PUBLISHED && row.publishedAt) return row.id;
         if (row.status !== REPORT_STATUS.PUBLISHED) throw Errors.BadRequest('Only a published report can be edited again.');
-        await db.update(reports).set({ status: REPORT_STATUS.IN_PROGRESS })
+        // "Editing again" is a published report with a `published_at`; the two states differ only by that stamp. A report published
+        // before the stamp was kept has none (it would read as a plain draft: no banner, and the republish would skip the notice
+        // choice), so it is taken from the version clients are reading, or from now when no version is on record.
+        const latest = row.publishedAt ? null : await db.select({ publishedAt: reportVersions.publishedAt }).from(reportVersions)
+            .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.reportId, row.id)))
+            .orderBy(desc(reportVersions.versionNumber)).limit(1).get();
+        await db.update(reports).set({ status: REPORT_STATUS.IN_PROGRESS, publishedAt: row.publishedAt ?? latest?.publishedAt ?? new Date() })
             .where(and(eq(reports.id, row.id), eq(reports.tenantId, tenantId)));
         return row.id;
     }

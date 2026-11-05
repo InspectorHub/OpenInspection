@@ -371,6 +371,14 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                 : new Response('snapshot not found', { status: 404 });
         }
 
+        // Stores what the open sockets have sent, without locking: a caller about to decide something from the database (is the
+        // report unchanged since its last version?) asks for this first, because the debounce may not have run yet.
+        if (url.pathname.endsWith('/flush') && req.method === 'POST') {
+            const open = this.ctx.getWebSockets().length;
+            if (open > 0) await this.persist();
+            return Response.json({ flushed: open > 0 });
+        }
+
         // Publish marks the document locked and closes the open sockets; "Edit and republish" and retract clear it.
         if (url.pathname.endsWith('/lock') && req.method === 'POST') {
             return Response.json({ closed: await lockDoc(this.ctx, () => this.persist()) });

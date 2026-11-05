@@ -103,6 +103,29 @@ describe('edit again and retract', () => {
             expect(docCalls).toEqual([{ doc: `${TENANT}:${PRIMARY}`, action: 'unlock' }]);
         });
 
+        it('stamps published_at from the latest version for a report published before the stamp was kept, and stays idempotent', async () => {
+            // A legacy row: published, no published_at, with two versions on record.
+            await db.update(schema.reports).set({ publishedAt: null }).where(eq(schema.reports.id, PRIMARY));
+            const v1 = new Date('2026-06-03T00:00:00Z');
+            const v2 = new Date('2026-06-04T00:00:00Z');
+            for (const [n, at] of [[1, v1], [2, v2]] as const) {
+                await db.insert(schema.reportVersions).values({
+                    id: `v${n}`, tenantId: TENANT, inspectionId: INSP, reportId: PRIMARY, versionNumber: n, publishedAt: at, publishedBy: USER, snapshotJson: '{}',
+                } as never);
+            }
+            expect(reportEditState(await row(PRIMARY))).toBe('published');
+
+            const res = await request('/edit-again');
+
+            expect(res.status).toBe(200);
+            const primary = await row(PRIMARY);
+            // Without the stamp this would read as a plain draft (no "editing again" banner, no notice choice on republish).
+            expect(reportEditState(primary)).toBe('editing');
+            expect(primary.publishedAt?.getTime()).toBe(v2.getTime());
+            expect((await request('/edit-again')).status).toBe(200);
+            expect((await row(PRIMARY)).publishedAt?.getTime()).toBe(v2.getTime());
+        });
+
         it('opens a NAMED report, leaving the primary published', async () => {
             expect((await request('/edit-again', { reportId: RADON })).status).toBe(200);
             expect((await row(RADON)).status).toBe('in_progress');

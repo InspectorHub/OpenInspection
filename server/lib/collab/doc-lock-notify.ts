@@ -14,6 +14,26 @@ import { logger } from '../logger';
 
 export type DocLockTarget = { reportId: string } | { primary: true } | { allReportsOf: true };
 
+/**
+ * Asks the results documents of a report to store what their open sockets have sent, so that the database holds it. A document
+ * that cannot be reached is logged and skipped, like the lock call: the caller then decides from what the database has.
+ */
+export async function flushCollabDocs(
+    env: { INSPECTION_DOC?: DurableObjectNamespace | undefined },
+    tenantId: string,
+    reportIds: readonly string[],
+): Promise<void> {
+    const ns = env.INSPECTION_DOC;
+    if (!ns) return;
+    await Promise.all(reportIds.map(async (reportId) => {
+        try {
+            await ns.get(ns.idFromName(collabDocName(tenantId, reportId))).fetch('https://do.local/flush', { method: 'POST' });
+        } catch (err) {
+            logger.warn('results document could not be asked to store its edits', { tenantId, reportId, error: String(err) });
+        }
+    }));
+}
+
 export async function setCollabDocLocks(
     env: { INSPECTION_DOC?: DurableObjectNamespace | undefined },
     db: DrizzleD1Database,

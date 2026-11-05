@@ -4,7 +4,7 @@ import { reportVersions } from '../db/schema';
 import { PublishInspectionSchema } from '../validations/inspection.schema';
 import { getDrizzle } from '../route-helpers';
 import { relockUnchangedReport } from '../inspection/report-lock';
-import { setCollabDocLocks } from '../collab/doc-lock-notify';
+import { flushCollabDocs, setCollabDocLocks } from '../collab/doc-lock-notify';
 import { resolveTenantSlug } from '../url';
 import { REPORT_STATUS } from '../status/report-status';
 import { logger } from '../logger';
@@ -28,6 +28,9 @@ async function unchangedSinceVersion(c: Context<HonoConfig>, id: string, reportI
     const versions = c.var.services.reportVersion;
     const db = getDrizzle(c);
     const reportId = await versions.resolveReportId(db, tenantId, id, reportIdInBody);
+    // What the inspector typed in the last second may still be in the live document, not yet in the database this check reads: ask the
+    // document to store it first, or "nothing changed" would be answered, the report locked, and the typed note stranded.
+    if (reportId) await flushCollabDocs(c.env, tenantId, [reportId]);
     const latest = await db.select().from(reportVersions)
         .where(and(
             eq(reportVersions.tenantId, tenantId),

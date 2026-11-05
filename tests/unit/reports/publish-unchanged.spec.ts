@@ -248,3 +248,53 @@ describe('the step from snapshot version 3 to 4 is not by itself a change', () =
         expect(await versions(A)).toHaveLength(2);
     });
 });
+
+describe('publish asks the live document to store its edits before it decides nothing changed', () => {
+    const C = 'insp-c';
+    const REPORT_C = 'rep-c';
+
+    async function publishWithDocument(onFlush: () => Promise<void>) {
+        const calls: string[] = [];
+        const ns = {
+            idFromName: (name: string) => name,
+            get: () => ({ fetch: async (url: string) => {
+                const action = new URL(url).pathname.slice(1);
+                calls.push(action);
+                if (action === 'flush') await onFlush();
+                return new Response('{}');
+            } }),
+        };
+        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        const res = await buildApp().request(`/api/inspections/${C}/publish`, {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+        }, { DB: {}, JWT_SECRET: 'test-secret', INSPECTION_DOC: ns }, EXEC);
+        return { calls, body: await res.json() as { data: Record<string, unknown> } };
+    }
+
+    beforeEach(async () => {
+        await seed(C);
+        await db.insert(schema.reports).values({ id: REPORT_C, tenantId: T, inspectionId: C, kind: 'primary', title: 'Home', status: 'in_progress', createdAt: new Date(1) });
+    });
+
+    it('a note typed in the last second is stored first, so the publish is a real one and the note reaches the client', async () => {
+        const first = await publishWithDocument(async () => undefined);
+        expect(first.body.data).not.toHaveProperty('unchangedSinceVersion');
+        expect(await versions(C)).toHaveLength(1);
+
+        // The inspector typed after the first publish; the document has not yet reached the database.
+        const second = await publishWithDocument(async () => { await setResults(C, { i1: { rating: 'good', note: 'typed a moment ago' } }); });
+
+        // Control: the flush was asked for, and the answer is not "nothing changed".
+        expect(second.calls).toContain('flush');
+        expect(second.body.data).not.toHaveProperty('unchangedSinceVersion');
+        expect(await versions(C)).toHaveLength(2);
+    });
+
+    it('with nothing typed, the same flush changes nothing and the answer is still "nothing changed"', async () => {
+        await publishWithDocument(async () => undefined);
+        const again = await publishWithDocument(async () => undefined);
+        expect(again.calls).toContain('flush');
+        expect(again.body.data.unchangedSinceVersion).toBe(1);
+        expect(await versions(C)).toHaveLength(1);
+    });
+});
