@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLoaderData, useFetcher } from "react-router";
-import { Icon, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button, Icon, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { ActionFailureAlert } from "~/components/ActionFailureAlert";
@@ -89,8 +89,8 @@ function ContractorTypeRow({ t, idx, count, reordering, onMove, onRequestDelete 
           <input type="hidden" name="intent" value="rename" />
           <input type="hidden" name="id" value={t.id} />
           <input name="name" value={name} onChange={(e) => setName(e.target.value)} autoFocus className={`flex-1 ${INPUT} py-1.5`} />
-          <button type="submit" disabled={!name.trim()} className="text-[12px] text-ih-primary-text font-bold disabled:opacity-50">{m.common_save()}</button>
-          <button type="button" onClick={() => { setEditing(false); setName(t.name); }} className="text-[12px] text-ih-fg-3">{m.common_cancel()}</button>
+          <Button type="submit" variant="link" size="sm" disabled={!name.trim()}>{m.common_save()}</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setName(t.name); }}>{m.common_cancel()}</Button>
         </fetcher.Form>
       ) : (
         <>
@@ -100,8 +100,8 @@ function ContractorTypeRow({ t, idx, count, reordering, onMove, onRequestDelete 
               <span title={m.settings_contractor_types_canonical_hint()} className="ml-2 text-[9px] font-bold uppercase tracking-widest text-ih-info-fg bg-ih-info-bg px-1.5 py-0.5 rounded">{m.settings_contractor_types_canonical()}</span>
             )}
           </span>
-          <button onClick={() => { setEditing(true); setName(t.name); }} className="text-[12px] text-ih-primary-text hover:underline font-bold">{m.settings_contractor_types_rename()}</button>
-          <button onClick={onRequestDelete} aria-label={m.settings_contractor_types_delete_aria({ name: t.name })} className="text-[12px] text-ih-bad-fg hover:underline font-bold">{m.common_delete()}</button>
+          <Button variant="link" size="sm" onClick={() => { setEditing(true); setName(t.name); }}>{m.settings_contractor_types_rename()}</Button>
+          <Button variant="danger-link" size="sm" onClick={onRequestDelete} aria-label={m.settings_contractor_types_delete_aria({ name: t.name })}>{m.common_delete()}</Button>
         </>
       )}
     </div>
@@ -162,7 +162,7 @@ export default function SettingsContractorTypes() {
         <createFetcher.Form method="POST" className="flex gap-2" onSubmit={createLatch((e) => { if (!newName.trim()) { e.preventDefault(); return; } setNewName(""); })}>
           <input type="hidden" name="intent" value="create" />
           <input name="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={m.settings_contractor_types_name_placeholder()} className={`flex-1 ${INPUT}`} />
-          <button type="submit" {...pendingProps(!newName.trim())} className={`px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold ${PENDING_CLASS}`}>{m.common_add()}</button>
+          <Button type="submit" variant="primary" pending={!newName.trim()}>{m.common_add()}</Button>
         </createFetcher.Form>
       </div>
 

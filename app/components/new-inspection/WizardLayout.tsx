@@ -1,5 +1,5 @@
 import type React from "react";
-import { PageHeader, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button, PageHeader } from "@core/shared-ui";
 import { Breadcrumb } from "../Breadcrumb";
 import { ADDRESS_DROPDOWN_OBSTACLE_ATTR } from "../address/AddressAutocomplete";
 import type { WizardStepId } from "~/lib/wizard-steps";
@@ -104,15 +104,12 @@ export function WizardLayout({
                         below by every viewport measure. */}
                     <div
                         {...{ [ADDRESS_DROPDOWN_OBSTACLE_ATTR]: "" }}
-                        className="flex items-center justify-between px-6 py-4 border-t border-ih-border"
+                        className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-ih-border"
                     >
-                        <button
-                            onClick={onBack}
-                            className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted"
-                        >
+                        <Button variant="secondary" onClick={onBack}>
                             {stepIdx > 0 ? m.common_back() : m.common_cancel()}
-                        </button>
-                        <div className="flex items-center gap-3">
+                        </Button>
+                        <div className="flex flex-wrap items-center gap-3">
                             {/* What the greyed-out button is waiting for, tied to it
                                 by aria-describedby so it is not sighted-only. */}
                             {blockedReason && (
@@ -120,13 +117,14 @@ export function WizardLayout({
                                     {blockedReason}
                                 </p>
                             )}
-                            <button
+                            <Button
+                                variant="primary"
                                 // Blocked stays native; busy is aria-disabled so focus stays on Next.
                                 disabled={blockedReason !== null}
                                 aria-busy={busy || undefined}
                                 aria-describedby={blockedReason ? "newinsp-blocked-reason" : undefined}
-                                {...pendingProps(busy, onNext)}
-                                className={`inline-flex items-center gap-2 h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed ${PENDING_CLASS}`}
+                                pending={busy}
+                                onClick={onNext}
                             >
                                 {/* border-current, so it is the button's own text
                                     colour in either colour scheme — no second
@@ -139,7 +137,7 @@ export function WizardLayout({
                                     />
                                 )}
                                 {isLastStep ? m.new_inspection_create() : m.common_next()}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

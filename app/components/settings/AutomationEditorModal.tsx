@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
-import { Modal, Icon, PENDING_CLASS, pendingProps } from "@core/shared-ui";
+import { Button, Modal, Icon } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import type { Rule, Svc, TemplateSummary, RoleProfileOption, Conditions } from "~/routes/settings-automations";
@@ -66,20 +66,19 @@ export function AutomationEditorModal({
       footer={
         <>
           {rule && !rule.isDefault && (
-            <button type="button"
-              {...pendingProps(submitting, () => {
+            <Button variant="secondary" className="text-ih-bad-fg"
+              pending={submitting}
+              onClick={() => {
                 if (!confirmDelete) { setConfirmDelete(true); return; }
                 submit({ intent: "delete", id: rule.id }, { method: "post" });
-              })}
-              className={`h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-bad-fg ${PENDING_CLASS}`}>
+              }}>
               {confirmDelete ? m.settings_automations_confirm_delete() : m.common_delete()}
-            </button>
+            </Button>
           )}
           <div className="flex-1" />
-          <button type="button" onClick={onClose} className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-fg-2">{m.common_cancel()}</button>
-          <button type="submit" form="automation-editor-form" disabled={saveBlocked} {...pendingProps(submitting)}
-            title={noChannel ? m.settings_automations_pick_channel_title() : undefined}
-            className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] disabled:opacity-50 ${PENDING_CLASS}`}>{m.common_save()}</button>
+          <Button variant="secondary" onClick={onClose}>{m.common_cancel()}</Button>
+          <Button type="submit" variant="primary" form="automation-editor-form" disabled={saveBlocked} pending={submitting}
+            title={noChannel ? m.settings_automations_pick_channel_title() : undefined}>{m.common_save()}</Button>
         </>
       }
     >

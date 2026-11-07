@@ -9,6 +9,7 @@
  * configured (the CTA is hidden in that case; the message still explains
  * what happened).
  */
+import { Button, buttonClasses } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export function SeatLimitPanel({
@@ -31,13 +32,13 @@ export function SeatLimitPanel({
         </p>
       </div>
       <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-ih-border">
-        <button onClick={onClose} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted">
+        <Button variant="secondary" onClick={onClose}>
           {m.common_close()}
-        </button>
+        </Button>
         {billingUrl && (
           <a
             href={billingUrl}
-            className="h-8 px-4 inline-flex items-center justify-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600"
+            className={buttonClasses({ variant: "primary", size: "md" })}
           >
             {m.modal_seatlimit_upgrade()}
           </a>

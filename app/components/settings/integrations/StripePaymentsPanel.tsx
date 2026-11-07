@@ -8,7 +8,7 @@ import { useChromeDateTimeFormat, useDisplayTimeZone } from "~/hooks/useSessionC
 import { formatShapedDateTime } from "@core/field-ui/shared/format-date";
 import { m } from "~/paraglide/messages";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button } from "@core/shared-ui";
 
 type WebhookLogEntry = { ts: string; eventType: string; result: string };
 
@@ -137,10 +137,9 @@ export function StripePaymentsPanel({
           hint={m.settings_stripe_webhook_secret_hint()}
         />
         <div className="flex justify-end pt-2 border-t border-ih-border">
-          <button type="submit" {...pendingProps(saving)}
-            className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed ${PENDING_CLASS}`}>
+          <Button type="submit" variant="primary" pending={saving}>
             {saving ? m.common_saving() : m.settings_stripe_save()}
-          </button>
+          </Button>
         </div>
       </Form>
 
@@ -166,10 +165,9 @@ export function StripePaymentsPanel({
       <div className="pt-3 space-y-1.5">
         <div className="flex items-center justify-between">
           <p className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.14em]">{m.settings_stripe_recent_deliveries()}</p>
-          <button type="button" {...pendingProps(revalidator.state !== "idle", () => revalidator.revalidate())}
-            className={`h-7 px-2.5 rounded-md border border-ih-border bg-ih-bg-card text-[11px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}>
+          <Button variant="secondary" size="sm" pending={revalidator.state !== "idle"} onClick={() => revalidator.revalidate()}>
             {revalidator.state !== "idle" ? m.settings_stripe_refreshing() : m.settings_stripe_refresh()}
-          </button>
+          </Button>
         </div>
         {webhookLog.length === 0 ? (
           <p className="text-[12px] text-ih-fg-3 leading-relaxed">

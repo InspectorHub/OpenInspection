@@ -56,7 +56,12 @@ describe("colours from the server reach a style attribute only when they are pla
 
   const picker = (color: string) => {
     const tag = { id: "t", name: "Urgent", color };
-    render(<TagPickerModal open activeItemId="i" tagsByItem={{ i: [tag] }} presetTags={[tag]} onToggle={vi.fn()} onClose={vi.fn()} />);
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    render(
+      <FieldDataSourceProvider dataSource={fake}>
+        <TagPickerModal open activeItemId="i" tagsByItem={{ i: [tag] }} presetTags={[tag]} onToggle={vi.fn()} onClose={vi.fn()} />
+      </FieldDataSourceProvider>,
+    );
     return Array.from(document.body.querySelectorAll("[style]")).map((e) => inline(e));
   };
 

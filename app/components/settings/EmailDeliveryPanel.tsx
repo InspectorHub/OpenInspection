@@ -1,5 +1,5 @@
 import { Link, Form, useNavigation } from "react-router";
-import { RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button, RadioCardGroup } from "@core/shared-ui";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import type { useForm } from "@conform-to/react";
 import { m } from "~/paraglide/messages";
@@ -245,9 +245,9 @@ export function EmailDeliveryPanel({
                 </span>
               );
             })()}
-            <button type="submit" {...pendingProps(busy)} className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}>
+            <Button type="submit" variant="primary" pending={busy}>
               {m.common_save()}
-            </button>
+            </Button>
           </div>
         </Form>
       </section>

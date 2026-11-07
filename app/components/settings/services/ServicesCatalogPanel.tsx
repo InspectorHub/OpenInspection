@@ -1,5 +1,5 @@
 import { Form, useNavigation } from "react-router";
-import { Table, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button, Table } from "@core/shared-ui";
 import { QualificationWidget } from "./QualificationWidget";
 import { PayRuleWidget } from "./PayRuleWidget";
 import type { PayRule } from "./PayRuleWidget";
@@ -61,9 +61,9 @@ function ToggleServiceForm({ svc }: { svc: Pick<Service, "id" | "active"> }) {
       <input type="hidden" name="intent" value="toggle-service" />
       <input type="hidden" name="id" value={svc.id} />
       <input type="hidden" name="active" value={String(svc.active)} />
-      <button type="submit" {...pendingProps(busy)} className={`text-[12px] font-semibold text-ih-primary-text hover:underline ${PENDING_CLASS}`}>
+      <Button type="submit" variant="link" size="sm" pending={busy}>
         {svc.active ? m.settings_services_deactivate() : m.settings_services_activate()}
-      </button>
+      </Button>
     </Form>
   );
 }
@@ -169,13 +169,9 @@ export function ServicesCatalogPanel({
             cell: (svc) => (
               <div className="flex items-center justify-end gap-3">
                 {onEdit && (
-                  <button
-                    type="button"
-                    onClick={() => onEdit(editingId === svc.id ? null : svc.id)}
-                    className="text-[12px] font-semibold text-ih-primary-text hover:underline"
-                  >
+                  <Button variant="link" size="sm" onClick={() => onEdit(editingId === svc.id ? null : svc.id)}>
                     {editingId === svc.id ? m.common_cancel() : m.settings_services_edit()}
-                  </button>
+                  </Button>
                 )}
                 <ToggleServiceForm svc={svc} />
               </div>

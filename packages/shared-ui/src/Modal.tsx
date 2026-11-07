@@ -56,7 +56,7 @@ export function Modal({ open, onClose, title, size = "md", children, footer, ini
           </button>
         </div>
         <div className="p-4">{children}</div>
-        {footer && <div className="flex justify-end gap-3 p-4 border-t border-ih-border">{footer}</div>}
+        {footer && <div className="flex flex-wrap justify-end gap-3 p-4 border-t border-ih-border">{footer}</div>}
       </div>
     </div>
   );

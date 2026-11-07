@@ -60,7 +60,7 @@ export function Drawer({ open, onClose, title, children, footer, wide = false, i
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">{children}</div>
-        {footer && <div className="flex justify-end gap-3 p-4 border-t border-ih-border">{footer}</div>}
+        {footer && <div className="flex flex-wrap justify-end gap-3 p-4 border-t border-ih-border">{footer}</div>}
       </div>
     </div>
   );

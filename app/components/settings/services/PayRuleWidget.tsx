@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PENDING_CLASS, pendingProps } from "@core/shared-ui";
+import { Button } from "@core/shared-ui";
 import type { action } from "~/routes/settings-services";
 import { toHundredths, fromHundredths } from "~/lib/settings-services";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
@@ -168,31 +168,23 @@ function RuleRow({
                     </div>
                 )}
 
-                <button
-                    type="button"
-                    {...pendingProps(busy, save)}
-                    className={`h-7 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}
-                >
+                <Button variant="primary" size="sm" pending={busy} onClick={save}>
                     {busy ? m.common_saving() : m.common_save()}
-                </button>
+                </Button>
 
                 {rule ? (
                     <fetcher.Form method="post" className="inline" onSubmit={latch()}>
                         <input type="hidden" name="intent" value="pay-rule-delete" />
                         <input type="hidden" name="serviceId" value={serviceId} />
                         <input type="hidden" name="ruleId" value={rule.id} />
-                        <button type="submit" {...pendingProps(busy)} className={`h-7 px-2 text-[12px] font-semibold text-ih-bad-fg hover:underline ${PENDING_CLASS}`}>
+                        <Button type="submit" variant="danger-link" size="sm" pending={busy}>
                             {m.settings_pay_rule_remove()}
-                        </button>
+                        </Button>
                     </fetcher.Form>
                 ) : (
-                    <button
-                        type="button"
-                        onClick={onDone}
-                        className="h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
-                    >
+                    <Button variant="secondary" size="sm" onClick={onDone}>
                         {m.common_cancel()}
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -238,13 +230,9 @@ export function PayRuleWidget({ serviceId, rules, members }: PayRuleWidgetProps)
                     <span className="text-[12px] text-ih-fg-3">
                         <span className="font-medium">{m.settings_pay_rule_label()}</span> {summary}
                     </span>
-                    <button
-                        type="button"
-                        onClick={() => setOpen(true)}
-                        className="text-[12px] font-semibold text-ih-primary-text hover:underline"
-                    >
+                    <Button variant="link" size="sm" onClick={() => setOpen(true)}>
                         {m.settings_pay_rule_change_link()}
-                    </button>
+                    </Button>
                 </div>
             ) : (
                 <div className="border border-ih-border rounded-md p-3 space-y-2 bg-ih-bg-muted">
@@ -283,21 +271,13 @@ export function PayRuleWidget({ serviceId, rules, members }: PayRuleWidgetProps)
 
                     <div className="flex items-center gap-3 pt-1">
                         {!adding && !everyoneTaken && (
-                            <button
-                                type="button"
-                                onClick={() => setAdding(true)}
-                                className="text-[12px] font-semibold text-ih-primary-text hover:underline"
-                            >
+                            <Button variant="link" size="sm" onClick={() => setAdding(true)}>
                                 {m.settings_pay_rule_add()}
-                            </button>
+                            </Button>
                         )}
-                        <button
-                            type="button"
-                            onClick={() => { setAdding(false); setOpen(false); }}
-                            className="h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-card transition-colors"
-                        >
+                        <Button variant="secondary" size="sm" onClick={() => { setAdding(false); setOpen(false); }}>
                             {m.common_close()}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}

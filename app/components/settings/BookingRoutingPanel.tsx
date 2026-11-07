@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useFetcher } from "react-router";
-import { Banner, Input, RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Banner, Button, Input, RadioCardGroup } from "@core/shared-ui";
 import type { action } from "~/routes/settings-booking";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
@@ -139,13 +139,14 @@ export function BookingRoutingPanel({
         )}
         <geocodeFetcher.Form method="post" onSubmit={geocodeLatch()}>
           <input type="hidden" name="intent" value="routing-geocode-company" />
-          <button
+          <Button
             type="submit"
+            variant="secondary"
+            size="sm"
             disabled={geocoding || !initial.companyAddress || !initial.geocodeAvailable}
-            className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-40"
           >
             {geocoding ? m.settings_routing_locating() : m.settings_routing_locate()}
-          </button>
+          </Button>
         </geocodeFetcher.Form>
         {geocodeResult && (
           <p className={`text-[12px] font-medium ${geocodeResult.ok ? "text-ih-ok-fg" : "text-ih-bad-fg"}`}>
@@ -179,13 +180,9 @@ export function BookingRoutingPanel({
       </div>
 
       <div className="flex items-center gap-3 pt-1">
-        <button
-          type="button"
-          {...pendingProps(saving, handleSave)}
-          className={`h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50 ${PENDING_CLASS}`}
-        >
+        <Button variant="primary" size="sm" pending={saving} onClick={handleSave}>
           {saving ? m.settings_holiday_save_pending() : m.settings_routing_save()}
-        </button>
+        </Button>
         {saved && <span className="text-[13px] text-ih-ok-fg font-bold">{m.settings_holiday_saved()}</span>}
         {failed && (
           <span className="text-[13px] text-ih-bad-fg font-bold">

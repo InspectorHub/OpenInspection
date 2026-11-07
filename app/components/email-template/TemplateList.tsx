@@ -1,5 +1,5 @@
 import { Link, useFetcher } from "react-router";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { buttonClasses, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
@@ -63,7 +63,7 @@ function TemplateRowItem({ row }: { row: TemplateRow }) {
           </button>
         </fetcher.Form>
       )}
-      <Link to={`/settings/communication/templates/${row.trigger}`} className="shrink-0 h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-card hover:border-ih-primary hover:text-ih-primary-text transition-colors">{m.common_edit()}</Link>
+      <Link to={`/settings/communication/templates/${row.trigger}`} className={buttonClasses({ variant: "secondary", size: "sm", className: "shrink-0" })}>{m.common_edit()}</Link>
     </div>
   );
 }

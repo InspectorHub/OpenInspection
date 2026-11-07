@@ -20,7 +20,7 @@ import { useDisplayLocale, useSessionContext } from "~/hooks/useSessionContext";
 import { importEntryHref } from "~/lib/import-entry-points";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { ActionFailureAlert } from "~/components/ActionFailureAlert";
-import { PageHeader, TabStrip, Card, Button, EmptyState, Table, Banner, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { PageHeader, TabStrip, Card, Button, EmptyState, Table, Banner } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
@@ -264,28 +264,28 @@ export default function TeamPage() {
                               email is only quiet rather than broken if the
                               inviter can still fetch the link. */}
                           {member.inviteLink && (
-                            <button
-                              type="button"
+                            <Button
+                              variant="link"
+                              size="sm"
                               onClick={() => setLinkInvite({ url: member.inviteLink as string, email: member.email })}
-                              className="text-[12px] font-medium text-ih-primary-text hover:underline"
                             >
                               {m.settings_team_invite_link_action()}
-                            </button>
+                            </Button>
                           )}
                           <resendFetcher.Form method="post" className="inline" onSubmit={resendLatch()}>
                             <input type="hidden" name="intent" value="resend-invite" />
                             <input type="hidden" name="token" value={member.token} />
-                            <button type="submit" {...pendingProps(resendFetcher.state !== "idle")} className={`text-[12px] font-medium text-ih-primary-text hover:underline ${PENDING_CLASS}`}>
+                            <Button type="submit" variant="link" size="sm" pending={resendFetcher.state !== "idle"}>
                               {m.settings_team_resend_invite()}
-                            </button>
+                            </Button>
                           </resendFetcher.Form>
-                          <button
-                            type="button"
+                          <Button
+                            variant="danger-link"
+                            size="sm"
                             onClick={() => setPendingCancel({ token: member.token as string, email: member.email })}
-                            className="text-[12px] font-medium text-ih-bad-fg hover:underline"
                           >
                             {m.settings_team_cancel_invite()}
-                          </button>
+                          </Button>
                         </>
                       )}
                     </div>
@@ -300,8 +300,9 @@ export default function TeamPage() {
                     // enforces owner/manager regardless — this stops us
                     // offering an action we know will be refused.
                     <div className="flex items-center gap-3">
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => setEditMember({
                         id: member.id,
                         name: member.name as string | null,
@@ -309,10 +310,9 @@ export default function TeamPage() {
                         role: member.role as string,
                         permissionOverrides: (member.permissionOverrides ?? null) as Record<string, boolean> | null,
                       })}
-                      className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1"
                     >
                       {m.common_edit()}
-                    </button>
+                    </Button>
                       {/* OWNER ONLY, and only where there is something to
                           clear. This is the one action that lowers another
                           person's authentication requirement, so it is not on
@@ -320,22 +320,22 @@ export default function TeamPage() {
                           with no enrolment would answer with a refusal the
                           owner could have been spared. */}
                       {canRemove(member, viewerEmail, isOwner) && (
-                        <button
-                          type="button"
+                        <Button
+                          variant="danger-link"
+                          size="sm"
                           onClick={() => removeMember.open({ id: member.id, name: member.name || member.email })}
-                          className="text-[12px] font-medium text-ih-bad-fg hover:underline"
                         >
                           {m.common_remove()}
-                        </button>
+                        </Button>
                       )}
                       {isOwner && member.totpEnabled === true && (
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setPendingReset({ id: member.id, email: member.email })}
-                          className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1"
                         >
                           {m.settings_team_reset_two_factor()}
-                        </button>
+                        </Button>
                       )}
                     </div>
                   ) : null,

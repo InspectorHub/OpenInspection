@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { m } from "~/paraglide/messages";
+import { buttonClasses } from "@core/shared-ui";
 
 export function ManageTeamSchedulesBar({
   members,
@@ -31,7 +32,7 @@ export function ManageTeamSchedulesBar({
       </div>
       <Link
         to="/settings/schedule"
-        className="h-9 px-4 inline-flex items-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors shrink-0"
+        className={buttonClasses({ variant: "primary", size: "md", className: "shrink-0" })}
       >
         {m.settings_teamsched_manage()}
       </Link>

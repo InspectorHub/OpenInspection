@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useCopyClipboard } from "~/hooks/useCopyClipboard";
 import { m } from "~/paraglide/messages";
 import { usePageOrigin } from "~/hooks/usePageOrigin";
+import { Button } from "@core/shared-ui";
 
 export function EmbedWidgetPanel({ tenant }: { tenant: string | null | undefined }) {
   const STYLES = [
@@ -36,31 +37,26 @@ export function EmbedWidgetPanel({ tenant }: { tenant: string | null | undefined
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
       <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_embed_heading()}</h3>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {STYLES.map((s) => (
-          <button
+          <Button
             key={s.id}
+            variant="secondary"
+            selected={style === s.id}
+            className={style === s.id ? "text-ih-primary-text bg-ih-primary-tint" : undefined}
             onClick={() => setStyle(s.id)}
-            className={`h-9 px-4 rounded-md border-2 text-[13px] font-bold transition-colors ${
-              style === s.id
-                ? "border-ih-primary text-ih-primary-text bg-ih-primary-tint"
-                : "border-ih-border text-ih-fg-2 hover:border-ih-border"
-            }`}
           >
             {s.label}
-          </button>
+          </Button>
         ))}
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-[12px] font-bold text-ih-fg-2">{m.settings_embed_code_label()}</span>
-          <button
-            onClick={() => copy(snippet)}
-            className="h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors"
-          >
+          <Button variant="primary" size="sm" className="shrink-0" onClick={() => copy(snippet)}>
             {copied ? m.settings_common_copied() : m.settings_embed_copy_snippet()}
-          </button>
+          </Button>
         </div>
         {/* ds-allow: fixed-dark terminal/code block — stays dark in both themes */}
         <pre className="bg-slate-900 text-emerald-300 dark:bg-slate-950 p-4 rounded-md overflow-x-auto text-[12px] font-mono leading-relaxed whitespace-pre-wrap break-all">
