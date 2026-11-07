@@ -65,4 +65,32 @@ describe("useEditorResume", () => {
     localStorage.setItem("oi:editor:last-item:i1", JSON.stringify({ sectionId: 3 }));
     expect(readLastPlace("i1")).toBeNull();
   });
+
+  it("does not write a guessed first item over the saved place, and goes to the saved place when the schema arrives", () => {
+    localStorage.setItem("oi:editor:last-item:i1", JSON.stringify({ sectionId: "attic", itemId: "a1" }));
+    const partial = [{ id: "roof", items: [{ id: "r1" }] }];
+    const openPlace = vi.fn();
+    const view = renderHook((p: { sections: typeof sections; item: string | null; section: string | undefined }) => useEditorResume({ inspectionId: "i1", sections: p.sections, activeItemId: p.item, activeSectionId: p.section, openPlace }), {
+      initialProps: { sections: partial as typeof sections, item: null as string | null, section: undefined as string | undefined },
+    });
+    expect(openPlace).toHaveBeenLastCalledWith({ sectionId: "roof", itemId: "r1" });
+    view.rerender({ sections: partial as typeof sections, item: "r1", section: "roof" });
+    expect(readLastPlace("i1")).toEqual({ sectionId: "attic", itemId: "a1" });
+    // The full schema arrives while the person is still on the guessed item.
+    view.rerender({ sections, item: "r1", section: "roof" });
+    expect(openPlace).toHaveBeenLastCalledWith({ sectionId: "attic", itemId: "a1" });
+    view.rerender({ sections, item: "a1", section: "attic" });
+    expect(readLastPlace("i1")).toEqual({ sectionId: "attic", itemId: "a1" });
+  });
+
+  it("writes once the person moves off a guessed item", () => {
+    const openPlace = vi.fn();
+    const view = renderHook((p: { item: string | null; section: string | undefined }) => useEditorResume({ inspectionId: "i1", sections, activeItemId: p.item, activeSectionId: p.section, openPlace }), {
+      initialProps: { item: null as string | null, section: undefined as string | undefined },
+    });
+    view.rerender({ item: "r1", section: "roof" });
+    expect(readLastPlace("i1")).toBeNull();
+    view.rerender({ item: "r2", section: "roof" });
+    expect(readLastPlace("i1")).toEqual({ sectionId: "roof", itemId: "r2" });
+  });
 });

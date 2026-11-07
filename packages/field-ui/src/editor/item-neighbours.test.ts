@@ -29,6 +29,18 @@ describe("itemNeighbours", () => {
     expect(itemNeighbours(sections, "roof", "r1").prev).toBeNull();
   });
 
+  it("walks only what the list shows, but never loses the open item", () => {
+    const hidden = new Set(["r2"]);
+    const visible = (_section: { id: string }, item: { id: string }) => !hidden.has(item.id);
+    const n = itemNeighbours(sections, "roof", "r1", visible);
+    expect(n.next).toEqual({ sectionId: "attic", itemId: "a1" });
+    expect(n.position).toEqual({ index: 1, total: 1 });
+    // The open item itself is hidden by the filter: it is still where the walk starts.
+    const fromHidden = itemNeighbours(sections, "roof", "r2", visible);
+    expect(fromHidden.prev).toEqual({ sectionId: "roof", itemId: "r1" });
+    expect(fromHidden.next).toEqual({ sectionId: "attic", itemId: "a1" });
+  });
+
   it("knows nothing about an item that is not there", () => {
     expect(itemNeighbours(sections, "roof", "zzz")).toEqual({ prev: null, next: null, position: null });
     expect(itemNeighbours(sections, "roof", null)).toEqual({ prev: null, next: null, position: null });

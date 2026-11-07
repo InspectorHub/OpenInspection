@@ -7,7 +7,10 @@ export interface NavSection {
   items?: ReadonlyArray<{ id: string }>;
 }
 
-export interface ItemStop {
+/** Whether the list shows this item (the filter chips and the search): Previous / Next walk what the list shows, not what it hides. */
+export type ItemVisible = (section: NavSection, item: { id: string }) => boolean;
+
+interface ItemStop {
   sectionId: string;
   itemId: string;
 }
@@ -19,9 +22,15 @@ export interface ItemNeighbours {
   position: { index: number; total: number } | null;
 }
 
-export function itemNeighbours(sections: ReadonlyArray<NavSection>, sectionId: string | undefined, itemId: string | null): ItemNeighbours {
+export function itemNeighbours(sections: ReadonlyArray<NavSection>, sectionId: string | undefined, itemId: string | null, isVisible?: ItemVisible): ItemNeighbours {
   const stops: ItemStop[] = [];
-  for (const section of sections) for (const item of section.items ?? []) stops.push({ sectionId: section.id, itemId: item.id });
+  for (const section of sections) {
+    for (const item of section.items ?? []) {
+      // The open item is always a stop, even when a filter hides it: that is where the walk starts from.
+      if (isVisible && item.id !== itemId && !isVisible(section, item)) continue;
+      stops.push({ sectionId: section.id, itemId: item.id });
+    }
+  }
   const at = itemId === null ? -1 : stops.findIndex((stop) => stop.itemId === itemId && (sectionId === undefined || stop.sectionId === sectionId));
   const here = at < 0 ? undefined : stops[at];
   if (here === undefined) return { prev: null, next: null, position: null };
