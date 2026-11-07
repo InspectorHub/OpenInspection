@@ -61,7 +61,7 @@ describe('Speed Mode focus', () => {
   it('pulls focus back when it would leave: Tab from the last control wraps to the first', () => {
     const { getByRole, getByTestId } = openIt();
     const dialog = getByRole('dialog');
-    const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled])'));
+    const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled])')).filter((b) => !b.closest('[inert]'));
     const first = buttons[0];
     const last = buttons[buttons.length - 1];
     last.focus();
@@ -74,7 +74,7 @@ describe('Speed Mode focus', () => {
   it('Shift+Tab out of the first control wraps to the last', () => {
     const { getByRole, getByTestId } = openIt();
     const dialog = getByRole('dialog');
-    const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled])'));
+    const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled])')).filter((b) => !b.closest('[inert]'));
     const last = buttons[buttons.length - 1];
     buttons[0].focus();
     fireEvent.keyDown(buttons[0], { key: 'Tab', shiftKey: true });
@@ -97,7 +97,7 @@ describe('Speed Mode focus', () => {
     const onNARating = vi.fn();
     const { getByRole } = openIt({ onSpeedNext, onSpeedPrev, onSpeedRate, onClearRating, onNARating });
     const dialog = getByRole('dialog');
-    const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled])'));
+    const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled])')).filter((b) => !b.closest('[inert]'));
     // At both edges of the dialog, where a wrapping trap would have swallowed the shortcut.
     buttons[buttons.length - 1].focus();
     expect(fireEvent.keyDown(document.activeElement as Element, { key: 'Tab' })).toBe(false);

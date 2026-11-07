@@ -55,6 +55,13 @@ export function AddMediaChooser({ onClose, onTakePhoto, onAddFromLibrary, onPick
      );
     })()}
    </div>
+   <button
+    type="button"
+    onClick={onClose}
+    className="mt-3 min-h-[44px] w-full rounded-xl text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
+   >
+    {m.common_cancel()}
+   </button>
   </div>
  </div>
  );

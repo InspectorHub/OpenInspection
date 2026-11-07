@@ -89,7 +89,7 @@ export function RepairItemsPanel({
 
       {open && (
         <div id="repair-items-disclosure" className="mt-2 border border-ih-border rounded-md p-2 bg-ih-bg-muted/40">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={m.editor_repair_search_placeholder()} aria-label={m.editor_repair_search_aria()} autoFocus
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={m.editor_repair_search_placeholder()} aria-label={m.editor_repair_search_aria()} autoFocus inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
             className="w-full px-2 py-1.5 rounded border border-ih-border bg-ih-bg-card text-[12px] text-ih-fg-1 focus:border-ih-primary outline-none" />
           <ul role="listbox" aria-label={m.editor_repair_label()} className="mt-2 max-h-48 overflow-auto divide-y divide-ih-border">
             {filtered.length === 0 ? (

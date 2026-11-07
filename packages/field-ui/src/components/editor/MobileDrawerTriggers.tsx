@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { m } from "../../i18n";
+import { useTextEntryActive } from "../../hooks/useTextEntryActive";
 
 /**
  * `actions` has no trigger in this nav — it opens from the app bar's own
@@ -54,6 +55,9 @@ let mountedNavs = 0;
  * mobile.
  */
 export function MobileDrawerTriggers({ onOpen, showTheme = true }: MobileDrawerTriggersProps) {
+    // Out of sight while a text field has focus: on iOS the soft keyboard shrinks the web view and a bar fixed to the bottom is laid out
+    // a frame late, which showed as a flicker. See useTextEntryActive.
+    const typing = useTextEntryActive();
     // While this nav is on screen the document carries `data-mobile-nav`; theme.css lifts the floating notices
     // (`--ih-toast-bottom`) above the nav so they never cover its labels. The mark is set in an effect, so it is absent
     // until the first client commit; no floating notice exists before the person does something, so none is mispositioned.
@@ -66,7 +70,7 @@ export function MobileDrawerTriggers({ onOpen, showTheme = true }: MobileDrawerT
         };
     }, []);
     return (
-        <nav aria-label={m.editor_mobile_nav_label()} className="fixed left-0 right-0 bottom-0 z-30 h-[var(--ih-mobile-nav-h)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] bg-ih-bg-card border-t border-ih-border flex">
+        <nav aria-label={m.editor_mobile_nav_label()} className={`fixed left-0 right-0 bottom-0 z-30 h-[var(--ih-mobile-nav-h)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] bg-ih-bg-card border-t border-ih-border flex transition-[opacity,visibility] duration-150 ${typing ? "opacity-0 invisible" : "opacity-100"}`}>
             {([
                 { id: 'sections', label: m.editor_mobile_drawer_sections(), icon: 'sections' },
                 { id: 'items',    label: m.editor_mobile_drawer_items(),    icon: 'items' },

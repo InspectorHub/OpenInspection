@@ -51,7 +51,7 @@ export function AddSectionPromptModal({
     >
       <input
         ref={inputRef}
-        type="text"
+        type="text" enterKeyHint="done"
         className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:outline-none focus:ring-2 focus:ring-ih-primary"
         placeholder={m.editor_addsection_placeholder()}
         value={value}

@@ -323,7 +323,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
  <div className="space-y-3">
  <label className="block">
  <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.modal_invite_email_label()}</span>
- <input ref={emailRef} className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+ <input ref={emailRef} className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} />
  </label>
  <label className="flex items-center gap-2 text-sm text-ih-fg-3">
  <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />

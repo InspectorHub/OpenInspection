@@ -20,6 +20,39 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   labelAction?: React.ReactNode;
 }
 
+/**
+ * Mobile-keyboard defaults per `type`. Callers' own props are spread after these, so any
+ * attribute passed explicitly wins. A number field gets the numeric keypad only when it can
+ * not be negative (iOS numeric/decimal pads have no minus key), and the decimal pad only when
+ * its step allows a fraction.
+ */
+function inputKeyboardDefaults(
+  type: string | undefined,
+  min?: React.InputHTMLAttributes<HTMLInputElement>["min"],
+  step?: React.InputHTMLAttributes<HTMLInputElement>["step"],
+): React.InputHTMLAttributes<HTMLInputElement> {
+  switch (type) {
+    case "email":
+      return { inputMode: "email", autoCapitalize: "none", autoCorrect: "off", spellCheck: false };
+    case "tel":
+      return { inputMode: "tel" };
+    case "url":
+      return { inputMode: "url", autoCapitalize: "none", autoCorrect: "off", spellCheck: false };
+    case "search":
+      return { enterKeyHint: "search", autoCapitalize: "none" };
+    case "password":
+      return { autoCapitalize: "none", autoCorrect: "off", spellCheck: false };
+    case "number": {
+      // No minimum means a negative value may be typed, and the numeric keypad has no minus key: leave the default number keyboard.
+      if (min === undefined || Number(min) < 0) return {};
+      const whole = step === undefined || (Number.isInteger(Number(step)) && step !== "any");
+      return { inputMode: whole ? "numeric" : "decimal" };
+    }
+    default:
+      return {};
+  }
+}
+
 // React 19: `ref` is a plain prop, so no forwardRef wrapper.
 export function Input({
   label, error, hint, reserveErrorSpace = false, labelAction, className = "", ref, ...props
@@ -40,6 +73,7 @@ export function Input({
         className={`ih-input w-full text-ih-fg-1 placeholder:text-ih-fg-4 ${
           error ? "border-ih-bad" : ""
         } ${className}`}
+        {...inputKeyboardDefaults(props.type, props.min, props.step)}
         {...props}
       />
       {/* A reserved slot holds the hint and the error in one grid cell and shows one of them, so the slot is

@@ -209,7 +209,7 @@ export default function AgentSettingsProfilePage() {
           <div className="flex-1">
             <Input
               id="agentSlug"
-              type="text"
+              type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="off"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
               placeholder={m.agent_portal_settings_slug_placeholder()}

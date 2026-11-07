@@ -75,7 +75,7 @@ export function PermissionTemplatesPanel({ templates }: { templates: readonly Te
                   <input
                     className="flex-1 px-3 py-1.5 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1"
                     value={renaming.name}
-                    maxLength={MAX_TEMPLATE_NAME_LENGTH}
+                    maxLength={MAX_TEMPLATE_NAME_LENGTH} enterKeyHint="done"
                     aria-label={m.team_template_save_name_label()}
                     onChange={(e) => setRenaming({ id: t.id, name: e.target.value })}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); rename(t, renaming.name); } }}

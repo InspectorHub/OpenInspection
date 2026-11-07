@@ -54,7 +54,7 @@ export function FiltersDrawer({
         </div>
         <div>
           <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">{m.dashboard_filters_agent_id()}</label>
-          <input type="text" value={filterAgentId} onChange={(e) => setFilterAgentId(e.target.value)} placeholder={m.dashboard_filters_agent_id()} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none" />
+          <input type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={filterAgentId} onChange={(e) => setFilterAgentId(e.target.value)} placeholder={m.dashboard_filters_agent_id()} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none" />
         </div>
       </div>
     </Drawer>

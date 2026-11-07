@@ -61,3 +61,8 @@ afterEach(() => {
       `Stub fetch or the API (e.g. vi.stubGlobal('fetch', …)) — see tests/setup-web.ts.`,
   );
 });
+
+// Hermeticity for browser storage: what one test saves (the editor's last place, a sort order) must not decide how the next one opens.
+afterEach(() => {
+  if (typeof localStorage !== 'undefined') localStorage.clear();
+});

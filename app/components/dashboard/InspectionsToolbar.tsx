@@ -31,7 +31,7 @@ export function InspectionsToolbar({
       {/* Search */}
       <div className="relative flex-1 min-w-[180px] sm:flex-none">
         <input
-          type="text"
+          type="text" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={m.dashboard_toolbar_search()}

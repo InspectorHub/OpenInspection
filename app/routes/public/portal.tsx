@@ -190,7 +190,7 @@ export default function PortalLanding() {
             name="email"
             type="email"
             required
-            autoComplete="email"
+            autoComplete="email" enterKeyHint="go"
             label={m.portal_landing_email_label()}
             placeholder={m.portal_landing_email_placeholder()}
           />

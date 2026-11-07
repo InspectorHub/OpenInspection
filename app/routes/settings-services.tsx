@@ -21,7 +21,7 @@ import type { PayRule } from "~/components/settings/services/PayRuleWidget";
 import { parseDepositPolicy } from "~/lib/deposit-policy-form";
 import type { DepositPolicy } from "../../server/lib/billing/deposit-policy";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -313,12 +313,9 @@ export default function SettingsServices() {
         <p className="text-[13px] text-ih-fg-3">
           {m.settings_services_intro()}
         </p>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
-        >
+        <Button variant="primary" onClick={() => setShowForm(!showForm)}>
           {m.settings_services_add_button()}
-        </button>
+        </Button>
       </div>
 
       {/* Inline add service form */}
@@ -338,12 +335,12 @@ export default function SettingsServices() {
             </div>
           )}
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setShowForm(false)} className="h-8 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
+            <Button variant="secondary" onClick={() => setShowForm(false)}>
               {m.common_cancel()}
-            </button>
-            <button type="submit" {...pendingProps(nav.state !== "idle")} className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}>
+            </Button>
+            <Button type="submit" variant="primary" pending={nav.state !== "idle"}>
               {m.common_save()}
-            </button>
+            </Button>
           </div>
         </Form>
       )}

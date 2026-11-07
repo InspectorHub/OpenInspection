@@ -353,7 +353,7 @@ export function TemplateEditorModal({
                   setTestSent(false);
                 }}
                 placeholder={isEmail ? m.settings_msgtpl_to_email_placeholder() : m.settings_msgtpl_to_phone_placeholder()}
-                type={isEmail ? "email" : "tel"}
+                type={isEmail ? "email" : "tel"} inputMode={isEmail ? "email" : "tel"} autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
               />
             </div>

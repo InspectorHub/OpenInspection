@@ -17,7 +17,7 @@ import { m } from "../../i18n";
 
 type EditorState = ReturnType<typeof useInspectionState>;
 
-const BACK_CLASS = "w-9 h-9 shrink-0 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted";
+const BACK_CLASS = "w-11 h-11 shrink-0 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted";
 const backIcon = (
  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5M12 19l-7-7 7-7" />
@@ -185,7 +185,7 @@ export function EditorHeader({
  <div data-testid="header-search" className={`${HEADER_OVERFLOW.versionHistory.inline} items-center gap-2 shrink-0`}>
  {/* Search */}
  <input
-  type="text"
+  type="text" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
   placeholder={m.editor_header_search_placeholder()}
   aria-label={m.editor_header_search_placeholder()}
   value={state.searchQuery}

@@ -19,6 +19,22 @@ describe("MobileBottomDrawer", () => {
     expect(sheet(container).getAttribute("aria-hidden")).toBe("true");
   });
 
+  it("casts no shadow while parked below the screen, because a big blur would bleed up over the bottom bar", () => {
+    const closed = render(
+      <MobileBottomDrawer open={false} onClose={vi.fn()} title="Jump to">
+        <button type="button">Item</button>
+      </MobileBottomDrawer>,
+    );
+    expect(sheet(closed.container).className).not.toContain("shadow-ih-popover");
+    cleanup();
+    const open = render(
+      <MobileBottomDrawer open onClose={vi.fn()} title="Jump to">
+        <button type="button">Item</button>
+      </MobileBottomDrawer>,
+    );
+    expect(sheet(open.container).className).toContain("shadow-ih-popover");
+  });
+
   it("sizes the sheet in vh with a dvh cap, so the address bar cannot push it off screen and an old browser still gets a height", () => {
     const { container } = render(
       <MobileBottomDrawer open onClose={vi.fn()} title="Jump to" heightFraction={0.7}>
@@ -27,7 +43,12 @@ describe("MobileBottomDrawer", () => {
     );
     const style = sheet(container).getAttribute("style") ?? "";
     expect(style).toContain("height: 70vh");
-    expect(style).toContain("max-height: 70dvh");
+    expect(style).toContain("max-height: min(70dvh");
+    // The sheet and its backdrop end at the soft keyboard instead of running behind it.
+    expect(style).toContain("--keyboard-height");
+    // ...and never reaches up under the status bar or the notch while the keyboard is up.
+    expect(style).toContain("safe-area-inset-top");
+    expect(sheet(container).className).toContain("bottom-[var(--keyboard-height,0px)]");
   });
 
   it("is reachable while open", () => {
@@ -66,7 +87,8 @@ describe("MobileBottomDrawer", () => {
     opener.focus();
     fireEvent.click(opener);
     await act(async () => { await Promise.resolve(); });
-    const first = screen.getByText("first");
+    // The sheet's own Close is its first control (the way out is the first thing a keyboard or screen reader reaches).
+    const first = screen.getByRole("button", { name: "Close" });
     const last = screen.getByText("last");
     expect(sheet(container).contains(document.activeElement)).toBe(true);
     expect(document.activeElement).toBe(first);
@@ -80,5 +102,21 @@ describe("MobileBottomDrawer", () => {
     expect(sheet(container).hasAttribute("inert")).toBe(true);
     expect(document.body.style.overflow).not.toBe("hidden");
     expect(document.activeElement).toBe(opener);
+  });
+});
+
+describe("MobileBottomDrawer exit", () => {
+  it("has a worded Close of at least 44px that closes the sheet, whatever the title", () => {
+    const onClose = vi.fn();
+    render(
+      <MobileBottomDrawer open onClose={onClose}>
+        <p>body</p>
+      </MobileBottomDrawer>,
+    );
+    const close = screen.getByRole("button", { name: "Close" });
+    expect(close.className).toContain("min-h-11");
+    expect(close.className).toContain("min-w-11");
+    fireEvent.click(close);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

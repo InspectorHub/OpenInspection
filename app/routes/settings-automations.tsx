@@ -9,7 +9,7 @@ import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { AutomationEditorModal } from "~/components/settings/AutomationEditorModal";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
@@ -207,10 +207,9 @@ export default function SettingsAutomations() {
 
       <div className="flex items-center justify-between gap-4">
         <p className="text-[13px] text-ih-fg-3">{m.settings_automations_intro()}</p>
-        <button onClick={() => setEditing("new")}
-          className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
+        <Button variant="primary" onClick={() => setEditing("new")}>
           {m.settings_automations_new_button()}
-        </button>
+        </Button>
       </div>
 
       <Form method="post" onSubmit={latch()} className="bg-ih-bg-card border border-ih-border rounded-lg p-4 space-y-2">
@@ -218,10 +217,9 @@ export default function SettingsAutomations() {
         <label htmlFor="reviewUrl" className="block text-[12px] font-semibold text-ih-fg-2">{m.settings_automations_review_label()}</label>
         <p className="text-[11px] text-ih-fg-3">{m.settings_automations_review_hint()}</p>
         <div className="flex gap-2">
-          <input id="reviewUrl" name="reviewUrl" type="url" defaultValue={reviewUrl} placeholder={m.settings_automations_review_placeholder()}
+          <input id="reviewUrl" name="reviewUrl" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="off" enterKeyHint="done" defaultValue={reviewUrl} placeholder={m.settings_automations_review_placeholder()}
             className="flex-1 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1" />
-          <button type="submit" {...pendingProps(nav.state !== "idle")}
-            className={`h-9 px-4 rounded-md bg-ih-bg-muted text-ih-fg-1 font-semibold text-[13px] border border-ih-border ${PENDING_CLASS}`}>{m.common_save()}</button>
+          <Button type="submit" variant="secondary" pending={nav.state !== "idle"} className="shrink-0">{m.common_save()}</Button>
         </div>
       </Form>
 
@@ -240,7 +238,7 @@ export default function SettingsAutomations() {
                   </div>
                   <p className="text-[11px] text-ih-fg-3 mt-0.5">{TRIGGER_LABELS[rule.trigger] || rule.trigger} &rarr; {recipientLabel(rule, roleProfiles)}</p>
                 </div>
-                <button onClick={() => setEditing(rule)} className="text-[12px] text-ih-primary-text font-semibold">{m.common_edit()}</button>
+                <Button variant="link" size="sm" onClick={() => setEditing(rule)}>{m.common_edit()}</Button>
                 <Form method="post" onSubmit={latch()} className="shrink-0">
                   <input type="hidden" name="intent" value="toggle" />
                   <input type="hidden" name="id" value={rule.id} />

@@ -265,7 +265,7 @@ export default function LoginPage() {
           <Input
             id={fields.email.id}
             name={fields.email.name}
-            type="email"
+            type="email" autoComplete="username" enterKeyHint="next"
             autoFocus
             label={m.auth_login_email_label()}
             aria-invalid={fields.email.errors ? true : undefined}
@@ -275,7 +275,7 @@ export default function LoginPage() {
           <Input
             id={fields.password.id}
             name={fields.password.name}
-            type="password"
+            type="password" autoComplete="current-password" enterKeyHint="go"
             label={m.auth_login_password_label()}
             labelAction={
               <a href="/forgot-password" className="text-xs font-bold text-ih-primary-text hover:underline">

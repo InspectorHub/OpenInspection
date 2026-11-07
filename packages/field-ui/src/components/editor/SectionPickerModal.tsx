@@ -27,7 +27,7 @@ export function SectionPickerModal({
  <input
  ref={inputRef}
  id="section-picker-input"
- type="text"
+ type="text" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
  placeholder={m.editor_sectionpicker_placeholder()}
  value={sectionPickerQuery}
  onChange={(e) => setSectionPickerQuery(e.target.value)}

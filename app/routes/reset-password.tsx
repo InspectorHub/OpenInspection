@@ -120,7 +120,7 @@ export default function ResetPasswordPage() {
         <Input
           id={fields.newPassword.id}
           name={fields.newPassword.name}
-          type="password"
+          type="password" autoComplete="new-password" enterKeyHint="go"
           autoFocus
           label={m.auth_reset_password_label()}
           aria-invalid={fields.newPassword.errors ? true : undefined}

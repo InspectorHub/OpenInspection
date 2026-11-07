@@ -44,15 +44,17 @@ export function RatingButtonRow({ levels, activeLevel, onRating }: RatingButtonR
 
   return (
     // FE-4 — gap-3 (12px) between rating buttons: adjacent mis-taps were the
-    // top field complaint. Single row (no wrap), same as the pre-migration
-    // flex-1 tile row.
+    // top field complaint. One row from `sm` up, same as the pre-migration
+    // flex-1 tile row. On a phone the tiles fill a grid with a 7rem minimum,
+    // so a long label ("Satisfactory", "Not inspected") has room to show
+    // whole instead of being cut to "Sat..." in a quarter of the screen.
     <div data-shortcut-scope>
       <RatingSegment
         ratings={ratings}
         value={activeLevel?.id ?? null}
         onChange={onRating}
         ariaLabel={m.editor_rating_aria()}
-        className="flex-nowrap gap-3"
+        className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-3 sm:flex sm:flex-nowrap"
       />
     </div>
   );

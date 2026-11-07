@@ -6,7 +6,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { VariableChips } from "~/components/email-template/VariableChips";
 import { EmailPreview } from "~/components/email-template/EmailPreview";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button } from "@core/shared-ui";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
@@ -123,11 +123,11 @@ function TemplateEditor({ detail }: { detail: Detail }) {
             <Form method="post" onSubmit={latch()} className="flex items-center gap-2">
               <input type="hidden" name="intent" value="reset" />
               <span className="text-[12px] text-ih-fg-3">{m.settings_comms_template_reset_confirm()}</span>
-              <button type="submit" {...pendingProps(nav.state !== "idle")} className={`h-8 px-3 rounded-md bg-ih-bad-bg text-ih-bad-fg border border-ih-bad text-[12px] font-bold ${PENDING_CLASS}`}>{m.settings_comms_template_reset_button()}</button>
-              <button type="button" onClick={() => setConfirmReset(false)} className="h-8 px-3 rounded-md border border-ih-border text-[12px] text-ih-fg-2">{m.common_cancel()}</button>
+              <Button type="submit" variant="danger" size="sm" pending={nav.state !== "idle"}>{m.settings_comms_template_reset_button()}</Button>
+              <Button variant="secondary" size="sm" onClick={() => setConfirmReset(false)}>{m.common_cancel()}</Button>
             </Form>
           ) : (
-            <button type="button" onClick={() => setConfirmReset(true)} className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">{m.settings_comms_template_reset_default()}</button>
+            <Button variant="secondary" size="sm" onClick={() => setConfirmReset(true)}>{m.settings_comms_template_reset_default()}</Button>
           )}
         </div>
       </div>
@@ -183,9 +183,9 @@ function TemplateEditor({ detail }: { detail: Detail }) {
           </div>
 
           <div className="flex justify-end pt-2">
-            <button type="submit" {...pendingProps(nav.state !== "idle")} className={`h-9 px-5 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}>
+            <Button type="submit" variant="primary" pending={nav.state !== "idle"}>
               {saving ? m.common_saving() : m.settings_comms_template_save_changes()}
-            </button>
+            </Button>
           </div>
         </div>
 

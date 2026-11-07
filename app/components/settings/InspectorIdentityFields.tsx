@@ -109,7 +109,7 @@ export function InspectorIdentityFields({
                 <div className="space-y-2">
                     <label htmlFor={nameField.id} className={LABEL}>{m.settings_profile_name_label()}</label>
                     <input
-                        type="text"
+                        type="text" autoComplete="name"
                         id={nameField.id}
                         name={nameField.name}
                         defaultValue={name ?? ""}
@@ -126,7 +126,7 @@ export function InspectorIdentityFields({
                 <div className="space-y-2">
                     <label htmlFor={phoneField.id} className={LABEL}>{m.settings_profile_phone_label()}</label>
                     <input
-                        type="tel"
+                        type="tel" inputMode="tel" autoComplete="tel"
                         id={phoneField.id}
                         name={phoneField.name}
                         defaultValue={phone ?? ""}

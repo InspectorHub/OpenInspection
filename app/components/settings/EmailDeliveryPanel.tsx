@@ -1,5 +1,5 @@
 import { Link, Form, useNavigation } from "react-router";
-import { RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button, RadioCardGroup } from "@core/shared-ui";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import type { useForm } from "@conform-to/react";
 import { m } from "~/paraglide/messages";
@@ -129,7 +129,7 @@ export function EmailDeliveryPanel({
               <div>
                 <label htmlFor={emailFields.senderEmail.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_emaildelivery_sender_email_label()}</label>
                 <input
-                  type="email" name={emailFields.senderEmail.name} id={emailFields.senderEmail.id}
+                  type="email" name={emailFields.senderEmail.name} id={emailFields.senderEmail.id} inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                   defaultValue={config.senderEmail || ""} placeholder={m.settings_emaildelivery_sender_email_placeholder()}
                   aria-invalid={emailFields.senderEmail.errors ? true : undefined}
                   className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
@@ -164,7 +164,7 @@ export function EmailDeliveryPanel({
               </label>
               {overrideName ? (
                 <input
-                  type="text" name={emailFields.senderDisplayName.name} id={emailFields.senderDisplayName.id}
+                  type="text" name={emailFields.senderDisplayName.name} id={emailFields.senderDisplayName.id} autoCapitalize="words"
                   defaultValue={config.senderDisplayName || ""} placeholder={m.settings_emaildelivery_display_name_placeholder()}
                   className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
@@ -189,7 +189,7 @@ export function EmailDeliveryPanel({
                 </label>
               ) : null}
               <input
-                type="email" name={emailFields.replyTo.name} id={emailFields.replyTo.id}
+                type="email" name={emailFields.replyTo.name} id={emailFields.replyTo.id} inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 defaultValue={config.replyTo || ""} placeholder={m.settings_emaildelivery_replyto_placeholder()}
                 aria-invalid={emailFields.replyTo.errors ? true : undefined}
                 className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
@@ -245,9 +245,9 @@ export function EmailDeliveryPanel({
                 </span>
               );
             })()}
-            <button type="submit" {...pendingProps(busy)} className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}>
+            <Button type="submit" variant="primary" pending={busy}>
               {m.common_save()}
-            </button>
+            </Button>
           </div>
         </Form>
       </section>

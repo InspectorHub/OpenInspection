@@ -158,7 +158,7 @@ export default function AgentLoginPage() {
         <Input
           id={fields.email.id}
           name={fields.email.name}
-          type="email"
+          type="email" autoComplete="username" enterKeyHint="next"
           autoFocus
           label={m.auth_login_email_label()}
           aria-invalid={fields.email.errors ? true : undefined}
@@ -168,7 +168,7 @@ export default function AgentLoginPage() {
         <Input
           id={fields.password.id}
           name={fields.password.name}
-          type="password"
+          type="password" autoComplete="current-password" enterKeyHint="go"
           label={m.auth_login_password_label()}
           aria-invalid={fields.password.errors ? true : undefined}
           error={fields.password.errors?.[0]}
@@ -216,7 +216,7 @@ export default function AgentLoginPage() {
         <Input
           id={linkFields.linkEmail.id}
           name={linkFields.linkEmail.name}
-          type="email"
+          type="email" autoComplete="email" enterKeyHint="go"
           label={m.auth_agent_login_link_email_label()}
           aria-invalid={linkFields.linkEmail.errors ? true : undefined}
           error={linkFields.linkEmail.errors?.[0]}

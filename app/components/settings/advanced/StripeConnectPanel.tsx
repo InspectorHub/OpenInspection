@@ -1,5 +1,5 @@
 import { Form, useNavigation } from "react-router";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button } from "@core/shared-ui";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import type { FormMetadata } from "@conform-to/react";
 import type { StripeConnectInput } from "~/lib/forms/settings-config.schema";
@@ -45,10 +45,9 @@ export function StripeConnectPanel({ stripeConnected, stripeAccountId, stripeFor
           </div>
           <Form method="post" onSubmit={latch()}>
             <input type="hidden" name="intent" value="disconnect-stripe" />
-            <button type="submit" {...pendingProps(busy)}
-              className={`h-9 px-4 rounded-md border border-ih-bad text-ih-bad-fg text-[13px] font-bold hover:bg-ih-bad-bg transition-colors ${PENDING_CLASS}`}>
+            <Button type="submit" variant="secondary" className="border-ih-bad text-ih-bad-fg hover:bg-ih-bad-bg" pending={busy}>
               {m.settings_calconnect_disconnect()}
-            </button>
+            </Button>
           </Form>
         </div>
       ) : (
@@ -82,10 +81,9 @@ export function StripeConnectPanel({ stripeConnected, stripeAccountId, stripeFor
               {stripeForm.errors[0]}
             </div>
           )}
-          <button type="submit" {...pendingProps(busy)}
-            className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all ${PENDING_CLASS}`}>
+          <Button type="submit" variant="primary" pending={busy}>
             {m.settings_stripeconnect_connect_account()}
-          </button>
+          </Button>
         </Form>
       )}
     </section>

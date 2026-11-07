@@ -93,3 +93,17 @@ html[data-sidebar-collapsed="1"] .ih-sidebar { width: var(--width-sidebar-collap
   @page { size: Letter; margin: 0.5in 0.5in 0.7in 0.5in; }
   html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/*
+ * iOS WebKit zooms the page when a text field under 16px takes focus, and leaves it zoomed (or flickers while it zooms in and
+ * out). Several fields here and in the field editor are 13-14px, so every text field is raised to 16px on iOS rather than
+ * forbidding zoom, which would also take pinch-zoom away from people who need it. Unlayered on purpose: it outranks the
+ * utilities. `-webkit-touch-callout` exists only in iOS WebKit, so other browsers keep the denser sizes.
+ */
+@supports (-webkit-touch-callout: none) {
+  textarea,
+  select,
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']) {
+    font-size: max(16px, 1em);
+  }
+}

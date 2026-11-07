@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Button, Drawer, IconButton, SegmentedControl } from "@core/shared-ui";
+import { Drawer, IconButton, SegmentedControl } from "@core/shared-ui";
 import { useFieldDataSource } from "../../context";
 import { CommentLibraryList } from "./CommentLibraryList";
 import { MobileBottomDrawer } from "../MobileBottomDrawer";
@@ -48,7 +48,7 @@ export function CommentLibraryDrawer({ open, comments, state, serverComments, on
  <input
  ref={searchRef}
  id="comment-library-search"
- type="text"
+ type="text" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
  placeholder={m.editor_comment_library_search_placeholder()}
  value={state.commentLibrarySearch}
  onChange={(e) => {
@@ -68,13 +68,9 @@ export function CommentLibraryDrawer({ open, comments, state, serverComments, on
      full-bleed borders and the list scrolls independently under the pinned
      search/filter header (h-full flex column). The sheet has no body padding. */
  <div className={`flex flex-col h-full ${sheet ? "" : "-m-4"}`}>
- {/* The sheet opens on this button, not on the search field: the dialog focuses its first focusable, and a
-     field there would raise the soft keyboard over most of the list before anyone asked to type. */}
- {sheet && (
- <div className="flex justify-end px-2 pt-1">
- <Button variant="ghost" className="min-h-11 touch-manipulation" onClick={onClose}>{m.common_close()}</Button>
- </div>
- )}
+ {/* The sheet opens on its Close button, not on the search field: the dialog focuses its first focusable, and a
+     field there would raise the soft keyboard over most of the list before anyone asked to type. The sheet's own header
+     Close (MobileBottomDrawer) is that first button. */}
  {sheet && searchBlock}
 
  {/* Sort + Filter mode header */}

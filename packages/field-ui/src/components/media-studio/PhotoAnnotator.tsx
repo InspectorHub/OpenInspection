@@ -315,17 +315,17 @@ export function PhotoAnnotator({
 
   return (
     /* ds-allow: fixed-dark photo-studio chrome (white/* neutrals + amber-400 hints stay dark in both themes) */
-    <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: "rgba(0,0,0,0.92)" }}>
+    <div className="fixed inset-x-0 top-0 bottom-[var(--keyboard-height,0px)] z-[100] flex flex-col" style={{ background: "rgba(0,0,0,0.92)" }}>
       {/* -------------------------------------------------------- */}
       {/* Top bar                                                   */}
       {/* -------------------------------------------------------- */}
       <div
-        className="flex items-center gap-3 px-4 h-14 flex-shrink-0"
+        className="flex items-center gap-3 px-4 min-h-14 pt-[env(safe-area-inset-top,0px)] flex-shrink-0"
         style={{ background: "rgba(15,23,42,0.8)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
       >
         <button
           onClick={onClose}
-          className="w-9 h-9 rounded-md flex items-center justify-center text-white/70 hover:bg-white/10 transition-colors"
+          className="w-11 h-11 rounded-md flex items-center justify-center text-white/70 hover:bg-white/10 transition-colors"
           aria-label={m.media_annotate_close_aria()}
         >
           <Icon name="x" className="w-5 h-5" />
@@ -529,7 +529,7 @@ export function PhotoAnnotator({
                   <div className="bg-slate-800 rounded-lg border border-white/20 p-2 shadow-ih-popover">
                     <input
                       ref={labelInputRef}
-                      type="text"
+                      type="text" enterKeyHint="done"
                       value={labelText}
                       onChange={(e) => setLabelText(e.target.value)}
                       onKeyDown={(e) => {

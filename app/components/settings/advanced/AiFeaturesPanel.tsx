@@ -68,7 +68,7 @@ export function AiFeaturesPanel({ geminiConfigured, aiEnabled, courtesyTranslati
         />
         <Input
           id="aiBaseUrl"
-          name="aiBaseUrl"
+          name="aiBaseUrl" inputMode="url" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
           label={m.settings_ai_base_url_label()}
           value={baseUrl}
           onChange={(e) => setBaseUrl(e.currentTarget.value)}
@@ -78,7 +78,7 @@ export function AiFeaturesPanel({ geminiConfigured, aiEnabled, courtesyTranslati
         />
         <Input
           id="aiModel"
-          name="aiModel"
+          name="aiModel" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
           label={m.settings_ai_model_label()}
           value={model}
           onChange={(e) => setModel(e.currentTarget.value)}

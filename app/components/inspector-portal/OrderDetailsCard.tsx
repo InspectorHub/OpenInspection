@@ -129,7 +129,7 @@ export function OrderDetailsCard({
                         <span className={LABEL_CLASS}>{m.inspections_hub_details_reference()}</span>
                         <input
                             type="text"
-                            name="referenceNumber"
+                            name="referenceNumber" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                             maxLength={64}
                             defaultValue={referenceNumber ?? ""}
                             className={FIELD_CLASS}

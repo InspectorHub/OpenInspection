@@ -4,7 +4,7 @@ import type { Route } from "./+types/templates";
 import { useDisplayTimeZone, useCapability } from "~/hooks/useSessionContext";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { Pagination, PageHeader, Icon } from "@core/shared-ui";
+import { Button, Pagination, PageHeader, Icon } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { ActionFailureAlert } from "~/components/ActionFailureAlert";
 import { usePagination } from "~/hooks/usePagination";
@@ -239,9 +239,9 @@ export default function TemplatesPage() {
               </Link>
             )}
             {canCreate && (
-              <button onClick={() => setCreateOpen(true)} className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2">
+              <Button variant="primary" onClick={() => setCreateOpen(true)}>
                 {m.templates_action_new_template()}
-              </button>
+              </Button>
             )}
           </>
         }
@@ -253,7 +253,7 @@ export default function TemplatesPage() {
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative">
           <input
-            type="text"
+            type="text" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={m.templates_search_placeholder()}

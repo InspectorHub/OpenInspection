@@ -281,7 +281,7 @@ function CostItemRow({
             <div className="col-span-4 md:col-span-2">
               <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_qty()}</label>
               <input
-                type="number" min={0}
+                type="number" min={0} inputMode="decimal"
                 value={item.quantity ?? ""}
                 onChange={(e) => onChange({ quantity: e.target.value === "" ? null : Number(e.target.value) })}
                 onBlur={onCommit}
@@ -292,7 +292,7 @@ function CostItemRow({
             <div className="col-span-4 md:col-span-2">
               <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_uom()}</label>
               <input
-                value={item.uom ?? ""}
+                value={item.uom ?? ""} autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 onChange={(e) => onChange({ uom: e.target.value || null })}
                 onBlur={onCommit}
                 disabled={busy}
@@ -347,7 +347,7 @@ function CostItemRow({
               <div>
                 <label className="block whitespace-nowrap font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_eul()}</label>
                 <input
-                  type="number" min={0}
+                  type="number" min={0} inputMode="numeric"
                   value={item.eul ?? ""}
                   onChange={(e) => onChange({ eul: e.target.value === "" ? null : Number(e.target.value) })}
                   onBlur={onCommit}
@@ -358,7 +358,7 @@ function CostItemRow({
               <div>
                 <label className="block whitespace-nowrap font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_eff_age()}</label>
                 <input
-                  type="number" min={0}
+                  type="number" min={0} inputMode="numeric"
                   value={item.effAge ?? ""}
                   onChange={(e) => onChange({ effAge: e.target.value === "" ? null : Number(e.target.value) })}
                   onBlur={onCommit}
@@ -369,7 +369,7 @@ function CostItemRow({
               <div>
                 <label className="block whitespace-nowrap font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_rul()}</label>
                 <input
-                  type="number" min={0}
+                  type="number" min={0} inputMode="numeric"
                   value={item.rul ?? ""}
                   onChange={(e) => onChange({ rul: e.target.value === "" ? null : Number(e.target.value) })}
                   onBlur={onCommit}

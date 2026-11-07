@@ -64,7 +64,7 @@ export function OnBehalfFields({
                             type="text"
                             value={value.onBehalfOf}
                             disabled={disabled}
-                            maxLength={200}
+                            maxLength={200} autoCapitalize="words"
                             onChange={(e) => onChange({ ...value, onBehalfOf: e.target.value })}
                             placeholder={m.agreement_onbehalf_name_placeholder()}
                             className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"

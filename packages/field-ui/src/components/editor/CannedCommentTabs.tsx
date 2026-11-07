@@ -179,7 +179,7 @@ export function CannedCommentTabs({
       {/* B-20 — searchable defect library */}
       {activeTab === "defects" && rawTabEntries.length > 0 && (
         <input
-          value={defectQuery}
+          value={defectQuery} inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
           onChange={(e) => onDefectQueryChange(e.target.value)}
           placeholder={m.editor_canned_search_placeholder()}
           aria-label={m.editor_canned_search_aria()}

@@ -199,7 +199,7 @@ export function SendAgreementModal({
                     <div key={s.key} className="flex items-start gap-2">
                         <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <input
-                                type="text"
+                                type="text" autoCapitalize="words"
                                 value={s.name}
                                 placeholder={m.agreement_send_name_placeholder()}
                                 aria-label={m.agreement_send_name_aria()}
@@ -208,7 +208,7 @@ export function SendAgreementModal({
                                 className="px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
                             />
                             <input
-                                type="email"
+                                type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                                 value={s.email}
                                 placeholder={m.agreement_send_email_placeholder()}
                                 aria-label={m.agreement_send_email_aria()}

@@ -235,7 +235,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
             {effectiveTab === "library" && (
               <div>
                 <input
-                  type="text"
+                  type="text" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
                   placeholder={m.editor_siderail_search_placeholder()}
                   onChange={(e) => onLibrarySearch?.(e.target.value)}
                   className="w-full px-2 py-1.5 rounded border border-ih-border bg-ih-bg-app text-[12px] mb-2"

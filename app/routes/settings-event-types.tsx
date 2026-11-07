@@ -6,7 +6,7 @@ import type { Route } from "./+types/settings-event-types";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
-import { Table, Modal, PENDING_CLASS, pendingProps, useActionLatch } from "@core/shared-ui";
+import { Table, Modal, Button, useActionLatch } from "@core/shared-ui";
 import { EventTypeFields } from "~/components/settings/EventTypeFields";
 import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { m } from "~/paraglide/messages";
@@ -163,12 +163,9 @@ export default function SettingsEventTypes() {
         <p className="text-[13px] text-ih-fg-3">
           {m.settings_event_types_intro()}
         </p>
-        <button
-          onClick={openCreate}
-          className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
-        >
+        <Button variant="primary" onClick={openCreate}>
           {m.settings_event_types_add_button()}
-        </button>
+        </Button>
       </div>
 
       {deleteFailed && <p role="alert" className="text-[12px] font-medium text-ih-bad-fg">{m.settings_event_types_delete_failed()}</p>}
@@ -227,18 +224,12 @@ export default function SettingsEventTypes() {
                 align: "right",
                 cell: (t) => (
                   <>
-                    <button
-                      onClick={() => openEdit(t)}
-                      className="text-[12px] text-ih-primary-text hover:underline mr-3 font-bold"
-                    >
+                    <Button variant="link" size="sm" onClick={() => openEdit(t)}>
                       {m.common_edit()}
-                    </button>
-                    <button
-                      onClick={() => { setDeleteFailed(false); setPendingDelete(t); }}
-                      className="text-[12px] text-ih-bad-fg hover:underline font-bold"
-                    >
+                    </Button>
+                    <Button variant="danger-link" size="sm" onClick={() => { setDeleteFailed(false); setPendingDelete(t); }}>
                       {m.common_delete()}
-                    </button>
+                    </Button>
                   </>
                 ),
               },
@@ -266,18 +257,12 @@ export default function SettingsEventTypes() {
         initialFocusRef={nameRef}
         footer={
           <>
-            <button
-              onClick={() => setModalOpen(false)}
-              className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
-            >
+            <Button variant="secondary" onClick={() => setModalOpen(false)}>
               {m.common_cancel()}
-            </button>
-            <button
-              {...pendingProps(saving, save)}
-              className={`px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}
-            >
+            </Button>
+            <Button variant="primary" pending={saving} onClick={save}>
               {saving ? m.settings_common_saving() : m.common_save()}
-            </button>
+            </Button>
           </>
         }
       >

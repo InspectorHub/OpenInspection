@@ -166,7 +166,7 @@ export function BookingPoliciesPanel({ initialConfig }: { initialConfig: TenantC
           {depositChoice === "percent" && (
             <div className="flex items-center gap-1">
               <input
-                type="number"
+                type="number" inputMode="numeric"
                 min="1"
                 max="100"
                 step="1"

@@ -114,7 +114,7 @@ export function FormField({
  placeholder={item.options?.placeholder || item.label}
  min={item.options?.min ?? undefined}
  max={item.options?.max ?? undefined}
- step={item.options?.step ?? undefined}
+ step={item.options?.step ?? undefined} inputMode={(item.options?.min ?? -1) < 0 ? undefined : Number.isInteger(item.options?.step ?? 1) ? "numeric" : "decimal"}
  />
  );
  case "date":

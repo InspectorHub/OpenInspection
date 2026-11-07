@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup, screen } from "@testing-library/react";
+import { render, cleanup, fireEvent, screen } from "@testing-library/react";
 import { AddMediaChooser } from "./AddMediaChooser";
 import { m } from "../../i18n";
 
@@ -23,5 +23,16 @@ describe("AddMediaChooser video choice", () => {
     expect(screen.getByRole("button", { name: m.editor_addmedia_add_from_library() })).toBeTruthy();
     expect(grid().children).toHaveLength(2);
     expect(grid().className).toContain("grid-cols-2");
+  });
+});
+
+describe("AddMediaChooser exit", () => {
+  it("shows a Cancel of at least 44px that closes the chooser, not only an invisible backdrop", () => {
+    const onClose = vi.fn();
+    render(<AddMediaChooser {...base} onClose={onClose} />);
+    const cancel = screen.getByRole("button", { name: m.common_cancel() });
+    expect(cancel.className).toContain("min-h-[44px]");
+    fireEvent.click(cancel);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,4 +1,5 @@
 import { Link, isRouteErrorResponse } from "react-router";
+import { Button, buttonClasses } from "@core/shared-ui";
 import { isNetworkFailure } from "~/lib/network-error";
 import { m } from "~/paraglide/messages";
 
@@ -23,16 +24,15 @@ export function RouteErrorNotice({ error, messages, back, fullScreen = false }: 
   const wrap = fullScreen
     ? "flex flex-col items-center justify-center h-screen bg-ih-bg-app gap-3 px-6 text-center"
     : "max-w-[1080px] mx-auto pt-16 px-9 flex flex-col items-center gap-3 text-center";
-  const button = "h-9 px-4 inline-flex items-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600";
   return (
     <div className={wrap}>
       <p className="text-[15px] font-bold text-ih-fg-1">{message}</p>
       {offline ? (
-        <button type="button" className={button} onClick={() => window.location.reload()}>
+        <Button variant="primary" onClick={() => window.location.reload()}>
           {m.helper_network_retry()}
-        </button>
+        </Button>
       ) : (
-        <Link to={back.to} className={button}>{back.label}</Link>
+        <Link to={back.to} className={buttonClasses({ variant: "primary", size: "md" })}>{back.label}</Link>
       )}
     </div>
   );

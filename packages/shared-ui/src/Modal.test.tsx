@@ -18,6 +18,13 @@ function renderModal(props: Partial<React.ComponentProps<typeof Modal>> = {}) {
 }
 
 describe("Modal", () => {
+  it("stays above the soft keyboard: the overlay, and with it the dim backdrop, ends at the keyboard top", () => {
+    renderModal();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.parentElement?.className).toContain("bottom-[var(--keyboard-height,0px)]");
+    expect(dialog.className).toContain("safe-area-inset-top");
+  });
+
   it("renders nothing when closed", () => {
     render(
       <Modal open={false} title="Hidden" onClose={() => {}}>
@@ -121,5 +128,14 @@ describe("Modal", () => {
     const overlay = screen.getByRole("dialog").parentElement as HTMLElement;
     expect(overlay.className).toContain("bg-ih-backdrop");
     expect(overlay.className).not.toContain("rgba(15,23,42");
+  });
+});
+
+describe("Modal close control", () => {
+  it("has a touch target of at least 44px", () => {
+    renderModal();
+    const close = screen.getByRole("button", { name: "Close" });
+    expect(close.className).toContain("w-11");
+    expect(close.className).toContain("h-11");
   });
 });

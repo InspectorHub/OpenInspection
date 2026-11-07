@@ -321,7 +321,7 @@ export function ScheduleStep({
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
               placeholder={m.booking_placeholder_name()}
-              autoComplete={contactIsSelf ? "name" : "off"}
+              autoComplete={contactIsSelf ? "name" : "off"} autoCapitalize="words"
               className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
             />
           </label>
@@ -332,7 +332,7 @@ export function ScheduleStep({
               value={clientEmail}
               onChange={(e) => setClientEmail(e.target.value)}
               placeholder={m.booking_placeholder_email()}
-              autoComplete={contactIsSelf ? "email" : "off"}
+              autoComplete={contactIsSelf ? "email" : "off"} inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
               className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
             />
           </label>

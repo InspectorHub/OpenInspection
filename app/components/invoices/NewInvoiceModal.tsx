@@ -89,7 +89,7 @@ export function NewInvoiceModal({
         <div>
           <label htmlFor="ninv-client" className={labelCls}>{m.invoices_new_client_label()}</label>
           <input
-            id="ninv-client" name="clientName" required className={inputCls}
+            id="ninv-client" name="clientName" required autoCapitalize="words" className={inputCls}
             value={clientName} onChange={(e) => setClientName(e.target.value)}
           />
         </div>

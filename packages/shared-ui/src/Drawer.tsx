@@ -33,7 +33,7 @@ export function Drawer({ open, onClose, title, children, footer, wide = false, i
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-ih-backdrop"
+      className="fixed inset-x-0 top-0 bottom-[var(--keyboard-height,0px)] z-50 bg-ih-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -54,13 +54,13 @@ export function Drawer({ open, onClose, title, children, footer, wide = false, i
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-ih-button text-ih-fg-4 hover:text-ih-fg-2"
+            className="w-11 h-11 -my-2 -mr-2 flex items-center justify-center rounded-ih-button text-ih-fg-4 hover:text-ih-fg-2"
           >
             &#x2715;
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">{children}</div>
-        {footer && <div className="flex justify-end gap-3 p-4 border-t border-ih-border">{footer}</div>}
+        {footer && <div className="flex flex-wrap justify-end gap-3 p-4 border-t border-ih-border">{footer}</div>}
       </div>
     </div>
   );

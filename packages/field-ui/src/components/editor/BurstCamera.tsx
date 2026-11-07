@@ -139,14 +139,14 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
       {/* ds-allow: fixed-dark camera overlay chrome (light-on-dark) */}
       <div className="relative z-10 flex items-center justify-between px-4 pt-4">
         {/* ds-allow: over-video control — stays light-on-dark regardless of theme (legible over arbitrary camera footage) */}
-        <IconButton type="button" onClick={onClose} aria-label={m.editor_burst_close_aria()} className="w-10 h-10 rounded-full bg-black/40 text-white hover:bg-black/60">
+        <IconButton type="button" onClick={onClose} aria-label={m.editor_burst_close_aria()} className="w-11 h-11 rounded-full bg-black/40 text-white hover:bg-black/60">
           <Icon name="x" className="w-5 h-5" />
         </IconButton>
         {captures.length > 0 && (
           <div className="text-white text-xs font-mono px-3 py-1 rounded-full bg-black/40">{m.editor_burst_captured_count({ count: captures.length })}</div>
         )}
         {/* ds-allow: over-video control — stays light-on-dark regardless of theme (legible over arbitrary camera footage) */}
-        <IconButton type="button" onClick={switchFacing} aria-label={m.editor_burst_switch_camera_aria()} className="w-10 h-10 rounded-full bg-black/40 text-white hover:bg-black/60">
+        <IconButton type="button" onClick={switchFacing} aria-label={m.editor_burst_switch_camera_aria()} className="w-11 h-11 rounded-full bg-black/40 text-white hover:bg-black/60">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5M4 9a8 8 0 0114-3M20 15a8 8 0 01-14 3" /></svg>
         </IconButton>
       </div>

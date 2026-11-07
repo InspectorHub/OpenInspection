@@ -91,7 +91,8 @@ describe("SpeedMode navigation buttons", () => {
   it("CONTROL - desktop Prev and Next keep their size", () => {
     render(<SpeedMode {...base} currentIndex={1} />);
     for (const button of nav()) {
-      expect(button.className).not.toContain("min-h-11");
+      // `pointer-coarse:min-h-11` is the shared Button's own touch rule and is on every button; the bare class is this screen's.
+      expect(button.className).not.toMatch(/(^|\s)min-h-11/);
       expect(button.className).not.toContain("touch-manipulation");
     }
   });

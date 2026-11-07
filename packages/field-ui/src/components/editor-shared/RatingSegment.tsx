@@ -64,7 +64,7 @@ const TONE_IDLE: Record<RatingTone, string> = {
 
 const SIZE_CLASSES: Record<NonNullable<RatingSegmentProps["size"]>, string> = {
   sm: "h-8 min-w-8 px-2 rounded text-[11px] font-bold",
-  md: "h-11 min-w-0 flex-1 px-3 rounded-lg text-[13px] font-bold @container",
+  md: "min-h-11 min-w-0 flex-1 px-3 py-1 rounded-lg text-[13px] font-bold @container",
   lg: "h-20 w-20 rounded-xl text-sm font-bold @container",
 };
 
@@ -220,7 +220,7 @@ export function RatingSegment({
                 throughout the defect and clipped nothing — the label simply
                 painted past the tile and over its neighbour. As a block it
                 fills the tile's content box and can finally cut the text off. */}
-            <span className="block truncate px-0.5">{text}</span>
+            <span className={size === "md" ? "block px-0.5 text-center leading-tight [overflow-wrap:anywhere]" : "block truncate px-0.5"}>{text}</span>
             {r.hint != null && (
               <span className="block text-[9px] font-mono opacity-60 mt-0.5">{r.hint}</span>
             )}

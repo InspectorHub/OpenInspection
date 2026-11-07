@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Form } from "react-router";
-import { RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button, RadioCardGroup } from "@core/shared-ui";
 import type { useFetcher } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
@@ -128,10 +128,9 @@ export function SmsSecretsPanel({
             <p className="text-[12px] text-ih-bad-fg">{secretFormError("save-sms-secrets")}</p>
           )}
           <div className="flex justify-end pt-3 border-t border-ih-border">
-            <button type="submit" {...pendingProps(savingSmsSecrets)}
-              className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}>
+            <Button type="submit" variant="primary" pending={savingSmsSecrets}>
               {savingSmsSecrets ? m.common_saving() : m.settings_smssecrets_save({ provider: provider === "twilio" ? m.settings_sms_provider_twilio() : m.settings_sms_provider_telnyx() })}
-            </button>
+            </Button>
           </div>
         </Form>
 
@@ -144,11 +143,10 @@ export function SmsSecretsPanel({
                 type="text" readOnly value={inboundUrl || m.settings_smssecrets_inbound_placeholder()}
                 className="flex-1 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-muted text-[11px] font-mono text-ih-fg-2 outline-none"
               />
-              <button type="button" disabled={!inboundUrl}
-                onClick={() => { if (inboundUrl) void navigator.clipboard.writeText(inboundUrl); }}
-                className="h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors shrink-0 disabled:opacity-60">
+              <Button variant="primary" size="sm" disabled={!inboundUrl} className="shrink-0"
+                onClick={() => { if (inboundUrl) void navigator.clipboard.writeText(inboundUrl); }}>
                 {m.common_copy()}
-              </button>
+              </Button>
             </div>
             <p className="text-[11px] text-ih-fg-3">
               {provider === "telnyx"
@@ -164,14 +162,13 @@ export function SmsSecretsPanel({
           <div className="flex-1 min-w-[200px]">
             <label htmlFor="sms-test-to" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_smssecrets_test_label()}</label>
             <input
-              type="tel" name="to" id="sms-test-to" placeholder="+15551234567"
+              type="tel" inputMode="tel" name="to" id="sms-test-to" placeholder="+15551234567"
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
             />
           </div>
-          <button type="submit" {...pendingProps(smsTestFetcher.state !== "idle")}
-            className={`h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}>
+          <Button type="submit" variant="secondary" pending={smsTestFetcher.state !== "idle"}>
             {smsTestFetcher.state !== "idle" ? m.settings_smssecrets_sending() : m.settings_smssecrets_send_test()}
-          </button>
+          </Button>
           {smsTestFetcher.data && "intent" in smsTestFetcher.data && smsTestFetcher.data.intent === "test-sms" && "ok" in smsTestFetcher.data && (
             smsTestFetcher.data.ok
               ? <span className="text-[12px] text-ih-ok-fg">{m.settings_smssecrets_test_sent()}</span>

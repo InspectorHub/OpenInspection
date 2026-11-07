@@ -21,6 +21,7 @@ export interface PresenceLocation {
 export function createWebUrls(location?: PresenceLocation): FieldUrls & Required<Pick<FieldUrls, "costExport">> {
     return {
         photo: (inspectionId, key) => `/api/inspections/${pathSegment(inspectionId)}/photo?key=${encodeURIComponent(key)}`,
+        tagLibrary: () => "/library/tags",
         reportPreview: (tenantSlug, inspectionId) =>
             tenantSlug ? `/report-view/${pathSegment(tenantSlug)}/${pathSegment(inspectionId)}` : null,
         reportPdf: (inspectionId) => `/api/inspections/${pathSegment(inspectionId)}/pdf?type=full`,

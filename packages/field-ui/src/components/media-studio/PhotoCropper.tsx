@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import Cropper from "react-easy-crop";
-import { useLayer, PENDING_CLASS, pendingProps } from "@core/shared-ui";
+import { Button, useLayer } from "@core/shared-ui";
 import { bakeCrop, normalizeRotation, type BakeFormat, type PixelCrop } from "./cropImage";
 import { m } from "../../i18n";
 
@@ -179,14 +179,14 @@ export function PhotoCropper({
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10H11a4 4 0 00-4 4v2M21 10l-4-4M21 10l-4 4" /></svg>
           </button>
         </div>
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           {bakeError && (
             <p role="alert" className="mr-auto text-[12px] text-ih-bad-fg font-medium">{bakeError}</p>
           )}
-          <button type="button" onClick={onCancel} className="h-9 px-4 rounded-md border border-ih-border text-ih-fg-2 text-[13px] font-bold hover:bg-ih-bg-muted">{m.common_cancel()}</button>
-          <button type="button" {...pendingProps(busy, handleSave)} disabled={!pixels} className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 disabled:opacity-50 ${PENDING_CLASS}`}>
+          <Button variant="secondary" onClick={onCancel}>{m.common_cancel()}</Button>
+          <Button variant="primary" pending={busy} onClick={handleSave} disabled={!pixels}>
             {busy ? m.common_saving() : saveLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

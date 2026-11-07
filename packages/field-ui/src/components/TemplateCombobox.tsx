@@ -169,7 +169,7 @@ export function TemplateCombobox({
                             </svg>
                             <input
                                 ref={inputRef}
-                                type="text"
+                                type="text" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
                                 value={query}
                                 onChange={e => setQuery(e.target.value)}
                                 onKeyDown={handleKeyDown}

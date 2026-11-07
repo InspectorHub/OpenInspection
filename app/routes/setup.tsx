@@ -124,7 +124,7 @@ export default function SetupPage() {
           <Input
             id={fields.workspaceName.id}
             name={fields.workspaceName.name}
-            type="text"
+            type="text" autoComplete="organization" autoCapitalize="words" enterKeyHint="next"
             autoFocus
             placeholder={m.auth_setup_company_placeholder()}
             label={m.auth_setup_company_label()}
@@ -136,7 +136,7 @@ export default function SetupPage() {
             id={fields.adminName.id}
             name={fields.adminName.name}
             type="text"
-            autoComplete="name"
+            autoComplete="name" autoCapitalize="words" enterKeyHint="next"
             placeholder={m.auth_setup_name_placeholder()}
             label={m.auth_setup_name_label()}
             aria-invalid={fields.adminName.errors ? true : undefined}
@@ -147,7 +147,7 @@ export default function SetupPage() {
           <Input
             id={fields.email.id}
             name={fields.email.name}
-            type="email"
+            type="email" autoComplete="email" enterKeyHint="next"
             label={m.auth_setup_email_label()}
             aria-invalid={fields.email.errors ? true : undefined}
             error={fields.email.errors?.[0]}
@@ -156,7 +156,7 @@ export default function SetupPage() {
           <Input
             id={fields.password.id}
             name={fields.password.name}
-            type="password"
+            type="password" autoComplete="new-password" enterKeyHint="next"
             label={m.auth_login_password_label()}
             aria-invalid={fields.password.errors ? true : undefined}
             error={fields.password.errors?.[0]}
@@ -165,7 +165,7 @@ export default function SetupPage() {
           <Input
             id={fields.setupCode.id}
             name={fields.setupCode.name}
-            type="text"
+            type="text" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="go"
             placeholder={m.auth_setup_code_placeholder()}
             label={m.auth_setup_code_label()}
             className="font-mono"

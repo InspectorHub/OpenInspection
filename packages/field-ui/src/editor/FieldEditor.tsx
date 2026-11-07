@@ -61,6 +61,7 @@ import { useStructureEdit } from "../hooks/useStructureEdit";
 import { PublishModal } from "../components/editor/PublishModal";
 import { SignModal } from "../components/editor/SignModal";
 import { useEditorLayout } from "../hooks/useBreakpoint";
+import { useItemStepping } from "../hooks/useItemStepping";
 import { SharedOverlays } from "./SharedOverlays";
 import { AppBar } from "../components/editor/AppBar";
 import { TabletActions } from "../components/editor/TabletActions";
@@ -739,6 +740,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  // Owned here, above the layout, so a swap of the tree keeps what is half typed and what is half committed.
  const itemUi = useItemEditorUiStore();
  const notesFlushRef = useRef<(() => void) | null>(null);
+ const stepper = useItemStepping(state, notesFlushRef); // opens on an item; Previous / Next on the touch layouts
  useResetBatchOnPhone(isPhone, state.batchMode, state.setBatchMode, state.setBatchSelected);
 
  // Reads the saved tags when the editor opens and saves each toggle; see the hook.
@@ -1875,13 +1877,10 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  );
 
 
- // Back out one level: the overview to the items, an open item to the list (phone only: the tablet shows both at
- // once), then out of the editor through the host's exit, so the unsaved-changes guard still runs.
- const goBack = (itemLevel: boolean) => {
+ // Back: the overview to the items, then out through the host's exit (the unsaved-changes guard runs); an open item is no level.
+ const goBack = () => {
   notesFlushRef.current?.();
-  if (state.activeView === "property") { state.setActiveView("items"); return; }
-  if (itemLevel && state.activeItemId) { state.setActiveItemId(null); return; }
-  dataSource.exit();
+  if (state.activeView === "property") state.setActiveView("items"); else dataSource.exit();
  };
  const openSpeedFromDrawer = () => { setMobileDrawer(null); openSpeedMode(); };
  const appBarTitles = {
@@ -1979,15 +1978,15 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  return (
  <>
  {overlaysEl}
- <div key="phone" data-layout="phone" data-collab-synced={collabSynced ? "true" : "false"} className="min-h-dvh pb-[var(--ih-mobile-nav-h)]">
+ <div key="phone" data-layout="phone" data-collab-synced={collabSynced ? "true" : "false"} className="flex min-h-dvh flex-col pb-[var(--ih-mobile-nav-h)]">
  <AppBar
  platform={dataSource.platform}
  {...appBarTitles}
- onBack={() => goBack(true)}
+ onBack={() => goBack()}
  onMore={() => setMobileDrawer('actions')}
  status={saveStatusEl}
  />
- <main className="p-4">
+ <main className="flex-1 p-4">
  {topBannersEl}
  {/* `activeView === "property"` is checked FIRST, exactly as the desktop
      tree checks it, and for the reason the two must agree: choosing
@@ -2004,6 +2003,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
   <p className="text-center text-ih-fg-3 mt-12">{m.editor_route_mobile_begin()}</p>
  ))}
  </main>
+ {stepper.phone}
  <MobileDrawerTriggers onOpen={(id) => setMobileDrawer(id)} showTheme={caps.themeControl} />
  </div>
  </>
@@ -2021,7 +2021,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
   tablet
   platform={dataSource.platform}
   {...appBarTitles}
-  onBack={() => goBack(false)}
+  onBack={() => goBack()}
   onOpenSections={() => setMobileDrawer('sections')}
   onMore={() => setMobileDrawer('actions')}
   actions={<TabletActions onPreview={() => setMobileDrawer('preview')} onPublish={handlePublishClick} />}
@@ -2040,7 +2040,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  }
  sectionTitle={state.currentSection?.title ?? ""}
  list={itemListEl}
- main={<>{topBannersEl}{state.activeView === "property" ? propertyOverviewEl : itemEditorEl}</>}
+ main={<>{topBannersEl}{state.activeView === "property" ? propertyOverviewEl : itemEditorEl}{stepper.pane}</>}
  emptyTemplate={emptyTemplateEl}
  batchBar={batchBarEl}
  tools={toolsDockEl}

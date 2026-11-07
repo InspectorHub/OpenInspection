@@ -6,6 +6,15 @@ import { Drawer } from "@core/shared-ui";
 afterEach(cleanup);
 
 describe("Drawer", () => {
+  it("ends above the soft keyboard (--keyboard-height) so its footer is never covered", () => {
+    render(
+      <Drawer open title="Filters" onClose={() => {}} footer={<button type="button">Apply</button>}>
+        <p>body</p>
+      </Drawer>,
+    );
+    expect(screen.getByRole("dialog").parentElement?.className).toContain("bottom-[var(--keyboard-height,0px)]");
+  });
+
   it("renders nothing when closed", () => {
     render(
       <Drawer open={false} title="Filters" onClose={() => {}}>

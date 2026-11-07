@@ -146,7 +146,7 @@ export default function JoinPage() {
           <Input
             id={fields.name.id}
             name={fields.name.name}
-            type="text"
+            type="text" autoComplete="name" autoCapitalize="words" enterKeyHint="next"
             autoFocus
             label={m.auth_join_name_label()}
             aria-invalid={fields.name.errors ? true : undefined}
@@ -156,7 +156,7 @@ export default function JoinPage() {
           <Input
             id={fields.password.id}
             name={fields.password.name}
-            type="password"
+            type="password" autoComplete="new-password" enterKeyHint="go"
             label={m.auth_login_password_label()}
             aria-invalid={fields.password.errors ? true : undefined}
             hint={makePasswordHint()}

@@ -174,7 +174,7 @@ export function CredentialsEditor({
                   className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
                 <input
-                  defaultValue={c.memberNumber ?? ""}
+                  defaultValue={c.memberNumber ?? ""} autoCapitalize="none" autoCorrect="off" spellCheck={false}
                   placeholder={m.settings_profile_credentials_member_placeholder()}
                   onBlur={(e) => { if (e.target.value !== (c.memberNumber ?? "")) onUpdate(c.id, { memberNumber: e.target.value }); }}
                   className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:border-ih-primary focus:shadow-ih-focus outline-none"

@@ -93,7 +93,7 @@ export function ContactModal({
             <input
               id={fields.name.id}
               name={fields.name.name}
-              type="text"
+              type="text" autoCapitalize="words"
               defaultValue={contact?.name || ""}
               placeholder={m.contacts_modal_name_placeholder()}
               aria-invalid={fields.name.errors ? true : undefined}
@@ -110,7 +110,7 @@ export function ContactModal({
               <input
                 id={fields.email.id}
                 name={fields.email.name}
-                type="email"
+                type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 defaultValue={contact?.email || ""}
                 placeholder={m.contacts_modal_email_placeholder()}
                 aria-invalid={fields.email.errors ? true : undefined}
@@ -130,7 +130,7 @@ export function ContactModal({
               <input
                 id={fields.phone.id}
                 name={fields.phone.name}
-                type="tel"
+                type="tel" inputMode="tel"
                 defaultValue={contact?.phone || ""}
                 placeholder={m.contacts_modal_phone_placeholder()}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none text-sm"
@@ -143,7 +143,7 @@ export function ContactModal({
             <input
               id={fields.agency.id}
               name={fields.agency.name}
-              type="text"
+              type="text" autoCapitalize="words"
               defaultValue={contact?.agency || ""}
               placeholder={m.contacts_modal_agency_placeholder()}
               className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none text-sm"

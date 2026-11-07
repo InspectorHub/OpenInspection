@@ -64,3 +64,47 @@ describe("Input", () => {
     expect(err2.className).toContain("row-start-1");
   });
 });
+
+describe("Input keyboard defaults", () => {
+  const attrs = (el: Element | null) => ({
+    inputmode: el?.getAttribute("inputmode") ?? null,
+    capitalize: el?.getAttribute("autocapitalize") ?? null,
+    correct: el?.getAttribute("autocorrect") ?? null,
+    spell: el?.getAttribute("spellcheck") ?? null,
+    enter: el?.getAttribute("enterkeyhint") ?? null,
+  });
+
+  it("email: email keypad, no capitalisation, correction or spellcheck", () => {
+    const { container } = render(<Input type="email" />);
+    expect(attrs(container.querySelector("input"))).toMatchObject({
+      inputmode: "email", capitalize: "none", correct: "off", spell: "false",
+    });
+  });
+
+  it("tel and url pick their own keypads", () => {
+    expect(attrs(render(<Input type="tel" />).container.querySelector("input")).inputmode).toBe("tel");
+    expect(attrs(render(<Input type="url" />).container.querySelector("input")).inputmode).toBe("url");
+  });
+
+  it("search gets a Search key", () => {
+    const { container } = render(<Input type="search" />);
+    expect(attrs(container.querySelector("input")).enter).toBe("search");
+  });
+
+  it("number: numeric or decimal only when it cannot be negative, nothing otherwise (the numeric keypad has no minus key)", () => {
+    const mode = (el: React.ReactElement) => attrs(render(el).container.querySelector("input")).inputmode;
+    expect(mode(<Input type="number" min={0} />)).toBe("numeric");
+    expect(mode(<Input type="number" min={0} step="0.01" />)).toBe("decimal");
+    expect(mode(<Input type="number" min={0} step="any" />)).toBe("decimal");
+    // No minimum: a negative value may be typed, so the default number keyboard stays.
+    expect(mode(<Input type="number" />)).toBeNull();
+    expect(mode(<Input type="number" step="0.01" />)).toBeNull();
+    expect(mode(<Input type="number" min={-5} />)).toBeNull();
+  });
+
+  it("plain text gets no defaults, and explicit props win", () => {
+    expect(attrs(render(<Input type="text" />).container.querySelector("input")).inputmode).toBeNull();
+    const { container } = render(<Input type="email" inputMode="text" />);
+    expect(attrs(container.querySelector("input")).inputmode).toBe("text");
+  });
+});

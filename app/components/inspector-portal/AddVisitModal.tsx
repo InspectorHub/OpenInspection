@@ -121,7 +121,7 @@ export function AddVisitModal({
                             {m.settings_event_types_duration_label()}
                         </span>
                         <input
-                            type="number"
+                            type="number" inputMode="numeric"
                             min={1}
                             value={durationMin}
                             onChange={(e) => setDurationMin(Number(e.target.value) || 1)}

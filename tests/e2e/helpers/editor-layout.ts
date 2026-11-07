@@ -86,7 +86,9 @@ export async function showItemList(page: Page, layout: EditorLayout): Promise<vo
 export async function openItem(page: Page, label: string, layout: EditorLayout): Promise<void> {
     await expect(async () => {
         await showItemList(page, layout);
-        const scope = layout === 'tablet' ? page.getByTestId('tablet-list-pane') : page;
+        // On a phone the list is the Items drawer. The page itself also names the open item (the app bar), so an unscoped
+        // text match could land on that and never reach the row.
+        const scope = layout === 'tablet' ? page.getByTestId('tablet-list-pane') : layout === 'phone' ? page.getByRole('dialog', { name: /Items/ }) : page;
         await scope.getByText(label, { exact: false }).first().click();
         await expect(page.locator('#notes-textarea')).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 30_000 });

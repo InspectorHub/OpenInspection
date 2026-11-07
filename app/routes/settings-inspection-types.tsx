@@ -5,7 +5,7 @@ import type { Route } from "./+types/settings-inspection-types";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
-import { Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";
+import { Button, Modal } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 // F68 — with no `meta` this page's browser tab reads only "OpenInspection".
@@ -228,12 +228,9 @@ export default function SettingsInspectionTypes() {
               {m.settings_inspection_types_org_desc()}
             </p>
           </div>
-          <button
-            onClick={openAdd}
-            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
-          >
+          <Button variant="primary" className="shrink-0" onClick={openAdd}>
             {m.settings_inspection_types_add_button()}
-          </button>
+          </Button>
         </div>
 
         {orgSubtypes.length === 0 ? (
@@ -273,22 +270,17 @@ export default function SettingsInspectionTypes() {
                     )}
                   </div>
                   <div className="flex flex-col gap-1">
-                    <button
-                      onClick={() => openEdit(ot)}
-                      className="text-[12px] text-ih-primary-text hover:underline font-bold"
-                    >
+                    <Button variant="link" size="sm" onClick={() => openEdit(ot)}>
                       {m.common_edit()}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className={ot.enabled ? "text-ih-fg-3" : "text-ih-ok-fg"}
                       onClick={() => toggleOrg(ot)}
-                      className={`text-[12px] font-bold hover:underline ${
- ot.enabled
- ? "text-ih-fg-3"
- : "text-ih-ok-fg"
- }`}
                     >
                       {ot.enabled ? m.settings_inspection_types_action_disable() : m.settings_inspection_types_action_enable()}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -305,18 +297,12 @@ export default function SettingsInspectionTypes() {
         initialFocusRef={nameRef}
         footer={
           <>
-            <button
-              onClick={() => setModalOpen(false)}
-              className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
-            >
+            <Button variant="secondary" onClick={() => setModalOpen(false)}>
               {m.common_cancel()}
-            </button>
-            <button
-              {...pendingProps(saving, save)}
-              className={`px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}
-            >
+            </Button>
+            <Button variant="primary" pending={saving} onClick={save}>
               {saving ? m.settings_common_saving() : m.common_save()}
-            </button>
+            </Button>
           </>
         }
       >

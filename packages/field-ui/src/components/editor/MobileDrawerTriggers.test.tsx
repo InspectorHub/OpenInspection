@@ -1,12 +1,15 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { MobileDrawerTriggers } from './MobileDrawerTriggers';
 import { m } from '../../i18n';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('MobileDrawerTriggers', () => {
   it('names the navigation landmark', () => {
@@ -75,5 +78,23 @@ describe('MobileDrawerTriggers', () => {
     const css = readFileSync(join(process.cwd(), 'packages', 'field-ui', 'src', 'theme.css'), 'utf8');
     expect(css).toMatch(/--ih-mobile-nav-h:\s*calc\(3\.5rem \+ env\(safe-area-inset-bottom\)\)/);
     expect(css).toMatch(/:root\[data-mobile-nav\]\s*\{[^}]*--ih-toast-bottom:\s*calc\(var\(--ih-mobile-nav-h\) \+ 1rem\)/);
+  });
+  it('is out of sight while a text field has focus (iOS lays a bottom-fixed bar out a frame late when the keyboard shrinks the web view) and back after', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('pointer: coarse'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }));
+    render(
+      <>
+        <textarea aria-label="notes" />
+        <MobileDrawerTriggers onOpen={() => {}} />
+      </>,
+    );
+    const nav = screen.getByRole('navigation', { name: m.editor_mobile_nav_label() });
+    expect(nav.className).not.toContain('invisible');
+    act(() => screen.getByLabelText('notes').focus());
+    expect(nav.className).toContain('invisible');
+    act(() => screen.getByLabelText('notes').blur());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 450));
+    });
+    expect(nav.className).not.toContain('invisible');
   });
 });

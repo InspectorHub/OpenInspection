@@ -160,7 +160,7 @@ export function DepositWidget({ serviceId, policy, companyDefault }: DepositWidg
                             {choice === "percent" && (
                                 <div className="flex items-center gap-1">
                                     <input
-                                        type="number"
+                                        type="number" inputMode="numeric"
                                         min="1"
                                         max="100"
                                         step="1"

@@ -69,7 +69,7 @@ test("as a phone sheet: a bottom dialog with the search first, and one tap inser
   mount("en-US", p);
   const sheet = screen.getByRole("dialog", { name: "Comment Library" });
   // A bottom sheet, not the right-hand drawer.
-  expect(sheet.className).toContain("bottom-0");
+  expect(sheet.className).toContain("bottom-[var(--keyboard-height,0px)]");
   expect(sheet.className).not.toContain("inset-y-0");
   // The search field leads the fields (sort and filter come after it), and the list is padded for the home indicator.
   const fields = [...sheet.querySelectorAll<HTMLElement>("input,select")];
