@@ -1978,7 +1978,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  return (
  <>
  {overlaysEl}
- <div key="phone" data-layout="phone" data-collab-synced={collabSynced ? "true" : "false"} className="min-h-dvh pb-[var(--ih-mobile-nav-h)]">
+ <div key="phone" data-layout="phone" data-collab-synced={collabSynced ? "true" : "false"} className="flex min-h-dvh flex-col pb-[var(--ih-mobile-nav-h)]">
  <AppBar
  platform={dataSource.platform}
  {...appBarTitles}
@@ -1986,7 +1986,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  onMore={() => setMobileDrawer('actions')}
  status={saveStatusEl}
  />
- <main className="p-4">
+ <main className="flex-1 p-4">
  {topBannersEl}
  {/* `activeView === "property"` is checked FIRST, exactly as the desktop
      tree checks it, and for the reason the two must agree: choosing

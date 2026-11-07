@@ -19,6 +19,22 @@ describe("MobileBottomDrawer", () => {
     expect(sheet(container).getAttribute("aria-hidden")).toBe("true");
   });
 
+  it("casts no shadow while parked below the screen, because a big blur would bleed up over the bottom bar", () => {
+    const closed = render(
+      <MobileBottomDrawer open={false} onClose={vi.fn()} title="Jump to">
+        <button type="button">Item</button>
+      </MobileBottomDrawer>,
+    );
+    expect(sheet(closed.container).className).not.toContain("shadow-ih-popover");
+    cleanup();
+    const open = render(
+      <MobileBottomDrawer open onClose={vi.fn()} title="Jump to">
+        <button type="button">Item</button>
+      </MobileBottomDrawer>,
+    );
+    expect(sheet(open.container).className).toContain("shadow-ih-popover");
+  });
+
   it("sizes the sheet in vh with a dvh cap, so the address bar cannot push it off screen and an old browser still gets a height", () => {
     const { container } = render(
       <MobileBottomDrawer open onClose={vi.fn()} title="Jump to" heightFraction={0.7}>

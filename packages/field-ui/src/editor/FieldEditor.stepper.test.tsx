@@ -38,6 +38,14 @@ describe("the editor opens on an item", () => {
     expect(screen.queryByText(m.editor_route_mobile_begin())).toBeNull();
   });
 
+  it("phone: the layout fills the screen as a column, so Previous / Next sits on the bottom bar even when the item is short", async () => {
+    mountForRatings(390, { data: THREE });
+    await title();
+    const layout = document.querySelector('[data-layout="phone"]') as HTMLElement;
+    expect(layout.className).toContain("flex-col");
+    expect(layout.querySelector("main")?.className).toContain("flex-1");
+  });
+
   it("phone: Back leaves the editor, because there is no list level to fall back to", async () => {
     const h = mountForRatings(390, { data: THREE });
     await title();
