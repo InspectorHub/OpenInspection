@@ -284,7 +284,7 @@ export function VersionHistoryPanel({
             type="button"
             // aria-disabled while saving: this sits inside an open Modal, where native disabled drops focus to <body>.
             {...pendingProps(saving, () => saveLatch(handleSaveNow))}
-            className={`h-9 px-3 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary/85 inline-flex items-center gap-1.5 ${PENDING_CLASS}`}
+            className={`min-h-9 pointer-coarse:min-h-11 px-3 py-1.5 shrink-0 whitespace-nowrap rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary/85 inline-flex items-center justify-center gap-1.5 ${PENDING_CLASS}`}
         >
             {saving ? m.editor_collab_saving() : m.editor_collab_save_version_now()}
         </button>
@@ -294,8 +294,8 @@ export function VersionHistoryPanel({
         <>
             <Modal open={open} onClose={onClose} title={m.editor_collab_version_history()} size="lg">
                 <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <p className="text-[12px] text-ih-fg-3">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                        <p className="min-w-[12rem] flex-1 text-[12px] text-ih-fg-3">
                             {m.editor_collab_history_desc()}
                         </p>
                         {saveAction}
