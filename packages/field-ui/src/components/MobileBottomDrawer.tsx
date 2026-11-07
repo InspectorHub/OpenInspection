@@ -43,7 +43,7 @@ export function MobileBottomDrawer({ open, onClose, title, children, heightFract
                 }`}
                 // `vh` first, then `dvh` as a cap: a browser without dynamic viewport units ignores the cap and keeps the `vh`
                 // height, and one with them stops the sheet from reaching under the mobile browser's address bar.
-                style={{ height: `${Math.round(heightFraction * 100)}vh`, maxHeight: `min(${Math.round(heightFraction * 100)}dvh, calc(100dvh - var(--keyboard-height, 0px)))` }}
+                style={{ height: `${Math.round(heightFraction * 100)}vh`, maxHeight: `min(${Math.round(heightFraction * 100)}dvh, calc(100dvh - var(--keyboard-height, 0px) - env(safe-area-inset-top, 0px)))` }}
             >
                 <div className="flex justify-center pt-2 pb-1">
                     <div className="w-10 h-1 rounded-full bg-ih-border" />

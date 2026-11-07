@@ -46,6 +46,8 @@ describe("MobileBottomDrawer", () => {
     expect(style).toContain("max-height: min(70dvh");
     // The sheet and its backdrop end at the soft keyboard instead of running behind it.
     expect(style).toContain("--keyboard-height");
+    // ...and never reaches up under the status bar or the notch while the keyboard is up.
+    expect(style).toContain("safe-area-inset-top");
     expect(sheet(container).className).toContain("bottom-[var(--keyboard-height,0px)]");
   });
 

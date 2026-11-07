@@ -22,7 +22,7 @@ describe("Modal", () => {
     renderModal();
     const dialog = screen.getByRole("dialog");
     expect(dialog.parentElement?.className).toContain("bottom-[var(--keyboard-height,0px)]");
-    expect(dialog.className).toContain("max-h-[90%]");
+    expect(dialog.className).toContain("safe-area-inset-top");
   });
 
   it("renders nothing when closed", () => {

@@ -40,7 +40,7 @@ export function Modal({ open, onClose, title, size = "md", children, footer, ini
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`w-full ${sizeClasses[size]} bg-ih-bg-card rounded-t-ih-modal sm:rounded-ih-modal shadow-ih-popover border border-ih-border max-h-[90%] overflow-y-auto`}
+        className={`w-full ${sizeClasses[size]} bg-ih-bg-card rounded-t-ih-modal sm:rounded-ih-modal shadow-ih-popover border border-ih-border max-h-[min(90%,calc(100%_-_env(safe-area-inset-top,0px)))] overflow-y-auto`}
       >
         <div className="flex items-center justify-between p-4 border-b border-ih-border">
           <h2 id={titleId} className="text-lg font-bold text-ih-fg-1">
