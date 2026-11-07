@@ -26,6 +26,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Unused API routes that no client called: `PUT /api/event-types/:id`, `DELETE /api/event-types/:id`, `POST /api/event-types/seed`, `GET /api/events/upcoming`, `GET /api/calendar/connections/:id/calendars`, `GET /api/inspections/{id}/full`, `GET /api/inspections/{id}/sign-status`, the `statusFlags` object on dashboard rows, `POST /api/auth/setup/skip` and `POST /api/auth/onboarding/flag`. Missing default event types are filled in by `POST /api/admin/data/install-bundled-content`; the signed state of an inspection is still returned as `signedByClient` by the inspection read.
 * The unreachable `feature-disabled` page and its translation strings.
 
+## [2.6.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.5.0...openinspection-v2.6.0) (2026-11-07)
+
+
+### Features
+
+* **field-ui:** name the tag button, head the tag row, and link to the tag library when there are no tags ([962c590](https://github.com/InspectorHub/OpenInspection/commit/962c590adfaf7ba6416860514fb831574e654d49))
+* **field-ui:** open the editor on an item and add previous/next item on touch layouts ([e93cbf4](https://github.com/InspectorHub/OpenInspection/commit/e93cbf4c879b93587918dd84c753c544de307c13))
+* **field-ui:** open the editor on an item, previous/next item, and a worded way out of every sheet ([9be67d6](https://github.com/InspectorHub/OpenInspection/commit/9be67d621ffaf9fd910a6303c3007e0c7a220e15))
+* **migration:** accept a staged-object reference for large delivered bundles ([dbc05bf](https://github.com/InspectorHub/OpenInspection/commit/dbc05bf44dadfc07a1111360094f3b2c1fcd8eae))
+* **migration:** accept a staged-object reference for large delivered bundles ([0c318f2](https://github.com/InspectorHub/OpenInspection/commit/0c318f2723760cff825ae63581b2131aa28e9777))
+
+
+### Bug Fixes
+
+* **field-ui:** every sheet and dialog has a worded way out, and the close targets reach 44px ([a519794](https://github.com/InspectorHub/OpenInspection/commit/a519794904fb76723b33d87ba08ca727c0b0b09c))
+* **migration:** keep a referenced bundle until the whole apply succeeded, and tidy up its edges ([7df467b](https://github.com/InspectorHub/OpenInspection/commit/7df467b53d6df601fc0d989161b32be82dd4b5c3))
+* **migration:** mark the size message as operator-facing so the locale gate accepts it ([12cdca0](https://github.com/InspectorHub/OpenInspection/commit/12cdca076296997d3fa25366a2a10f06daf6c0f4))
+* **migration:** stop exporting the bundle size helper nothing imports ([8341f47](https://github.com/InspectorHub/OpenInspection/commit/8341f470d172f843a16c92bb0f77bed3ea96baab))
+* **ui:** a bottom sheet or dialog never reaches up under the status bar while the keyboard is open ([de3f19c](https://github.com/InspectorHub/OpenInspection/commit/de3f19cc023f59c13487fb644e43fb95e61b3866))
+* **ui:** bottom bars fade instead of popping, bottom sheets end at the keyboard, and text fields ask for the right keyboard ([c250543](https://github.com/InspectorHub/OpenInspection/commit/c2505431599f317bc9feecfd8e8700e08d0655f4))
+* **ui:** buttons grow with their label instead of overflowing; use the shared Button ([9b1e0e1](https://github.com/InspectorHub/OpenInspection/commit/9b1e0e10d876122959671d8a35bea37d7ec14e2d))
+* **ui:** dialogs stay above the soft keyboard; rating tiles and the item stepper fit a phone ([39e5264](https://github.com/InspectorHub/OpenInspection/commit/39e52640561969e6b387b1f8f4277070970eb198))
+* **ui:** iOS web view pins the page behind a layer when the host asks; the photo studio ends at the keyboard and clears the status bar ([4512467](https://github.com/InspectorHub/OpenInspection/commit/45124671264da42228d35adc73afe293a7ea35cd))
+* **ui:** number fields without a minimum keep the default keyboard; the item stepper only hides for a soft keyboard ([6400b6e](https://github.com/InspectorHub/OpenInspection/commit/6400b6e8aef812639f2b0aa614f974de830248b7))
+* **ui:** the dim backdrop of a dialog ends at the soft keyboard instead of running behind it ([db3121a](https://github.com/InspectorHub/OpenInspection/commit/db3121ae31c4fcbae7644f5f310eb74ffbce20bd))
+* **web:** raise text fields to 16px on iOS so focusing one does not zoom the page ([d43482e](https://github.com/InspectorHub/OpenInspection/commit/d43482e3032908bc987c0bb8065f861cd766aed6))
+
 ## [2.5.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.4.0...openinspection-v2.5.0) (2026-11-05)
 
 
