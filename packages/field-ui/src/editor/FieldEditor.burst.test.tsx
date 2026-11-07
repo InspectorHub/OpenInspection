@@ -7,7 +7,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { m } from "../i18n";
 import { ORIGINAL_QUALITY_KEY } from "../shared/original-quality";
-import { mount } from "./FieldEditor.capabilities.fixtures";
+import { mount, NO_ITEMS_DATA } from "./FieldEditor.capabilities.fixtures";
 
 // The camera itself is not under test: a stand-in that is always mounted and can "finish" with one frame.
 vi.mock("../components/editor/BurstCamera", () => ({
@@ -36,35 +36,36 @@ const burstRows = () => screen.queryAllByRole("button", { name: m.editor_mobile_
 
 describe("burst camera needs a target item", () => {
   it("phone: no open item means no Burst row (Speed mode keeps the Capture heading); an open item adds the row", async () => {
-    mount(null, true);
+    mount(null, true, NO_ITEMS_DATA);
     await itemsTab();
     await openMore();
     const sheet = screen.getByRole("dialog", { name: m.editor_mobile_more() });
     expect(burstRows()).toHaveLength(0);
-    // Capture now also holds Speed mode, which needs no open item, so the heading is there without a burst row.
-    expect(within(sheet).queryByText(m.editor_mobile_group_capture())).not.toBeNull();
-    expect(within(sheet).queryByRole("button", { name: m.editor_dock_speed_mode() })).not.toBeNull();
+    // Nothing to rate and nothing to open: Capture has no entry at all, so no heading either.
+    expect(within(sheet).queryByText(m.editor_mobile_group_capture())).toBeNull();
     // The rest of the drawer is unaffected.
     expect(within(sheet).queryByText(m.editor_mobile_group_inspection())).not.toBeNull();
     cleanup();
+    // The editor opens on the first item by itself, so an inspection that has items has one open without a tap.
     mount(null, true);
-    await openPhoneItem();
+    await screen.findByRole("button", { name: m.editor_item_open_library() });
     await openMore();
     expect(burstRows()).toHaveLength(1);
     expect(within(screen.getByRole("dialog", { name: m.editor_mobile_more() })).queryByText(m.editor_mobile_group_capture())).not.toBeNull();
   });
 
   it("desktop: the dock offers Burst camera only once an item is open", async () => {
-    mount(null, false);
+    mount(null, false, NO_ITEMS_DATA);
     fireEvent.click(await screen.findByRole("button", { name: m.editor_dock_open() }));
     const menu = await screen.findByRole("menu", { name: m.editor_dock_menu_label() });
     expect(within(menu).queryByText(m.editor_dock_burst_camera())).toBeNull();
     // Control: the other tiles are still there.
     expect(within(menu).queryByText(m.editor_dock_photo_studio())).not.toBeNull();
-    fireEvent.click((await screen.findAllByText("Flashing condition"))[0]);
-    await waitFor(() => expect(screen.queryByPlaceholderText(m.editor_item_notes_placeholder_no_library()) ?? screen.queryByPlaceholderText(m.editor_item_notes_placeholder())).not.toBeNull());
-    // The dock menu is still open; with an item it now lists the burst tile.
-    expect(within(screen.getByRole("menu", { name: m.editor_dock_menu_label() })).queryByText(m.editor_dock_burst_camera())).not.toBeNull();
+    cleanup();
+    // With items, the first one is open from the start, so the dock lists the burst tile at once.
+    mount(null, false);
+    fireEvent.click(await screen.findByRole("button", { name: m.editor_dock_open() }));
+    await waitFor(() => expect(within(screen.getByRole("menu", { name: m.editor_dock_menu_label() })).queryByText(m.editor_dock_burst_camera())).not.toBeNull());
   });
 
   it("a commit with no target item is announced and uploads nothing", async () => {

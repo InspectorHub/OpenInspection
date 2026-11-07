@@ -139,6 +139,9 @@ export const ALL_OMITS: readonly Absent[] = [
   "renderThemeControl", "pdf", "cameraCapture",
 ];
 
+/** An inspection whose sections hold no items yet: nothing can be open, so there is no item to act on. */
+export const NO_ITEMS_DATA: EditorData = createEmptyEditorData({ ...DATA, schema: { sections: [{ id: "s1", title: "Roofing", items: [] }] } });
+
 /** An inspection with no sections yet: the editor then offers to choose a template. */
 export const EMPTY_TEMPLATE_DATA: EditorData = createEmptyEditorData({ ...DATA, schema: { sections: [] } });
 /** The item carries one video clip, so its viewer has a toolbar with a poster-frame action. */

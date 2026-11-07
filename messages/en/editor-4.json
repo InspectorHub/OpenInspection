@@ -207,5 +207,6 @@
   "editor_publish_banner_publish_update": "Publish update",
   "editor_publish_banner_locked": "This report was published from another device or tab, so edits here would be refused. Reload to see where it stands.",
   "editor_publish_banner_reload": "Reload",
-  "editor_publish_banner_error": "Could not open the report for editing. Please try again."
+  "editor_publish_banner_error": "Could not open the report for editing. Please try again.",
+  "editor_item_position": "{n} of {total}"
 }

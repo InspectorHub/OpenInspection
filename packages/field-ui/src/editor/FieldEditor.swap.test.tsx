@@ -102,12 +102,12 @@ describe("a note typed before a layout swap reaches the results document", () =>
     expect(docNotes(h)).toBeUndefined();
   });
 
-  it("phone: Back out of the open item commits the note", async () => {
+  it("phone: Back out of the open item commits the note and leaves the editor", async () => {
     const h = mountForRatings(390);
     await openPhoneItem();
     fireEvent.change(notes()!, { target: { value: "left behind" } });
     fireEvent.click(screen.getByRole("button", { name: m.common_back() }));
-    await waitFor(() => expect(notes()).toBeNull());
+    await waitFor(() => expect(h.fake.exitCount).toBe(1));
     expect(docNotes(h)).toBe("left behind");
   });
 

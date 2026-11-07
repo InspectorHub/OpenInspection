@@ -52,13 +52,14 @@ describe("mobile drawers", () => {
   it("the app bar names Inspection Details while that view is open, and the item label otherwise", async () => {
     mount(null, true);
     const title = await screen.findByTestId("app-bar-title");
-    expect(title.textContent).toContain(m.editor_route_select_an_item());
+    // The editor opens on the first item, so the bar names it, never a prompt to select one.
+    expect(title.textContent).toContain("Flashing condition");
     expect(title.textContent).not.toContain(m.editor_shared_inspection_details());
     fireEvent.click(await tab(m.editor_mobile_drawer_sections()));
     fireEvent.click(await screen.findByTestId("inspection-details-entry"));
     const after = await screen.findByTestId("app-bar-title");
     expect(after.textContent).toContain(m.editor_shared_inspection_details());
-    expect(after.textContent).not.toContain(m.editor_route_select_an_item());
+    expect(after.textContent).not.toContain("Flashing condition");
   });
 });
 

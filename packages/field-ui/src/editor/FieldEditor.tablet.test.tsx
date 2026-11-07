@@ -64,12 +64,11 @@ describe("tablet tree: frame", () => {
     expect(within(list()).getAllByText(/condition|cap|seal/)).toHaveLength(4);
   });
 
-  it("with nothing open the right pane offers the first unrated item; opening it shows the editor beside the list, and the row is marked", async () => {
+  it("opens on the first item: the editor stands beside the list from the start, and the row is marked", async () => {
     mountForRatings(834);
     await screen.findByTestId("tablet-list-pane");
-    expect(within(pane()).getByText(m.editor_pane_start_title())).toBeTruthy();
-    fireEvent.click(within(pane()).getByRole("button", { name: m.editor_pane_open_item({ label: "Flashing condition" }) }));
     await within(pane()).findByRole("radiogroup", { name: m.editor_rating_aria() });
+    expect(within(pane()).queryByText(m.editor_pane_start_title())).toBeNull();
     const row = within(list()).getByText("Flashing condition").closest("[data-sortable-item]") as HTMLElement;
     expect(row.className).toContain("bg-ih-primary-tint");
     expect(row.className).toContain("min-h-14");

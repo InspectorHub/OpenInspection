@@ -207,5 +207,6 @@
   "editor_publish_banner_publish_update": "Publicar actualización",
   "editor_publish_banner_locked": "Este informe se publicó desde otro dispositivo o pestaña, por lo que aquí se rechazarían los cambios. Recargue para ver su estado.",
   "editor_publish_banner_reload": "Recargar",
+  "editor_item_position": "{n} de {total}",
   "editor_publish_banner_error": "No se pudo abrir el informe para editarlo. Inténtelo de nuevo."
 }

@@ -227,3 +227,48 @@ for (const [viewportIndex, vp] of VIEWPORTS.entries()) {
         });
     });
 }
+
+/**
+ * Where the editor opens, and Previous / Next on the touch layouts. The seeded inspection has one section of three
+ * items (Roof, Plumbing, Electrical): stepping across sections is covered by the component tests, which have a section
+ * with no items between two that have some.
+ */
+for (const vp of [...VIEWPORTS, ...DESKTOP_WIDTHS]) {
+    const expected: EditorLayout = layoutForWidth(vp.width);
+
+    test.describe(`opens on an item at ${vp.name} (${expected})`, () => {
+        test.describe.configure({ mode: 'serial' });
+        test.use({ viewport: { width: vp.width, height: vp.height } });
+
+        test.beforeEach(async ({ page }) => {
+            await openSeededEditor(page, vp.width);
+        });
+
+        test('(e) an item is open straight away: no blank pane, nothing to tap first', async ({ page }) => {
+            await expect(page.locator('#notes-textarea')).toBeVisible();
+            await expect(page.getByText('Select an item', { exact: false })).toHaveCount(0);
+        });
+
+        if (expected !== 'desktop') {
+            test('(f) Next and Previous walk the items, and the editor reopens on the last one used', async ({ page }) => {
+                const stepper = page.getByTestId('item-stepper');
+                const next = stepper.getByRole('button', { name: 'Next item' });
+                const prev = stepper.getByRole('button', { name: 'Previous item' });
+                // Walk to the end, wherever an earlier test left the place.
+                while (await next.isEnabled()) await next.click();
+                await expect(stepper.getByText('3 of 3')).toBeVisible();
+                await expect(page.locator('#notes-textarea')).toBeVisible();
+                await expectNoHorizontalScroll(page);
+                await page.reload();
+                await awaitCollabSynced(page);
+                await expect(page.getByTestId('item-stepper').getByText('3 of 3')).toBeVisible();
+                await page.getByTestId('item-stepper').getByRole('button', { name: 'Previous item' }).click();
+                await expect(page.getByTestId('item-stepper').getByText('2 of 3')).toBeVisible();
+                await expect(prev).toBeEnabled();
+                // Back to the first item so the next viewport starts the same way.
+                while (await prev.isEnabled()) await prev.click();
+                await expect(stepper.getByText('1 of 3')).toBeVisible();
+            });
+        }
+    });
+}
