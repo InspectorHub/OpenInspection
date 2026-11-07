@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.9.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.8.0...field-ui-v0.9.0) (2026-11-07)
+
+
+### Features
+
+* **field-ui:** name the tag button, head the tag row, and link to the tag library when there are no tags ([962c590](https://github.com/InspectorHub/OpenInspection/commit/962c590adfaf7ba6416860514fb831574e654d49))
+* **field-ui:** open the editor on an item and add previous/next item on touch layouts ([e93cbf4](https://github.com/InspectorHub/OpenInspection/commit/e93cbf4c879b93587918dd84c753c544de307c13))
+* **field-ui:** open the editor on an item, previous/next item, and a worded way out of every sheet ([9be67d6](https://github.com/InspectorHub/OpenInspection/commit/9be67d621ffaf9fd910a6303c3007e0c7a220e15))
+
+
+### Bug Fixes
+
+* **field-ui:** bring the bottom bars back only after the keyboard is gone ([99e1631](https://github.com/InspectorHub/OpenInspection/commit/99e163149ab899094efcf2fdc05d51fcf90bcce6))
+* **field-ui:** every sheet and dialog has a worded way out, and the close targets reach 44px ([a519794](https://github.com/InspectorHub/OpenInspection/commit/a519794904fb76723b33d87ba08ca727c0b0b09c))
+* **field-ui:** hide the bottom bars while a text field has focus on a phone ([4ca4a3b](https://github.com/InspectorHub/OpenInspection/commit/4ca4a3b6d236d7c56a3d61e30298457b0001525f))
+* **field-ui:** keep the version history Save button on one line on a phone ([2565318](https://github.com/InspectorHub/OpenInspection/commit/2565318b316a3fe2da12ed9e7e97040ec483f6d4))
+* **field-ui:** review fixes for the editor's opening place and Previous / Next ([fc4edbd](https://github.com/InspectorHub/OpenInspection/commit/fc4edbda39a77dfb54368502adb184fed3dc0e20))
+* **field-ui:** the item stepper sits on the bottom bar for a short item, and a closed bottom sheet casts no shadow ([96ee76a](https://github.com/InspectorHub/OpenInspection/commit/96ee76a616b8b1d63e38d8a8b5a21c80e062c778))
+* **ui:** a bottom sheet or dialog never reaches up under the status bar while the keyboard is open ([de3f19c](https://github.com/InspectorHub/OpenInspection/commit/de3f19cc023f59c13487fb644e43fb95e61b3866))
+* **ui:** bottom bars fade instead of popping, bottom sheets end at the keyboard, and text fields ask for the right keyboard ([c250543](https://github.com/InspectorHub/OpenInspection/commit/c2505431599f317bc9feecfd8e8700e08d0655f4))
+* **ui:** buttons grow with their label instead of overflowing; use the shared Button ([9b1e0e1](https://github.com/InspectorHub/OpenInspection/commit/9b1e0e10d876122959671d8a35bea37d7ec14e2d))
+* **ui:** dialogs stay above the soft keyboard; rating tiles and the item stepper fit a phone ([39e5264](https://github.com/InspectorHub/OpenInspection/commit/39e52640561969e6b387b1f8f4277070970eb198))
+* **ui:** iOS web view pins the page behind a layer when the host asks; the photo studio ends at the keyboard and clears the status bar ([4512467](https://github.com/InspectorHub/OpenInspection/commit/45124671264da42228d35adc73afe293a7ea35cd))
+* **ui:** number fields without a minimum keep the default keyboard; the item stepper only hides for a soft keyboard ([6400b6e](https://github.com/InspectorHub/OpenInspection/commit/6400b6e8aef812639f2b0aa614f974de830248b7))
+
 ## [0.8.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.7.0...field-ui-v0.8.0) (2026-11-05)
 
 
