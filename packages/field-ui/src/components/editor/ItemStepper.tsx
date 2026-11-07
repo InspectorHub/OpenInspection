@@ -1,5 +1,6 @@
 import { Button, Icon } from "@core/shared-ui";
 import { m } from "../../i18n";
+import { useTextEntryActive } from "../../hooks/useTextEntryActive";
 import type { ItemNeighbours } from "../../editor/item-neighbours";
 
 /**
@@ -8,8 +9,10 @@ import type { ItemNeighbours } from "../../editor/item-neighbours";
  */
 export function ItemStepper({ neighbours, onPrev, onNext, className = "" }: { neighbours: ItemNeighbours; onPrev(): void; onNext(): void; className?: string }) {
   const { prev, next, position } = neighbours;
+  // Out of sight while a text field has focus (see the hook): the bar keeps its place, so the page does not shift when it comes back.
+  const typing = useTextEntryActive();
   return (
-    <nav aria-label={m.editor_hud_nav_prev_next()} data-testid="item-stepper" className={`flex items-center gap-2 border-t border-ih-border bg-ih-bg-card px-3 py-2 ${className}`}>
+    <nav aria-label={m.editor_hud_nav_prev_next()} data-testid="item-stepper" className={`flex items-center gap-2 border-t border-ih-border bg-ih-bg-card px-3 py-2 ${typing ? "invisible" : ""} ${className}`}>
       <Button variant="secondary" onClick={onPrev} disabled={prev === null} aria-label={m.editor_hud_nav_prev()} className="min-h-11 flex-1 whitespace-nowrap touch-manipulation" icon={<Icon name="chevL" size={16} />}>
         {m.editor_speedmode_prev()}
       </Button>

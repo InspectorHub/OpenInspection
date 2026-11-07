@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { MobileDrawerTriggers } from './MobileDrawerTriggers';
 import { m } from '../../i18n';
 
@@ -75,5 +75,22 @@ describe('MobileDrawerTriggers', () => {
     const css = readFileSync(join(process.cwd(), 'packages', 'field-ui', 'src', 'theme.css'), 'utf8');
     expect(css).toMatch(/--ih-mobile-nav-h:\s*calc\(3\.5rem \+ env\(safe-area-inset-bottom\)\)/);
     expect(css).toMatch(/:root\[data-mobile-nav\]\s*\{[^}]*--ih-toast-bottom:\s*calc\(var\(--ih-mobile-nav-h\) \+ 1rem\)/);
+  });
+  it('is out of sight while a text field has focus (iOS lays a bottom-fixed bar out a frame late when the keyboard shrinks the web view) and back after', async () => {
+    render(
+      <>
+        <textarea aria-label="notes" />
+        <MobileDrawerTriggers onOpen={() => {}} />
+      </>,
+    );
+    const nav = screen.getByRole('navigation', { name: m.editor_mobile_nav_label() });
+    expect(nav.className).not.toContain('invisible');
+    act(() => screen.getByLabelText('notes').focus());
+    expect(nav.className).toContain('invisible');
+    act(() => screen.getByLabelText('notes').blur());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+    });
+    expect(nav.className).not.toContain('invisible');
   });
 });
