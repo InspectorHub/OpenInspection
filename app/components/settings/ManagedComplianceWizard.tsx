@@ -412,7 +412,7 @@ export function ManagedComplianceWizard({ compliance, legalName, managedProvider
               <input
                 id="mcw-legalName"
                 name="legalName"
-                type="text"
+                type="text" autoCapitalize="words"
                 value={fields.legalName}
                 onChange={onChange("legalName")}
                 placeholder={m.settings_mcw_legal_name_placeholder()}
@@ -428,7 +428,7 @@ export function ManagedComplianceWizard({ compliance, legalName, managedProvider
               <input
                 id="mcw-repName"
                 name="repName"
-                type="text"
+                type="text" autoCapitalize="words"
                 value={fields.repName}
                 onChange={onChange("repName")}
                 placeholder={m.settings_mcw_rep_name_placeholder()}
@@ -468,7 +468,7 @@ export function ManagedComplianceWizard({ compliance, legalName, managedProvider
               <input
                 id="mcw-email"
                 name="email"
-                type="email"
+                type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 value={fields.email}
                 onChange={onChange("email")}
                 placeholder={m.settings_mcw_email_placeholder()}
@@ -484,7 +484,7 @@ export function ManagedComplianceWizard({ compliance, legalName, managedProvider
               <input
                 id="mcw-areaCode"
                 name="areaCode"
-                type="text"
+                type="text" inputMode="numeric"
                 value={fields.areaCode}
                 onChange={onChange("areaCode")}
                 placeholder="415"

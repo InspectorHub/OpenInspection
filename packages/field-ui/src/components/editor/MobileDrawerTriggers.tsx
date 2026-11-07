@@ -70,7 +70,7 @@ export function MobileDrawerTriggers({ onOpen, showTheme = true }: MobileDrawerT
         };
     }, []);
     return (
-        <nav aria-label={m.editor_mobile_nav_label()} className={`fixed left-0 right-0 bottom-0 z-30 h-[var(--ih-mobile-nav-h)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] bg-ih-bg-card border-t border-ih-border flex ${typing ? "invisible" : ""}`}>
+        <nav aria-label={m.editor_mobile_nav_label()} className={`fixed left-0 right-0 bottom-0 z-30 h-[var(--ih-mobile-nav-h)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] bg-ih-bg-card border-t border-ih-border flex transition-[opacity,visibility] duration-150 ${typing ? "opacity-0 invisible" : "opacity-100"}`}>
             {([
                 { id: 'sections', label: m.editor_mobile_drawer_sections(), icon: 'sections' },
                 { id: 'items',    label: m.editor_mobile_drawer_items(),    icon: 'items' },

@@ -111,7 +111,7 @@ export function SmsDeliveryPanel({
         <div>
           <label htmlFor="companyPhone" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_smsdelivery_company_phone_label()}</label>
           <input
-            type="tel" name="companyPhone" id="companyPhone" defaultValue={companyPhone}
+            type="tel" inputMode="tel" name="companyPhone" id="companyPhone" defaultValue={companyPhone}
             placeholder="+1 555 123 4567"
             className="w-full md:w-1/2 h-9 px-3 rounded-ih-button border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
           />

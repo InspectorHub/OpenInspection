@@ -108,7 +108,7 @@ export default function ForgotPasswordPage() {
         <Input
           id={fields.email.id}
           name={fields.email.name}
-          type="email"
+          type="email" autoComplete="email" enterKeyHint="go"
           autoFocus
           label={m.auth_login_email_label()}
           aria-invalid={fields.email.errors ? true : undefined}

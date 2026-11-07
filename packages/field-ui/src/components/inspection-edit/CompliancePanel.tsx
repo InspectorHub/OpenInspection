@@ -192,7 +192,7 @@ function SignoffRoleCard({
           {([...(mayNamePerson ? [[m.editor_compliance_person_id(), personId, setPersonId], [m.editor_compliance_name(), name, setName]] as const : []), [m.editor_compliance_license_optional(), license, setLicense] as const]).map(([label, value, set]) => (
             <label key={label} className="block">
               <span className="block text-[11px] text-ih-fg-3">{label}</span>
-              <input placeholder={label} value={value} onChange={(e) => set(e.target.value)} disabled={saving} className="ih-input w-full" />
+              <input placeholder={label} value={value} onChange={(e) => set(e.target.value)} disabled={saving} className="ih-input w-full" autoCapitalize={set === setName ? "words" : "none"} autoCorrect="off" spellCheck={false} />
             </label>
           ))}
           {pairTried && pairIncomplete ? <p role="alert" className="text-[11px] text-ih-bad-fg">{m.editor_compliance_signoff_pair_needed()}</p> : null}

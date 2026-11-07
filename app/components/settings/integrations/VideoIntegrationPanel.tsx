@@ -135,7 +135,7 @@ export function VideoIntegrationPanel({
             <input
               id="streamCustomerSubdomain"
               name="streamCustomerSubdomain"
-              type="text"
+              type="text" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
               value={subdomain}
               onChange={(e) => handleSubdomainChange(e.target.value)}
               placeholder={m.settings_video_subdomain_placeholder()}

@@ -260,7 +260,7 @@ export function RatingSystemEditor({
                   value={lvl.abbreviation}
                   onChange={(e) => patchLevel(i, { abbreviation: e.target.value })}
                   placeholder={m.rating_editor_abbr_placeholder()}
-                  maxLength={8}
+                  maxLength={8} autoCapitalize="characters" autoCorrect="off" spellCheck={false}
                   className="w-16 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold uppercase text-ih-fg-1 focus:shadow-ih-focus focus:border-ih-primary outline-none"
                 />
                 <input

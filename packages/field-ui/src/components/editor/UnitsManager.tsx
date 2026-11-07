@@ -185,7 +185,7 @@ function UnitRow({
             setName(unit.name);
           }
         }}
-        aria-label={m.editor_unitsmanager_rename_aria({ name: unit.name })}
+        aria-label={m.editor_unitsmanager_rename_aria({ name: unit.name })} enterKeyHint="done"
         maxLength={80}
         className="flex-1 h-8 px-2.5 rounded-ih-input border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1"
       />
@@ -242,7 +242,7 @@ function AddUnitForm({ busy, onSubmit }: { busy: boolean; onSubmit: SubmitUnit }
             add();
           }
         }}
-        placeholder={m.editor_unitsmanager_new_unit_name()}
+        placeholder={m.editor_unitsmanager_new_unit_name()} enterKeyHint="done"
         maxLength={80}
         aria-label={m.editor_unitsmanager_new_unit_name()}
         className="flex-1 h-8 px-2.5 rounded-ih-input border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"

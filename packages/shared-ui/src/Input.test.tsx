@@ -64,3 +64,43 @@ describe("Input", () => {
     expect(err2.className).toContain("row-start-1");
   });
 });
+
+describe("Input keyboard defaults", () => {
+  const attrs = (el: Element | null) => ({
+    inputmode: el?.getAttribute("inputmode") ?? null,
+    capitalize: el?.getAttribute("autocapitalize") ?? null,
+    correct: el?.getAttribute("autocorrect") ?? null,
+    spell: el?.getAttribute("spellcheck") ?? null,
+    enter: el?.getAttribute("enterkeyhint") ?? null,
+  });
+
+  it("email: email keypad, no capitalisation, correction or spellcheck", () => {
+    const { container } = render(<Input type="email" />);
+    expect(attrs(container.querySelector("input"))).toMatchObject({
+      inputmode: "email", capitalize: "none", correct: "off", spell: "false",
+    });
+  });
+
+  it("tel and url pick their own keypads", () => {
+    expect(attrs(render(<Input type="tel" />).container.querySelector("input")).inputmode).toBe("tel");
+    expect(attrs(render(<Input type="url" />).container.querySelector("input")).inputmode).toBe("url");
+  });
+
+  it("search gets a Search key", () => {
+    const { container } = render(<Input type="search" />);
+    expect(attrs(container.querySelector("input")).enter).toBe("search");
+  });
+
+  it("number: numeric for whole numbers, decimal for fractional steps, nothing when negatives are allowed", () => {
+    expect(attrs(render(<Input type="number" />).container.querySelector("input")).inputmode).toBe("numeric");
+    expect(attrs(render(<Input type="number" step="0.01" />).container.querySelector("input")).inputmode).toBe("decimal");
+    expect(attrs(render(<Input type="number" step="any" />).container.querySelector("input")).inputmode).toBe("decimal");
+    expect(attrs(render(<Input type="number" min={-5} />).container.querySelector("input")).inputmode).toBeNull();
+  });
+
+  it("plain text gets no defaults, and explicit props win", () => {
+    expect(attrs(render(<Input type="text" />).container.querySelector("input")).inputmode).toBeNull();
+    const { container } = render(<Input type="email" inputMode="text" />);
+    expect(attrs(container.querySelector("input")).inputmode).toBe("text");
+  });
+});

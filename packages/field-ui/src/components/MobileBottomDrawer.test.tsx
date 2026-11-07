@@ -43,7 +43,10 @@ describe("MobileBottomDrawer", () => {
     );
     const style = sheet(container).getAttribute("style") ?? "";
     expect(style).toContain("height: 70vh");
-    expect(style).toContain("max-height: 70dvh");
+    expect(style).toContain("max-height: min(70dvh");
+    // The sheet and its backdrop end at the soft keyboard instead of running behind it.
+    expect(style).toContain("--keyboard-height");
+    expect(sheet(container).className).toContain("bottom-[var(--keyboard-height,0px)]");
   });
 
   it("is reachable while open", () => {

@@ -43,7 +43,7 @@ export function CreateTemplateModal({
         <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">{m.templates_name_label()}</label>
         <input
           ref={nameRef}
-          value={newName}
+          value={newName} enterKeyHint="done"
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleCreate()}
           placeholder={m.templates_create_name_placeholder()}

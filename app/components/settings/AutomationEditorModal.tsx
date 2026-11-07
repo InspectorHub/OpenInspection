@@ -158,7 +158,7 @@ export function AutomationEditorModal({
                 {activeRoleProfiles.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
               </select>
             )}
-            <input name="delayMinutes" type="number" min={0} defaultValue={rule?.delayMinutes ?? 0}
+            <input name="delayMinutes" type="number" inputMode="numeric" min={0} defaultValue={rule?.delayMinutes ?? 0}
               className="w-24 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px]" title={m.settings_automations_delay_title()} />
           </div>
           {recipientKind === "all" && (

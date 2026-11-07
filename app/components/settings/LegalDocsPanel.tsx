@@ -147,7 +147,7 @@ export function LegalDocsPanel({ initial }: { initial: LegalDocsInitial }) {
               {m.settings_compliance_legal_privacy_url()}
             </span>
             <input
-              type="url"
+              type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}
               value={customPrivacyUrl}
               onChange={(e) => {
                 setCustomPrivacyUrl(e.target.value);
@@ -162,7 +162,7 @@ export function LegalDocsPanel({ initial }: { initial: LegalDocsInitial }) {
               {m.settings_compliance_legal_terms_url()}
             </span>
             <input
-              type="url"
+              type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}
               value={customTermsUrl}
               onChange={(e) => {
                 setCustomTermsUrl(e.target.value);

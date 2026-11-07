@@ -48,7 +48,7 @@ export function CommentLibraryDrawer({ open, comments, state, serverComments, on
  <input
  ref={searchRef}
  id="comment-library-search"
- type="text"
+ type="text" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
  placeholder={m.editor_comment_library_search_placeholder()}
  value={state.commentLibrarySearch}
  onChange={(e) => {

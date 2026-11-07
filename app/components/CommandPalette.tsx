@@ -323,7 +323,7 @@ export function CommandPalette({
             value={query}
             onChange={(e) => { setQuery(e.target.value); setActiveIdx(0); }}
             onKeyDown={handleKeyDown}
-            placeholder={m.command_palette_search_placeholder()}
+            placeholder={m.command_palette_search_placeholder()} inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false}
             className="flex-1 bg-transparent text-[14px] text-ih-fg-1 outline-none placeholder:text-ih-fg-4"
           />
           <kbd className="hidden sm:inline px-1.5 py-0.5 rounded bg-ih-bg-muted text-[10px] font-bold text-ih-fg-2">ESC</kbd>

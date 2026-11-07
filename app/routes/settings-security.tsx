@@ -341,7 +341,7 @@ export default function SettingsSecurityPage() {
                 type="email"
                 id={deleteFields.confirmEmail.id}
                 name={deleteFields.confirmEmail.name}
-                autoComplete="off"
+                autoComplete="off" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="done"
                 aria-invalid={deleteFields.confirmEmail.errors ? true : undefined}
                 placeholder={user.email ?? m.settings_security_delete_confirm_placeholder()}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-bad focus:shadow-ih-focus outline-none text-[13px] text-ih-fg-1"

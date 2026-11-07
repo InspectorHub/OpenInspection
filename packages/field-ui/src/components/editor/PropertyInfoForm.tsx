@@ -253,7 +253,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
                 )}
                 {!readOnly && (f.type === "text" || f.type === "number" || f.type === "date") && (
                   <input
-                    type={f.type}
+                    type={f.type} inputMode={f.type === "number" ? (["yearBuilt", "sqft", "bedrooms"].includes(f.id) ? "numeric" : "decimal") : undefined} autoCapitalize={f.id === "county" ? "words" : undefined}
                     value={(inspection[f.id] as string | number) ?? ""}
                     onChange={(e) => onSave?.(f.id, e.target.value)}
                     onBlur={(e) => commitAll(f, e.target.value)}

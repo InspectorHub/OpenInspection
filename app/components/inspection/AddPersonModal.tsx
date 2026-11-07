@@ -226,7 +226,7 @@ export function AddPersonModal({
                 label={m.inspections_hub_people_name_label()}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder={m.inspections_hub_people_name_ph()}
+                placeholder={m.inspections_hub_people_name_ph()} autoCapitalize="words"
               />
               <Input
                 label={m.inspections_hub_people_email_label()}
@@ -246,7 +246,7 @@ export function AddPersonModal({
                 label={m.inspections_hub_people_agency_label()}
                 value={newAgency}
                 onChange={(e) => setNewAgency(e.target.value)}
-                placeholder={m.inspections_hub_people_agency_ph()}
+                placeholder={m.inspections_hub_people_agency_ph()} autoCapitalize="words"
               />
             </div>
           ) : (
@@ -258,7 +258,7 @@ export function AddPersonModal({
                   // Small delay so a click on a dropdown item fires first.
                   setTimeout(() => setDropdownOpen(false), 150);
                 }}
-                placeholder={m.inspections_hub_people_search_ph()}
+                placeholder={m.inspections_hub_people_search_ph()} inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
               />
               {dropdownOpen && (
                 <div className="absolute z-10 w-full mt-1 rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover overflow-hidden">

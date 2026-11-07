@@ -185,7 +185,7 @@ export function EditorHeader({
  <div data-testid="header-search" className={`${HEADER_OVERFLOW.versionHistory.inline} items-center gap-2 shrink-0`}>
  {/* Search */}
  <input
-  type="text"
+  type="text" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
   placeholder={m.editor_header_search_placeholder()}
   aria-label={m.editor_header_search_placeholder()}
   value={state.searchQuery}

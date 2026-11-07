@@ -529,7 +529,7 @@ export function PhotoAnnotator({
                   <div className="bg-slate-800 rounded-lg border border-white/20 p-2 shadow-ih-popover">
                     <input
                       ref={labelInputRef}
-                      type="text"
+                      type="text" enterKeyHint="done"
                       value={labelText}
                       onChange={(e) => setLabelText(e.target.value)}
                       onKeyDown={(e) => {

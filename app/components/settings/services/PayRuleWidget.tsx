@@ -141,7 +141,7 @@ function RuleRow({
                 <div className="flex items-center gap-1">
                     {!isPercent && <span className="text-[12px] text-ih-fg-3">$</span>}
                     <input
-                        type="number"
+                        type="number" inputMode="decimal"
                         min="0"
                         step="0.01"
                         className={`${FIELD} w-20`}
@@ -157,7 +157,7 @@ function RuleRow({
                         <label className="text-[11px] text-ih-fg-3">{m.settings_pay_rule_deduction_label()}</label>
                         <span className="text-[12px] text-ih-fg-3">$</span>
                         <input
-                            type="number"
+                            type="number" inputMode="decimal"
                             min="0"
                             step="0.01"
                             className={`${FIELD} w-20`}

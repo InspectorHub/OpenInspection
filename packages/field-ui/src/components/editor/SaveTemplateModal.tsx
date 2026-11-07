@@ -59,7 +59,7 @@ export function SaveTemplateModal({ mode, name, onChangeName, onConfirm, onCance
           {m.editor_savetpl_name_label()}
           <input
             ref={nameRef}
-            type="text"
+            type="text" enterKeyHint="done"
             value={name}
             onChange={(e) => onChangeName(e.target.value)}
             placeholder={m.editor_savetpl_name_placeholder()}

@@ -253,7 +253,7 @@ export default function TemplatesPage() {
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative">
           <input
-            type="text"
+            type="text" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={m.templates_search_placeholder()}

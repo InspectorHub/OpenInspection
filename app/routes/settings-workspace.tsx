@@ -238,7 +238,7 @@ export default function SettingsWorkspacePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
               <label htmlFor={fields.companyName.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_company_name_label()}</label>
-              <input type="text" id={fields.companyName.id} name={fields.companyName.name} defaultValue={branding.companyName ?? "OpenInspection"}
+              <input type="text" autoCapitalize="words" id={fields.companyName.id} name={fields.companyName.name} defaultValue={branding.companyName ?? "OpenInspection"}
                 aria-invalid={fields.companyName.errors ? true : undefined}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] text-ih-fg-1" />
               {fields.companyName.errors && (
@@ -250,7 +250,7 @@ export default function SettingsWorkspacePage() {
                   makes "leave blank" obvious. The hint stays because it explains
                   WHERE the value comes from, which the label alone does not. */}
               <label htmlFor={fields.legalName.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_legal_name_label()}</label>
-              <input type="text" id={fields.legalName.id} name={fields.legalName.name} defaultValue={branding.legalName ?? ""}
+              <input type="text" autoCapitalize="words" id={fields.legalName.id} name={fields.legalName.name} defaultValue={branding.legalName ?? ""}
                 placeholder={branding.companyName ?? ""}
                 aria-invalid={fields.legalName.errors ? true : undefined}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] text-ih-fg-1" />

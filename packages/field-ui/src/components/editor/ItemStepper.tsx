@@ -12,7 +12,7 @@ export function ItemStepper({ neighbours, onPrev, onNext, className = "" }: { ne
   // Out of sight while a text field has focus (see the hook): the bar keeps its place, so the page does not shift when it comes back.
   const typing = useTextEntryActive();
   return (
-    <nav aria-label={m.editor_hud_nav_prev_next()} data-testid="item-stepper" className={`flex items-center gap-2 border-t border-ih-border bg-ih-bg-card px-3 py-2 ${typing ? "invisible" : ""} ${className}`}>
+    <nav aria-label={m.editor_hud_nav_prev_next()} data-testid="item-stepper" className={`flex items-center gap-2 border-t border-ih-border bg-ih-bg-card px-3 py-2 transition-[opacity,visibility] duration-150 ${typing ? "opacity-0 invisible" : "opacity-100"} ${className}`}>
       <Button variant="secondary" onClick={onPrev} disabled={prev === null} aria-label={m.editor_hud_nav_prev()} className="min-h-11 min-w-0 flex-1 touch-manipulation" icon={<Icon name="chevL" size={16} />}>
         {m.editor_speedmode_prev()}
       </Button>

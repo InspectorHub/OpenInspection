@@ -77,7 +77,7 @@ export function RetentionWindowSection({
                         {unitLabel ?? m.settings_compliance_years_label()}
                     </span>
                     <input
-                        type="number"
+                        type="number" inputMode="numeric"
                         min={min}
                         max={max}
                         step={1}

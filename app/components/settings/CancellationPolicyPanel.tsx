@@ -188,7 +188,7 @@ export function CancellationPolicyPanel({ policy, clause, agreements }: Props) {
         </span>
         <div className="flex items-center gap-2">
           <input
-            type="number"
+            type="number" inputMode="numeric"
             min="1"
             step="1"
             className={NUM_FIELD}

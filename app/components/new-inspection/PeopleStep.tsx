@@ -82,7 +82,7 @@ export function PeopleStep({
               // Delay so a click on a suggestion lands before the list closes.
               setTimeout(() => clientSearch.setDropdownOpen(false), 150);
             }}
-            placeholder={m.newinsp_people_client_search_ph()}
+            placeholder={m.newinsp_people_client_search_ph()} autoCapitalize="words"
             className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
           />
           <ContactSuggestions
@@ -118,7 +118,7 @@ export function PeopleStep({
         <div>
           <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_people_email_label()}</label>
           <input
-            type="email"
+            type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
             value={clientEmail}
             onChange={(e) => setClientEmail(e.target.value)}
             placeholder={m.newinsp_people_client_email_ph()}
@@ -128,7 +128,7 @@ export function PeopleStep({
         <div>
           <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_people_phone_label()}</label>
           <input
-            type="tel"
+            type="tel" inputMode="tel"
             value={clientPhone}
             onChange={(e) => setClientPhone(e.target.value)}
             placeholder={m.newinsp_people_phone_ph()}
@@ -171,14 +171,14 @@ export function PeopleStep({
               <input
                 value={newAgentName}
                 onChange={(e) => setNewAgentName(e.target.value)}
-                placeholder={m.newinsp_people_agent_name_ph()}
+                placeholder={m.newinsp_people_agent_name_ph()} autoCapitalize="words"
                 className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
               />
             </div>
             <div>
               <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_people_email_label()}</label>
               <input
-                type="email"
+                type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 value={newAgentEmail}
                 onChange={(e) => setNewAgentEmail(e.target.value)}
                 placeholder={m.newinsp_people_agent_email_ph()}
@@ -197,7 +197,7 @@ export function PeopleStep({
                 // Small delay so click on dropdown item fires first.
                 setTimeout(() => agentSearchCtl.setDropdownOpen(false), 150);
               }}
-              placeholder={m.newinsp_people_search_ph()}
+              placeholder={m.newinsp_people_search_ph()} autoCapitalize="words"
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
             />
             <ContactSuggestions

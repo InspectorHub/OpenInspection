@@ -43,7 +43,7 @@ export function InlineRename({ value, onCommit, onCancel, className, ariaLabel }
     <input
       ref={ref}
       value={draft}
-      aria-label={ariaLabel}
+      aria-label={ariaLabel} enterKeyHint="done"
       onChange={(e) => setDraft(e.target.value)}
       onKeyDown={(e) => {
         e.stopPropagation(); // don't let editor shortcuts (j/k/f/…) fire while typing

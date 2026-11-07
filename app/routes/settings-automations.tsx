@@ -217,7 +217,7 @@ export default function SettingsAutomations() {
         <label htmlFor="reviewUrl" className="block text-[12px] font-semibold text-ih-fg-2">{m.settings_automations_review_label()}</label>
         <p className="text-[11px] text-ih-fg-3">{m.settings_automations_review_hint()}</p>
         <div className="flex gap-2">
-          <input id="reviewUrl" name="reviewUrl" type="url" defaultValue={reviewUrl} placeholder={m.settings_automations_review_placeholder()}
+          <input id="reviewUrl" name="reviewUrl" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="off" enterKeyHint="done" defaultValue={reviewUrl} placeholder={m.settings_automations_review_placeholder()}
             className="flex-1 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1" />
           <Button type="submit" variant="secondary" pending={nav.state !== "idle"} className="shrink-0">{m.common_save()}</Button>
         </div>

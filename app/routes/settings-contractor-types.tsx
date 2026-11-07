@@ -88,7 +88,7 @@ function ContractorTypeRow({ t, idx, count, reordering, onMove, onRequestDelete 
         <fetcher.Form method="POST" className="flex-1 flex gap-2" onSubmit={renameLatch(() => setEditing(false))}>
           <input type="hidden" name="intent" value="rename" />
           <input type="hidden" name="id" value={t.id} />
-          <input name="name" value={name} onChange={(e) => setName(e.target.value)} autoFocus className={`flex-1 ${INPUT} py-1.5`} />
+          <input name="name" value={name} onChange={(e) => setName(e.target.value)} autoFocus enterKeyHint="done" className={`flex-1 ${INPUT} py-1.5`} />
           <Button type="submit" variant="link" size="sm" disabled={!name.trim()}>{m.common_save()}</Button>
           <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setName(t.name); }}>{m.common_cancel()}</Button>
         </fetcher.Form>
@@ -161,7 +161,7 @@ export default function SettingsContractorTypes() {
       <div className="bg-ih-bg-card border border-ih-border rounded-lg p-4">
         <createFetcher.Form method="POST" className="flex gap-2" onSubmit={createLatch((e) => { if (!newName.trim()) { e.preventDefault(); return; } setNewName(""); })}>
           <input type="hidden" name="intent" value="create" />
-          <input name="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={m.settings_contractor_types_name_placeholder()} className={`flex-1 ${INPUT}`} />
+          <input name="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={m.settings_contractor_types_name_placeholder()} enterKeyHint="done" className={`flex-1 ${INPUT}`} />
           <Button type="submit" variant="primary" pending={!newName.trim()}>{m.common_add()}</Button>
         </createFetcher.Form>
       </div>

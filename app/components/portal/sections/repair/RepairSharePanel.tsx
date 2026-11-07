@@ -77,7 +77,7 @@ export function RepairSharePanel({
             {m.repair_share_email_heading()}
           </p>
           <input
-            type="email"
+            type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
             placeholder={m.repair_share_email_placeholder()}
             value={emailTo}
             onChange={(e) => onEmailToChange(e.target.value)}

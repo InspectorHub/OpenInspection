@@ -128,7 +128,7 @@ export function DefectCategoryEditor({
           <label htmlFor="defect-category-sort-order" className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-3 mb-1.5">{m.defect_category_editor_sort_label()}</label>
           <input
             id="defect-category-sort-order"
-            type="number"
+            type="number" inputMode="numeric"
             min={0}
             max={999}
             value={sortOrder}

@@ -162,7 +162,7 @@ export function SmsSecretsPanel({
           <div className="flex-1 min-w-[200px]">
             <label htmlFor="sms-test-to" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_smssecrets_test_label()}</label>
             <input
-              type="tel" name="to" id="sms-test-to" placeholder="+15551234567"
+              type="tel" inputMode="tel" name="to" id="sms-test-to" placeholder="+15551234567"
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
             />
           </div>

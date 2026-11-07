@@ -73,7 +73,7 @@ export function AddItemTypeModal({ open, onConfirm, onCancel }: AddItemTypeModal
         {m.editor_additem_label_label()}
         <input
           ref={labelRef}
-          type="text"
+          type="text" enterKeyHint="done"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder={m.editor_additem_label_placeholder()}

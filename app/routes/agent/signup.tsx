@@ -226,7 +226,7 @@ export default function AgentSignupPage() {
                   {m.auth_join_name_label()}
                 </label>
                 <input
-                  type="text"
+                  type="text" autoComplete="name" autoCapitalize="words" enterKeyHint="next"
                   id={fields.name.id}
                   name={fields.name.name}
                   placeholder={m.auth_agent_name_placeholder()}
@@ -246,7 +246,7 @@ export default function AgentSignupPage() {
                   {m.auth_agent_signup_email_label()}
                 </label>
                 <input
-                  type="email"
+                  type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="email" enterKeyHint="next"
                   id={fields.email.id}
                   name={fields.email.name}
                   defaultValue={email}
@@ -267,7 +267,7 @@ export default function AgentSignupPage() {
                   {m.auth_login_password_label()}
                 </label>
                 <input
-                  type="password"
+                  type="password" autoComplete="new-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="go"
                   id={fields.password.id}
                   name={fields.password.name}
                   placeholder={m.auth_agent_password_placeholder()}

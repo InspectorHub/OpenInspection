@@ -28,7 +28,7 @@ export function ChangePasswordPanel({ pwForm, pwFields, showPassword, setShowPas
         <input type="hidden" name="intent" value="change-password" />
         <div className="space-y-2">
           <label htmlFor={pwFields.currentPassword.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_pw_current_label()}</label>
-          <input type={showPassword ? "text" : "password"} id={pwFields.currentPassword.id} name={pwFields.currentPassword.name} autoComplete="current-password"
+          <input type={showPassword ? "text" : "password"} id={pwFields.currentPassword.id} name={pwFields.currentPassword.name} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false}
             aria-invalid={pwFields.currentPassword.errors ? true : undefined}
             className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[13px] text-ih-fg-1" />
           {pwFields.currentPassword.errors && (
@@ -37,7 +37,7 @@ export function ChangePasswordPanel({ pwForm, pwFields, showPassword, setShowPas
         </div>
         <div className="space-y-2">
           <label htmlFor={pwFields.newPassword.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_pw_new_label()}</label>
-          <input type={showPassword ? "text" : "password"} id={pwFields.newPassword.id} name={pwFields.newPassword.name} autoComplete="new-password"
+          <input type={showPassword ? "text" : "password"} id={pwFields.newPassword.id} name={pwFields.newPassword.name} autoComplete="new-password" autoCapitalize="none" autoCorrect="off" spellCheck={false}
             aria-invalid={pwFields.newPassword.errors ? true : undefined}
             className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[13px] text-ih-fg-1" />
           {pwFields.newPassword.errors && (
@@ -46,7 +46,7 @@ export function ChangePasswordPanel({ pwForm, pwFields, showPassword, setShowPas
         </div>
         <div className="space-y-2">
           <label htmlFor={pwFields.confirmPassword.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_pw_confirm_label()}</label>
-          <input type={showPassword ? "text" : "password"} id={pwFields.confirmPassword.id} name={pwFields.confirmPassword.name} autoComplete="new-password"
+          <input type={showPassword ? "text" : "password"} id={pwFields.confirmPassword.id} name={pwFields.confirmPassword.name} autoComplete="new-password" autoCapitalize="none" autoCorrect="off" spellCheck={false}
             aria-invalid={pwFields.confirmPassword.errors ? true : undefined}
             className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[13px] text-ih-fg-1" />
           {pwFields.confirmPassword.errors && (

@@ -47,7 +47,7 @@ export function TeamStep({
               ))}
             </select>
           ) : (
-            <input value={inspectorId} onChange={(e) => setInspectorId(e.target.value)} placeholder={m.newinsp_team_inspector_ph()} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
+            <input autoCapitalize="none" autoCorrect="off" spellCheck={false} value={inspectorId} onChange={(e) => setInspectorId(e.target.value)} placeholder={m.newinsp_team_inspector_ph()} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
           )}
         </div>
       )}

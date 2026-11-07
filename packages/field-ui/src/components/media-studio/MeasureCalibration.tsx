@@ -36,7 +36,7 @@ export function MeasureCalibration({
         <input
           type="number"
           min="0"
-          step="any"
+          step="any" inputMode="decimal" enterKeyHint="done"
           value={calibKnown}
           onChange={(e) => onCalibKnownChange(e.target.value)}
           onKeyDown={(e) => {

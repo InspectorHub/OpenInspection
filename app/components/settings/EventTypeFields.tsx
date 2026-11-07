@@ -40,7 +40,7 @@ export function EventTypeFields({ form, setForm, nameRef }: {
                   {m.settings_event_types_slug_label()}
                 </label>
                 <input
-                  type="text"
+                  type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                   value={form.slug}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, slug: e.target.value }))
@@ -55,7 +55,7 @@ export function EventTypeFields({ form, setForm, nameRef }: {
                     {m.settings_event_types_duration_label()}
                   </label>
                   <input
-                    type="number"
+                    type="number" inputMode="numeric"
                     value={form.defaultDurationMin}
                     onChange={(e) =>
                       setForm((f) => ({
@@ -99,7 +99,7 @@ export function EventTypeFields({ form, setForm, nameRef }: {
                       className="w-10 h-10 rounded-md border border-ih-border cursor-pointer"
                     />
                     <input
-                      type="text"
+                      type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                       value={form.color}
                       onChange={(e) =>
                         setForm((f) => ({ ...f, color: e.target.value }))
@@ -113,7 +113,7 @@ export function EventTypeFields({ form, setForm, nameRef }: {
                     {m.settings_event_types_sort_label()}
                   </label>
                   <input
-                    type="number"
+                    type="number" inputMode="numeric"
                     value={form.sortOrder}
                     onChange={(e) =>
                       setForm((f) => ({
@@ -131,7 +131,7 @@ export function EventTypeFields({ form, setForm, nameRef }: {
                   {m.settings_event_types_followup_label()}
                 </label>
                 <input
-                  type="number"
+                  type="number" inputMode="numeric"
                   value={form.followUpDelayHours}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, followUpDelayHours: e.target.value }))

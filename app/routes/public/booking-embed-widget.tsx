@@ -282,7 +282,7 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
           </label>
           <input
             type="text"
-            name="clientName"
+            name="clientName" autoComplete="name" autoCapitalize="words"
             required
             placeholder={m.booking_placeholder_name()}
             className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
@@ -294,7 +294,7 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
           </label>
           <input
             type="email"
-            name="clientEmail"
+            name="clientEmail" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
             required
             placeholder={m.booking_placeholder_email()}
             className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
@@ -309,7 +309,7 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
           </label>
           <input
             type="tel"
-            name="clientPhone"
+            name="clientPhone" inputMode="tel" autoComplete="tel"
             placeholder={m.booking_embed_phone_placeholder()}
             className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
           />

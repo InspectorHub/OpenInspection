@@ -61,7 +61,7 @@ export function DiscountEditorModal({
         <input type="hidden" name="id" value={discount.id} />
 
         <Input
-          name="code"
+          name="code" autoCapitalize="none" autoCorrect="off" spellCheck={false}
           defaultValue={discount.code}
           label={m.settings_discount_code_label()}
           autoFocus
