@@ -29,7 +29,7 @@ export function Modal({ open, onClose, title, size = "md", children, footer, ini
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pb-[var(--keyboard-height,0px)] sm:p-4 bg-ih-backdrop"
+      className="fixed inset-x-0 top-0 bottom-[var(--keyboard-height,0px)] z-50 flex items-end sm:items-center justify-center sm:p-4 bg-ih-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -40,7 +40,7 @@ export function Modal({ open, onClose, title, size = "md", children, footer, ini
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`w-full ${sizeClasses[size]} bg-ih-bg-card rounded-t-ih-modal sm:rounded-ih-modal shadow-ih-popover border border-ih-border max-h-[calc(90vh_-_var(--keyboard-height,0px))] overflow-y-auto`}
+        className={`w-full ${sizeClasses[size]} bg-ih-bg-card rounded-t-ih-modal sm:rounded-ih-modal shadow-ih-popover border border-ih-border max-h-[90%] overflow-y-auto`}
       >
         <div className="flex items-center justify-between p-4 border-b border-ih-border">
           <h2 id={titleId} className="text-lg font-bold text-ih-fg-1">

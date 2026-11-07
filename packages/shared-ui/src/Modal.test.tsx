@@ -18,11 +18,11 @@ function renderModal(props: Partial<React.ComponentProps<typeof Modal>> = {}) {
 }
 
 describe("Modal", () => {
-  it("stays above the soft keyboard: the overlay and the dialog both leave room for --keyboard-height", () => {
+  it("stays above the soft keyboard: the overlay, and with it the dim backdrop, ends at the keyboard top", () => {
     renderModal();
     const dialog = screen.getByRole("dialog");
-    expect(dialog.parentElement?.className).toContain("pb-[var(--keyboard-height,0px)]");
-    expect(dialog.className).toContain("var(--keyboard-height,0px)");
+    expect(dialog.parentElement?.className).toContain("bottom-[var(--keyboard-height,0px)]");
+    expect(dialog.className).toContain("max-h-[90%]");
   });
 
   it("renders nothing when closed", () => {

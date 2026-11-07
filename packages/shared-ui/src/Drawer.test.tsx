@@ -12,7 +12,7 @@ describe("Drawer", () => {
         <p>body</p>
       </Drawer>,
     );
-    expect(screen.getByRole("dialog").className).toContain("bottom-[var(--keyboard-height,0px)]");
+    expect(screen.getByRole("dialog").parentElement?.className).toContain("bottom-[var(--keyboard-height,0px)]");
   });
 
   it("renders nothing when closed", () => {
