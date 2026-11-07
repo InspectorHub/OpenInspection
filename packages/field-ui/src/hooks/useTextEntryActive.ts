@@ -5,6 +5,11 @@ const NOT_TEXT_INPUT = new Set(["checkbox", "radio", "button", "submit", "reset"
 /** The longest a bar stays hidden after the last text field was left, when the window never grows back (iOS covers the web view and does not resize it). */
 const SETTLE_MS = 400;
 
+/** A soft keyboard exists only on a touch device. With a mouse and a hardware keyboard nothing needs to get out of its way. */
+function hasSoftKeyboard(): boolean {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+}
+
 function isTextEntry(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.tagName === "TEXTAREA") return true;
@@ -13,7 +18,8 @@ function isTextEntry(target: EventTarget | null): boolean {
 }
 
 /**
- * True while a text field has focus, which on a phone is when the soft keyboard is up or coming up. The bars fixed to the bottom of
+ * True while a text field has focus on a touch device, which on a phone is when the soft keyboard is up or coming up. Always false
+ * with a mouse (`pointer: fine`): a desktop browser has no soft keyboard, and hiding a bar there only made it vanish while typing. The bars fixed to the bottom of
  * the screen (the item stepper and the Sections / Items / Preview tabs) hide for that time: where the keyboard resizes the window
  * a bar fixed to the bottom is laid out late and showed as a flicker, and on a short screen the bars took a third of the room.
  *
@@ -26,8 +32,9 @@ function isTextEntry(target: EventTarget | null): boolean {
  * press, so it cannot stay stuck on.
  */
 export function useTextEntryActive(): boolean {
-  const [active, setActive] = useState(() => typeof document !== "undefined" && isTextEntry(document.activeElement));
+  const [active, setActive] = useState(() => typeof document !== "undefined" && hasSoftKeyboard() && isTextEntry(document.activeElement));
   useEffect(() => {
+    if (!hasSoftKeyboard()) return undefined;
     let on = typeof document !== "undefined" && isTextEntry(document.activeElement);
     const put = (value: boolean) => {
       on = value;

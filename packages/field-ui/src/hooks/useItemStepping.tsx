@@ -46,10 +46,10 @@ export function useItemStepping<S extends NavSection, I extends { id: string }>(
   }, [notesFlush, sectionId, selectSectionById, setActiveItemId]);
 
   const shown = state.activeView !== "property" && state.activeItemId !== null;
-  const make = (className: string) => {
+  const make = (className: string, hideWhileTyping: boolean) => {
     if (!shown) return null;
-    return <ItemStepper neighbours={neighbours} onPrev={() => stepTo(neighbours.prev)} onNext={() => stepTo(neighbours.next)} className={className} />;
+    return <ItemStepper neighbours={neighbours} onPrev={() => stepTo(neighbours.prev)} onNext={() => stepTo(neighbours.next)} className={className} hideWhileTyping={hideWhileTyping} />;
   };
   /** `phone` sits above the bottom tab bar; `pane` ends the tablet's editor pane. */
-  return { phone: make("sticky bottom-[var(--ih-mobile-nav-h)] z-10"), pane: make("sticky bottom-0 z-10") };
+  return { phone: make("sticky bottom-[var(--ih-mobile-nav-h)] z-10", true), pane: make("sticky bottom-0 z-10", false) };
 }

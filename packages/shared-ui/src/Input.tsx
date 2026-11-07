@@ -43,7 +43,8 @@ function inputKeyboardDefaults(
     case "password":
       return { autoCapitalize: "none", autoCorrect: "off", spellCheck: false };
     case "number": {
-      if (min !== undefined && Number(min) < 0) return {};
+      // No minimum means a negative value may be typed, and the numeric keypad has no minus key: leave the default number keyboard.
+      if (min === undefined || Number(min) < 0) return {};
       const whole = step === undefined || (Number.isInteger(Number(step)) && step !== "any");
       return { inputMode: whole ? "numeric" : "decimal" };
     }

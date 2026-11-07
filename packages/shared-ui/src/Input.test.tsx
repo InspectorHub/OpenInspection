@@ -91,11 +91,15 @@ describe("Input keyboard defaults", () => {
     expect(attrs(container.querySelector("input")).enter).toBe("search");
   });
 
-  it("number: numeric for whole numbers, decimal for fractional steps, nothing when negatives are allowed", () => {
-    expect(attrs(render(<Input type="number" />).container.querySelector("input")).inputmode).toBe("numeric");
-    expect(attrs(render(<Input type="number" step="0.01" />).container.querySelector("input")).inputmode).toBe("decimal");
-    expect(attrs(render(<Input type="number" step="any" />).container.querySelector("input")).inputmode).toBe("decimal");
-    expect(attrs(render(<Input type="number" min={-5} />).container.querySelector("input")).inputmode).toBeNull();
+  it("number: numeric or decimal only when it cannot be negative, nothing otherwise (the numeric keypad has no minus key)", () => {
+    const mode = (el: React.ReactElement) => attrs(render(el).container.querySelector("input")).inputmode;
+    expect(mode(<Input type="number" min={0} />)).toBe("numeric");
+    expect(mode(<Input type="number" min={0} step="0.01" />)).toBe("decimal");
+    expect(mode(<Input type="number" min={0} step="any" />)).toBe("decimal");
+    // No minimum: a negative value may be typed, so the default number keyboard stays.
+    expect(mode(<Input type="number" />)).toBeNull();
+    expect(mode(<Input type="number" step="0.01" />)).toBeNull();
+    expect(mode(<Input type="number" min={-5} />)).toBeNull();
   });
 
   it("plain text gets no defaults, and explicit props win", () => {

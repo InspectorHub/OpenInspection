@@ -3,11 +3,20 @@ import { act, cleanup, render, renderHook, screen } from "@testing-library/react
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useTextEntryActive } from "./useTextEntryActive";
 
-beforeEach(() => vi.useFakeTimers());
+beforeEach(() => {
+  vi.useFakeTimers();
+  pointer(true);
+});
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
+
+const pointer = (coarse: boolean): void => {
+  vi.stubGlobal("matchMedia", (query: string) => ({ matches: coarse && query.includes("pointer: coarse"), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }));
+};
+
 
 const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 
@@ -98,5 +107,15 @@ describe("useTextEntryActive", () => {
     act(() => { document.dispatchEvent(new Event("pointerdown")); });
     await tick(450);
     expect(hook.result.current).toBe(false);
+  });
+});
+
+describe("on a device with a mouse", () => {
+  it("is never active: a desktop browser has no soft keyboard to get out of the way of", () => {
+    pointer(false);
+    const { result } = renderHook(() => useTextEntryActive());
+    render(<Fields />);
+    act(() => screen.getByLabelText("notes").focus());
+    expect(result.current).toBe(false);
   });
 });
