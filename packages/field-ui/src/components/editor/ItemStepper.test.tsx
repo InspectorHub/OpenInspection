@@ -18,7 +18,7 @@ describe("while a text field has focus", () => {
     act(() => screen.getByLabelText("notes").focus());
     expect(bar.className).toContain("invisible");
     act(() => screen.getByLabelText("notes").blur());
-    await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 450)); });
     expect(bar.className).not.toContain("invisible");
   });
 });

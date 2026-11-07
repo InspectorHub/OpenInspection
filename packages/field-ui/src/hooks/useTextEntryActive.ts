@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 
 const NOT_TEXT_INPUT = new Set(["checkbox", "radio", "button", "submit", "reset", "range", "file", "image", "color", "hidden"]);
 
+/** The longest a bar stays hidden after the last text field was left, when the window never grows back (iOS covers the web view and does not resize it). */
+const SETTLE_MS = 400;
+
 function isTextEntry(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.tagName === "TEXTAREA") return true;
@@ -11,9 +14,12 @@ function isTextEntry(target: EventTarget | null): boolean {
 
 /**
  * True while a text field has focus, which on a phone is when the soft keyboard is up or coming up. The bars fixed to the bottom of
- * the screen (the item stepper and the Sections / Items / Preview tabs) hide for that time: the keyboard shrinks the web view, and
- * on iOS a bar fixed to the bottom is laid out one frame late, so for a moment it sits below the visible area and then jumps in above
- * the keyboard. Hidden, they cannot flicker, and a short screen keeps the room they took.
+ * the screen (the item stepper and the Sections / Items / Preview tabs) hide for that time: where the keyboard resizes the window
+ * a bar fixed to the bottom is laid out late and showed as a flicker, and on a short screen the bars took a third of the room.
+ *
+ * It stays true after the last field is left until the keyboard is gone, so the bars do not come back while the window is still
+ * short (they showed up mid-screen and then slid down to the bottom): that is when the window has grown back (a resize, then two
+ * frames for the layout), or after SETTLE_MS where the window is not resized.
  *
  * It follows `document.activeElement` rather than pairing focus and blur events: a field that is removed while it has focus fires no
  * blur, and moving from one field to another fires a blur between two focuses. The state is read again after every blur and every
@@ -22,16 +28,61 @@ function isTextEntry(target: EventTarget | null): boolean {
 export function useTextEntryActive(): boolean {
   const [active, setActive] = useState(() => typeof document !== "undefined" && isTextEntry(document.activeElement));
   useEffect(() => {
-    const sync = () => setActive(isTextEntry(document.activeElement));
+    let on = typeof document !== "undefined" && isTextEntry(document.activeElement);
+    const put = (value: boolean) => {
+      on = value;
+      setActive(value);
+    };
+    let cancelSettle: (() => void) | null = null;
+    const stopSettling = () => {
+      cancelSettle?.();
+      cancelSettle = null;
+    };
+    // No text field has focus any more: stay "active" until the keyboard is gone, then let go (unless a field took focus again).
+    const settle = () => {
+      stopSettling();
+      const started = window.innerHeight;
+      let frame = 0;
+      const finish = () => {
+        stopSettling();
+        put(isTextEntry(document.activeElement));
+      };
+      const onResize = () => {
+        if (window.innerHeight <= started) return;
+        frame = requestAnimationFrame(() => {
+          frame = requestAnimationFrame(finish);
+        });
+      };
+      const timer = setTimeout(finish, SETTLE_MS);
+      window.addEventListener("resize", onResize);
+      cancelSettle = () => {
+        clearTimeout(timer);
+        cancelAnimationFrame(frame);
+        window.removeEventListener("resize", onResize);
+      };
+    };
+    const sync = () => {
+      if (isTextEntry(document.activeElement)) {
+        stopSettling();
+        put(true);
+      } else if (on && cancelSettle === null) {
+        settle();
+      }
+    };
     const later = () => {
       setTimeout(sync, 0);
     };
-    document.addEventListener("focusin", sync);
+    const onIn = () => {
+      stopSettling();
+      sync();
+    };
+    document.addEventListener("focusin", onIn);
     document.addEventListener("focusout", later);
     document.addEventListener("pointerdown", later, true);
-    sync();
+    if (isTextEntry(document.activeElement)) put(true);
     return () => {
-      document.removeEventListener("focusin", sync);
+      stopSettling();
+      document.removeEventListener("focusin", onIn);
       document.removeEventListener("focusout", later);
       document.removeEventListener("pointerdown", later, true);
     };

@@ -89,7 +89,7 @@ describe('MobileDrawerTriggers', () => {
     expect(nav.className).toContain('invisible');
     act(() => screen.getByLabelText('notes').blur());
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 5));
+      await new Promise((r) => setTimeout(r, 450));
     });
     expect(nav.className).not.toContain('invisible');
   });

@@ -1,11 +1,15 @@
 // @vitest-environment happy-dom
 import { act, cleanup, render, renderHook, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useTextEntryActive } from "./useTextEntryActive";
 
-afterEach(cleanup);
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
-const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 5)); });
+const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 
 function Fields() {
   return (
@@ -18,39 +22,73 @@ function Fields() {
   );
 }
 
+function setHeight(px: number) {
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: px });
+}
+
 describe("useTextEntryActive", () => {
-  it("is false until a text field has focus, true while it does, false after it is left", async () => {
+  it("is false until a text field has focus, true while it does, and false once the keyboard has gone", async () => {
+    setHeight(844);
     const hook = renderHook(() => useTextEntryActive());
     render(<Fields />);
     expect(hook.result.current).toBe(false);
     act(() => screen.getByLabelText("notes").focus());
     expect(hook.result.current).toBe(true);
     act(() => screen.getByLabelText("notes").blur());
-    await flush();
+    await tick(5);
+    // Left, but the keyboard may still be on its way down: the bars stay out of sight.
+    expect(hook.result.current).toBe(true);
+    await tick(450);
     expect(hook.result.current).toBe(false);
   });
 
-  it("stays true when focus moves from one text field to another", async () => {
+  it("lets go as soon as the window has grown back, not before (the bars must not appear mid-screen while the window is short)", async () => {
+    setHeight(351);
+    const hook = renderHook(() => useTextEntryActive());
+    render(<Fields />);
+    act(() => screen.getByLabelText("notes").focus());
+    act(() => screen.getByLabelText("notes").blur());
+    await tick(5);
+    expect(hook.result.current).toBe(true);
+    // A resize that does not make the window taller changes nothing.
+    act(() => { window.dispatchEvent(new Event("resize")); });
+    await tick(100);
+    expect(hook.result.current).toBe(true);
+    setHeight(616);
+    act(() => { window.dispatchEvent(new Event("resize")); });
+    await tick(100);
+    expect(hook.result.current).toBe(false);
+  });
+
+  it("stays true when focus moves from one text field to another, and when a field takes focus again while settling", async () => {
+    setHeight(844);
     const hook = renderHook(() => useTextEntryActive());
     render(<Fields />);
     act(() => screen.getByLabelText("notes").focus());
     act(() => screen.getByLabelText("search").focus());
-    await flush();
+    await tick(450);
+    expect(hook.result.current).toBe(true);
+    act(() => screen.getByLabelText("search").blur());
+    await tick(100);
+    act(() => screen.getByLabelText("notes").focus());
+    await tick(450);
     expect(hook.result.current).toBe(true);
   });
 
   it("does not count a checkbox or a button, which raise no keyboard", async () => {
+    setHeight(844);
     const hook = renderHook(() => useTextEntryActive());
     render(<Fields />);
     act(() => screen.getByLabelText("tick").focus());
-    await flush();
+    await tick(450);
     expect(hook.result.current).toBe(false);
     act(() => screen.getByText("go").focus());
-    await flush();
+    await tick(450);
     expect(hook.result.current).toBe(false);
   });
 
   it("does not stay stuck on when the focused field is removed without a blur", async () => {
+    setHeight(844);
     const hook = renderHook(() => useTextEntryActive());
     const view = render(<Fields />);
     act(() => screen.getByLabelText("notes").focus());
@@ -58,7 +96,7 @@ describe("useTextEntryActive", () => {
     view.unmount();
     // A press anywhere re-reads what has focus.
     act(() => { document.dispatchEvent(new Event("pointerdown")); });
-    await flush();
+    await tick(450);
     expect(hook.result.current).toBe(false);
   });
 });
