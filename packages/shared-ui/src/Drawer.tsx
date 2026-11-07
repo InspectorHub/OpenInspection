@@ -44,7 +44,7 @@ export function Drawer({ open, onClose, title, children, footer, wide = false, i
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`absolute inset-y-0 right-0 w-full ${wide ? "sm:w-[480px]" : "sm:w-[360px]"} bg-ih-bg-card border-l border-ih-border shadow-ih-popover flex flex-col animate-ih-slide-in-right`}
+        className={`absolute top-0 bottom-[var(--keyboard-height,0px)] right-0 w-full ${wide ? "sm:w-[480px]" : "sm:w-[360px]"} bg-ih-bg-card border-l border-ih-border shadow-ih-popover flex flex-col animate-ih-slide-in-right`}
       >
         <div className="flex items-center justify-between p-4 border-b border-ih-border">
           <h2 id={titleId} className="text-[15px] font-bold text-ih-fg-1">

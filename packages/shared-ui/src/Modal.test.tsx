@@ -18,6 +18,13 @@ function renderModal(props: Partial<React.ComponentProps<typeof Modal>> = {}) {
 }
 
 describe("Modal", () => {
+  it("stays above the soft keyboard: the overlay and the dialog both leave room for --keyboard-height", () => {
+    renderModal();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.parentElement?.className).toContain("pb-[var(--keyboard-height,0px)]");
+    expect(dialog.className).toContain("var(--keyboard-height,0px)");
+  });
+
   it("renders nothing when closed", () => {
     render(
       <Modal open={false} title="Hidden" onClose={() => {}}>

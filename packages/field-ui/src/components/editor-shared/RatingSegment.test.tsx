@@ -146,7 +146,7 @@ describe("RatingSegment", () => {
     expect(tile.className).toContain("@container");
   });
 
-  it("size=md lets the label clip instead of running over the next tile", () => {
+  it("size=md wraps the label inside the tile instead of running over the next one", () => {
     render(
       <RatingSegment
         ratings={[{ value: "ni", label: "Not Inspected", shortLabel: "NI", tone: "neutral" as const }]}
@@ -161,8 +161,11 @@ describe("RatingSegment", () => {
     // nothing at all on a non-replaced inline box. Without `block` the span
     // carried the intent and clipped nothing — which is why the text overlapped
     // rather than ending in an ellipsis.
-    expect(label.className).toContain("truncate");
+    // The md tile grows and wraps its label instead (a narrow phone cut "Satisfactory" to "Sat..."); it stays a block so it never
+    // paints past the tile.
     expect(label.className).toContain("block");
+    expect(label.className).toContain("overflow-wrap:anywhere");
+    expect(label.className).not.toContain("truncate");
   });
 
   it("size=sm tiles are NOT query containers — their width comes from content", () => {
