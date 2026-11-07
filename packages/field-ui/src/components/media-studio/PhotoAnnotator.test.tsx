@@ -157,3 +157,15 @@ describe("PhotoAnnotator image load", () => {
     expect(images).toHaveLength(0);
   });
 });
+
+describe("PhotoAnnotator on a phone with the soft keyboard", () => {
+  it("ends at the keyboard, so the caption field and the tool bar are never behind it, and its top bar leaves the status bar clear", async () => {
+    open("/p/a.jpg");
+    await latestImage();
+    const close = screen.getByRole("button", { name: /close/i });
+    const root = close.closest(".fixed") as HTMLElement;
+    expect(root.className).toContain("bottom-[var(--keyboard-height,0px)]");
+    const topBar = close.parentElement as HTMLElement;
+    expect(topBar.className).toContain("pt-[env(safe-area-inset-top,0px)]");
+  });
+});

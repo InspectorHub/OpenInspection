@@ -315,12 +315,12 @@ export function PhotoAnnotator({
 
   return (
     /* ds-allow: fixed-dark photo-studio chrome (white/* neutrals + amber-400 hints stay dark in both themes) */
-    <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: "rgba(0,0,0,0.92)" }}>
+    <div className="fixed inset-x-0 top-0 bottom-[var(--keyboard-height,0px)] z-[100] flex flex-col" style={{ background: "rgba(0,0,0,0.92)" }}>
       {/* -------------------------------------------------------- */}
       {/* Top bar                                                   */}
       {/* -------------------------------------------------------- */}
       <div
-        className="flex items-center gap-3 px-4 h-14 flex-shrink-0"
+        className="flex items-center gap-3 px-4 min-h-14 pt-[env(safe-area-inset-top,0px)] flex-shrink-0"
         style={{ background: "rgba(15,23,42,0.8)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
       >
         <button

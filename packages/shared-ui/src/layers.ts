@@ -37,6 +37,43 @@ let scrollLocks = 0;
 let scrollBefore = "";
 const LOCKED = "hidden";
 
+/** The body styles the iOS lock changes, and the scroll position it took them at. */
+const PIN_PROPS = ["position", "top", "left", "right", "width"] as const;
+let pinnedBefore: Record<(typeof PIN_PROPS)[number], string> | null = null;
+let pinnedScroll = 0;
+
+/**
+ * Opt-in, for a host that runs this UI in an iOS web view where the soft keyboard covers the page instead of resizing it (the native
+ * client sets `data-scroll-lock="pin"` on <html>). `overflow: hidden` alone is not enough there: when a text field inside a fixed sheet
+ * takes focus, iOS resets a scrolled document to 0 and keeps the picture still by moving the visual viewport up by the same amount, so a
+ * `position: fixed` sheet is drawn that far down, half of it behind the keyboard (measured on an iPhone 12 with real taps: a page
+ * scrolled 205 px pushed the Comment Library sheet from 0-515 to 205-720). Pinning the body at the scroll position, so the document
+ * itself is not scrolled, leaves nothing to reset. Everywhere else the plain overflow lock stays: a fixed body drops the scrollbar, and
+ * it has not been tried in a mobile browser (address bar, rubber-banding).
+ */
+function pinsBody(): boolean {
+  return document.documentElement.dataset.scrollLock === "pin";
+}
+
+function pinBody(): void {
+  const body = document.body;
+  pinnedScroll = window.scrollY;
+  pinnedBefore = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
+  body.style.position = "fixed";
+  body.style.top = `-${pinnedScroll}px`;
+  body.style.left = "0";
+  body.style.right = "0";
+  body.style.width = "100%";
+}
+
+function unpinBody(): void {
+  if (pinnedBefore === null) return;
+  const body = document.body;
+  for (const prop of PIN_PROPS) body.style[prop] = pinnedBefore[prop];
+  pinnedBefore = null;
+  window.scrollTo(0, pinnedScroll);
+}
+
 function onWindowKeyDown(e: KeyboardEvent): void {
   if (e.key !== "Escape") return;
   // A widget that already used this Escape (closed its own suggestion list, reverted
@@ -146,6 +183,7 @@ export function useLayer(
     if (lockScroll && scrollLocks++ === 0) {
       scrollBefore = document.body.style.overflow;
       document.body.style.overflow = LOCKED;
+      if (pinsBody()) pinBody();
     }
     return () => {
       s.closedAsTop = layers[layers.length - 1] === layer;
@@ -153,8 +191,9 @@ export function useLayer(
       if (s.layer === layer) s.layer = null;
       // Restore only while the page is still locked the way we locked it: if some other
       // writer has changed overflow since, its value is not ours to overwrite.
-      if (lockScroll && --scrollLocks === 0 && document.body.style.overflow === LOCKED) {
-        document.body.style.overflow = scrollBefore;
+      if (lockScroll && --scrollLocks === 0) {
+        unpinBody();
+        if (document.body.style.overflow === LOCKED) document.body.style.overflow = scrollBefore;
       }
     };
     // Keyed on [open] only by design: see the docstring.

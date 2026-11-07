@@ -429,3 +429,64 @@ describe("composed overlays", () => {
     expect(document.activeElement).toBe(screen.getByText("trigger"));
   });
 });
+
+describe("scroll lock of a host that opts in to pinning the body", () => {
+  afterEach(() => {
+    delete document.documentElement.dataset.scrollLock;
+    vi.restoreAllMocks();
+  });
+
+  const optIn = (): void => {
+    document.documentElement.dataset.scrollLock = "pin";
+  };
+
+  it("pins the body at the scroll position while locked and puts it back, with the scroll, when unlocked", () => {
+    optIn();
+    Object.defineProperty(window, "scrollY", { value: 205, configurable: true });
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    document.body.style.top = "3px";
+    const { unmount } = render(<Probe open lockScroll />);
+    expect(document.body.style.position).toBe("fixed");
+    expect(document.body.style.top).toBe("-205px");
+    expect(document.body.style.overflow).toBe("hidden");
+    unmount();
+    expect(document.body.style.position).toBe("");
+    expect(document.body.style.top).toBe("3px");
+    expect(scrollTo).toHaveBeenCalledWith(0, 205);
+    document.body.style.top = "";
+  });
+
+  it("keeps the body pinned until the last of several locks is released", () => {
+    optIn();
+    Object.defineProperty(window, "scrollY", { value: 40, configurable: true });
+    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    const { rerender } = render(
+      <>
+        <Probe open lockScroll />
+        <Probe open lockScroll />
+      </>,
+    );
+    expect(document.body.style.position).toBe("fixed");
+    rerender(
+      <>
+        <Probe open lockScroll />
+        <Probe open={false} lockScroll />
+      </>,
+    );
+    expect(document.body.style.position).toBe("fixed");
+    rerender(
+      <>
+        <Probe open={false} lockScroll />
+        <Probe open={false} lockScroll />
+      </>,
+    );
+    expect(document.body.style.position).toBe("");
+  });
+
+  it("keeps the plain overflow lock for everyone who has not opted in (a browser, even on an iPhone), so a scrollbar is not lost", () => {
+    const { unmount } = render(<Probe open lockScroll />);
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(document.body.style.position).toBe("");
+    unmount();
+  });
+});
