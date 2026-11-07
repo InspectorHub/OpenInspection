@@ -325,7 +325,7 @@ export function PhotoAnnotator({
       >
         <button
           onClick={onClose}
-          className="w-9 h-9 rounded-md flex items-center justify-center text-white/70 hover:bg-white/10 transition-colors"
+          className="w-11 h-11 rounded-md flex items-center justify-center text-white/70 hover:bg-white/10 transition-colors"
           aria-label={m.media_annotate_close_aria()}
         >
           <Icon name="x" className="w-5 h-5" />

@@ -123,3 +123,12 @@ describe("Modal", () => {
     expect(overlay.className).not.toContain("rgba(15,23,42");
   });
 });
+
+describe("Modal close control", () => {
+  it("has a touch target of at least 44px", () => {
+    renderModal();
+    const close = screen.getByRole("button", { name: "Close" });
+    expect(close.className).toContain("w-11");
+    expect(close.className).toContain("h-11");
+  });
+});

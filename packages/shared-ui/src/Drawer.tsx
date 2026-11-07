@@ -54,7 +54,7 @@ export function Drawer({ open, onClose, title, children, footer, wide = false, i
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-ih-button text-ih-fg-4 hover:text-ih-fg-2"
+            className="w-11 h-11 -my-2 -mr-2 flex items-center justify-center rounded-ih-button text-ih-fg-4 hover:text-ih-fg-2"
           >
             &#x2715;
           </button>

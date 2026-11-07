@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { useDialogBehavior } from '@core/shared-ui';
+import { m } from '../i18n';
 
 export interface MobileBottomDrawerProps {
     open:    boolean;
@@ -47,11 +48,13 @@ export function MobileBottomDrawer({ open, onClose, title, children, heightFract
                 <div className="flex justify-center pt-2 pb-1">
                     <div className="w-10 h-1 rounded-full bg-ih-border" />
                 </div>
-                {title && (
-                    <div className="px-4 pb-2 text-[14px] font-bold text-ih-fg-1 border-b border-ih-border">
-                        {title}
-                    </div>
-                )}
+                {/* A sheet always has a worded way out: iOS has no back key, and the backdrop is easy to miss under a tall sheet. */}
+                <div className="flex items-center justify-between pl-4 pr-1 border-b border-ih-border">
+                    <span className="text-[14px] font-bold text-ih-fg-1">{title}</span>
+                    <button type="button" onClick={onClose} className="min-h-11 min-w-11 px-3 text-[14px] font-semibold text-ih-primary-text touch-manipulation">
+                        {m.common_close()}
+                    </button>
+                </div>
                 <div className="flex-1 overflow-y-auto overflow-x-hidden">{children}</div>
             </div>
         </>

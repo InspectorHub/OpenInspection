@@ -66,7 +66,8 @@ describe("MobileBottomDrawer", () => {
     opener.focus();
     fireEvent.click(opener);
     await act(async () => { await Promise.resolve(); });
-    const first = screen.getByText("first");
+    // The sheet's own Close is its first control (the way out is the first thing a keyboard or screen reader reaches).
+    const first = screen.getByRole("button", { name: "Close" });
     const last = screen.getByText("last");
     expect(sheet(container).contains(document.activeElement)).toBe(true);
     expect(document.activeElement).toBe(first);
@@ -80,5 +81,21 @@ describe("MobileBottomDrawer", () => {
     expect(sheet(container).hasAttribute("inert")).toBe(true);
     expect(document.body.style.overflow).not.toBe("hidden");
     expect(document.activeElement).toBe(opener);
+  });
+});
+
+describe("MobileBottomDrawer exit", () => {
+  it("has a worded Close of at least 44px that closes the sheet, whatever the title", () => {
+    const onClose = vi.fn();
+    render(
+      <MobileBottomDrawer open onClose={onClose}>
+        <p>body</p>
+      </MobileBottomDrawer>,
+    );
+    const close = screen.getByRole("button", { name: "Close" });
+    expect(close.className).toContain("min-h-11");
+    expect(close.className).toContain("min-w-11");
+    fireEvent.click(close);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
