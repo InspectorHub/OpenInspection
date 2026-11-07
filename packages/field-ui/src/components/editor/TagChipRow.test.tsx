@@ -11,7 +11,7 @@ import { TagChipRow, type TagPin } from "./TagChipRow";
 afterEach(cleanup);
 
 const tag = (id: string, name = id): TagPin => ({ id, name, color: "#ef4444" });
-const MORE = { name: /open tag library/i };
+const MORE = { name: /add tag/i };
 
 describe("TagChipRow — reaching the full tag list", () => {
   it("offers an opener, and calls it when pressed", () => {
@@ -31,6 +31,19 @@ describe("TagChipRow — reaching the full tag list", () => {
   it("shows nothing when there is nothing to show and no way to open the list (the control for the two above)", () => {
     const { container } = render(<TagChipRow pinnedTags={[]} activeTagIds={new Set()} onToggle={vi.fn()} />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it("names the button for what it does, and heads the row like Notes and Photos", () => {
+    render(<TagChipRow pinnedTags={[]} activeTagIds={new Set()} onToggle={vi.fn()} onOpenLibrary={vi.fn()} />);
+    const add = screen.getByRole("button", MORE);
+    // The visible words are inside the spoken name.
+    expect(add.textContent).toMatch(/add tag/i);
+    expect(screen.getByText(/^tags$/i).className).toContain("uppercase");
+  });
+
+  it("is a finger-sized target on a coarse pointer", () => {
+    render(<TagChipRow pinnedTags={[tag("a", "Alpha")]} activeTagIds={new Set()} onToggle={vi.fn()} onOpenLibrary={vi.fn()} />);
+    for (const name of ["Alpha", /add tag/i]) expect(screen.getByRole("button", { name }).className).toContain("min-h-11");
   });
 
   it("has no opener when the host gave none", () => {
@@ -89,7 +102,7 @@ describe("TagChipRow — touch", () => {
   it("gives every chip and the opener a finger-sized minimum height on a coarse pointer", () => {
     render(<TagChipRow pinnedTags={[tag("a", "Alpha")]} activeTagIds={new Set()} onToggle={vi.fn()} onOpenLibrary={vi.fn()} />);
     for (const b of screen.getAllByRole("button")) {
-      expect(b.className).toContain("[@media(pointer:coarse)]:min-h-9");
+      expect(b.className).toContain("[@media(pointer:coarse)]:min-h-11");
     }
   });
 });

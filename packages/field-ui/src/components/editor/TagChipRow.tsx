@@ -27,8 +27,8 @@ export interface TagChipRowProps {
     onOpenLibrary?: () => void;
 }
 
-/** A finger-sized target on a coarse pointer (a phone, a tablet): 36px tall with room between chips; a mouse keeps the compact chip. */
-const COARSE = "[@media(pointer:coarse)]:min-h-9 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:text-xs";
+/** A finger-sized target on a coarse pointer (a phone, a tablet): 44px tall with room between chips; a mouse keeps the compact chip. */
+const COARSE = "[@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:text-xs";
 
 /**
  * Workflow shortcuts PR — inline 1-click chip row showing up to 5 tenant-
@@ -45,6 +45,8 @@ export function TagChipRow({ pinnedTags, chosenTags, activeTagIds, onToggle, onO
     if (sorted.length === 0 && !onOpenLibrary) return null;
     return (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 [@media(pointer:coarse)]:gap-2">
+            {/* A heading like NOTES and PHOTOS, so the row reads as its own block and the add button need not explain itself. */}
+            <span className="mr-1 text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.editor_tagchiprow_title()}</span>
             {sorted.map(tag => {
                 const active = activeTagIds.has(tag.id);
                 const colour = safeCssColor(tag.color);
@@ -69,9 +71,9 @@ export function TagChipRow({ pinnedTags, chosenTags, activeTagIds, onToggle, onO
                     size="sm"
                     onClick={onOpenLibrary}
                     className={`h-auto px-2 py-0.5 rounded-full border border-dashed border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted ${COARSE}`}
-                    aria-label={m.editor_tagchiprow_open_library_aria()}
+                    aria-label={m.editor_tagchiprow_add_aria()}
                 >
-                    {m.editor_tagchiprow_more()}
+                    {m.editor_tagchiprow_add()}
                 </Button>
             )}
         </div>

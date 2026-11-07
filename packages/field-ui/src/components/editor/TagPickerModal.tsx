@@ -1,4 +1,5 @@
-import { Modal } from "@core/shared-ui";
+import { Button, Modal } from "@core/shared-ui";
+import { useFieldDataSource } from "../../context";
 import { m } from "../../i18n";
 import { readableTextOn, safeCssColor } from "../../lib/readable-text";
 
@@ -13,10 +14,17 @@ export interface TagPickerModalProps {
 
 export function TagPickerModal({ open, activeItemId, tagsByItem, presetTags, onToggle, onClose }: TagPickerModalProps) {
  const selected = tagsByItem[activeItemId] || [];
+ // A company with no tags: say so and, when the host can open an address outside the editor and knows the tag library's, offer it.
+ const host = useFieldDataSource();
+ const libraryUrl = host.urls.tagLibrary?.() ?? null;
+ const openLibrary = libraryUrl !== null && host.openUrl ? () => host.openUrl?.(libraryUrl) : null;
  return (
  <Modal open={open} onClose={onClose} title={m.editor_tagpicker_title()} size="sm">
   <div className="space-y-1.5">
    {presetTags.length === 0 && <p className="text-[13px] text-ih-fg-3">{m.editor_tagpicker_empty()}</p>}
+   {presetTags.length === 0 && openLibrary && (
+    <Button variant="secondary" size="md" className="mt-1" onClick={openLibrary}>{m.editor_tagpicker_open_library()}</Button>
+   )}
    {presetTags.map((tag) => {
    const isActive = selected.some(t => t.id === tag.id);
    return (
