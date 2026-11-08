@@ -104,7 +104,7 @@
   "newinsp_schedule_holiday_block": "No se puede programar en {name} — los feriados de la empresa están bloqueados.",
   "newinsp_schedule_holiday_block_generic": "No se puede programar en un día de cierre de la empresa.",
   "newinsp_quota_title": "Límite del plan gratuito alcanzado",
-  "newinsp_quota_body": "Usted ya usó las 5 inspecciones gratuitas. Todo lo que creó sigue siendo totalmente utilizable — suscríbase para crear nuevas.",
+  "newinsp_quota_body": "Usted ya usó las {cap} inspecciones nuevas de este mes. Todo lo que creó sigue siendo totalmente utilizable, y el cupo se renueva a las 00:00 UTC del día 1.",
   "newinsp_quota_subscribe": "Suscribirse",
   "newinsp_services_label": "Servicios y precios",
   "newinsp_services_template_hint": "La plantilla del informe que eligió decide qué contiene el informe; los servicios deciden cuánto se le cobra al cliente: nada de esto tiene que coincidir con la plantilla.",
@@ -232,5 +232,12 @@
   "team_scope_badge_assigned": "Solo asignadas",
   "team_defaults_new_inspectors_title": "Los inspectores nuevos pueden ver todas las inspecciones",
   "team_defaults_new_inspectors_desc": "Se aplica a los inspectores que invite de ahora en adelante. Los miembros actuales conservan su configuración.",
-  "team_defaults_save_failed": "No se pudo guardar este ajuste. Inténtelo de nuevo."
+  "team_defaults_save_failed": "No se pudo guardar este ajuste. Inténtelo de nuevo.",
+  "allowance_resets_utc": "Se renueva el {date} (UTC)",
+  "allowance_resets_local": "{when} en su hora",
+  "quota_banner_inspections": "{used} de {cap} inspecciones nuevas usadas este mes.",
+  "quota_banner_inspections_full": "Ya usó las {cap} inspecciones nuevas de este mes. Todo lo que creó sigue siendo utilizable.",
+  "quota_banner_email": "{used} de {cap} correos electrónicos incluidos usados este mes.",
+  "quota_banner_email_full": "Ya usó los {cap} correos electrónicos incluidos de este mes.",
+  "quota_banner_email_own_account": "Enviar desde su propia cuenta de correo"
 }
