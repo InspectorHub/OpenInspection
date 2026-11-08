@@ -211,6 +211,8 @@ export interface AppEnv extends NativeVersionEnv, NativeImportEnv, NativeVisible
     // single-inspector deployments). Routes that touch presence feature-detect.
     INSPECTION_PRESENCE?: DurableObjectNamespace;
     TENANT_PRESENCE?: DurableObjectNamespace;
+    /** `eu` | `us` | `fedramp`: mints every Durable Object id inside that jurisdiction (see server/lib/collab/do-jurisdiction.ts). Unset leaves them unpinned. */
+    DO_JURISDICTION?: string;
 
     // Collab editing (#181) — one DO instance per inspection holding the
     // authoritative Y.Doc for results. Optional so builds without the binding

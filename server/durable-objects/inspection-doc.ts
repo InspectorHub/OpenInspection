@@ -57,6 +57,7 @@ import { isNonEmptyProjection, logDivergence, projectionsEqual } from './results
 import { loadTemplateSnapshot, renameLegacyKeysResponse } from './inspection-doc-legacy-keys';
 import { matchSnapshotBySeqPath } from './inspection-doc-snapshot-path';
 import { ACK_TAG, AckTracker, ackTags, logPersistFailure } from './inspection-doc-ack';
+import { exportStoredState, parseStateImport, writeImportedState } from './inspection-doc-state-transfer';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -86,6 +87,8 @@ const IDENTITY_KEY = 'identity';
 
 /** DO storage key for the JSON array of projection snapshots (version history). */
 const SNAPSHOTS_KEY = 'snapshots';
+
+const STATE_KEYS = { ydoc: STORAGE_KEY, identity: IDENTITY_KEY, snapshots: SNAPSHOTS_KEY } as const;
 
 /** Maximum snapshots retained; oldest are dropped when the cap is exceeded. */
 const SNAPSHOT_CAP = 25;
@@ -369,6 +372,24 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             return snap
                 ? Response.json(snap)
                 : new Response('snapshot not found', { status: 404 });
+        }
+
+        // One-off copy into an object in another jurisdiction (see do-jurisdiction.ts); import refuses a non-empty target.
+        if (url.pathname.endsWith('/state-export') && req.method === 'GET') {
+            if (this.ctx.getWebSockets().length > 0) await this.persist();
+            return Response.json(await exportStoredState(this.ctx.storage, STATE_KEYS));
+        }
+        if (url.pathname.endsWith('/state-import') && req.method === 'POST') {
+            const parsed = parseStateImport(await req.json().catch(() => null));
+            if (!parsed) return new Response('invalid body', { status: 400 });
+            if ((await writeImportedState(this.ctx.storage, STATE_KEYS, parsed)) === 'not-empty') return new Response('target not empty', { status: 409 });
+            Y.applyUpdate(this.doc, parsed.bytes, HYDRATE_ORIGIN);
+            this.hadStoredState = true;
+            this.tenantId = parsed.identity.tenantId;
+            this.inspectionId = parsed.identity.inspectionId;
+            this.reportId = parsed.identity.reportId ?? null;
+            this.identityPersisted = true;
+            return Response.json({ ok: true, bytes: parsed.bytes.length });
         }
 
         // Stores what the open sockets have sent, without locking: a caller about to decide something from the database (is the
