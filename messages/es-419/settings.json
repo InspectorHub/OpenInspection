@@ -210,7 +210,7 @@
   "settings_statutory_meta_title": "PDF de formularios oficiales - Configuración - OpenInspection",
   "settings_usage_meta_title": "Uso - Configuración - OpenInspection",
   "settings_usage_crumb": "Uso",
-  "settings_usage_subtitle_free": "Lo que esta cuenta ha usado en el plan gratuito. El almacenamiento se mide una vez al día.",
+  "settings_usage_subtitle_free": "Lo que esta cuenta ha usado en el plan gratuito. Las inspecciones nuevas y los correos incluidos se cuentan por mes calendario (UTC); el almacenamiento se mide una vez al día.",
   "settings_usage_subtitle_saas": "Lo que esta cuenta ha consumido. Las inspecciones, los SMS y los correos electrónicos son totales acumulados; el almacenamiento se mide una vez al día.",
   "settings_usage_subtitle_standalone": "Lo que esta cuenta ha consumido. Los SMS y los correos electrónicos son totales acumulados; el almacenamiento se mide una vez al día.",
   "settings_usage_metric_inspections": "Inspecciones",
@@ -222,8 +222,7 @@
   "settings_usage_metric_storage": "Almacenamiento usado",
   "settings_usage_metric_storage_sub": "Fotos y documentos — medido a diario",
   "settings_usage_back_to_billing": "← Volver a facturación y plan",
-  "settings_usage_cap_reached": "Límite del plan gratuito alcanzado",
-  "settings_usage_cap_remaining": "Quedan {count} en el plan gratuito",
+  "settings_usage_cap_reached": "Límite mensual alcanzado",
   "settings_usage_byo": "a través de su propia cuenta: {count}",
   "settings_team_meta_title": "Equipo - OpenInspection",
   "settings_team_crumb": "Equipo",
@@ -313,5 +312,8 @@
   "settings_team_templates_limit": "Una empresa puede tener {max} plantillas. Archive una para guardar otra.",
   "settings_hub_offline_packages_title": "Paquetes sin conexión",
   "settings_hub_offline_packages_desc": "Importe el trabajo que un miembro del equipo exportó cuando la aplicación no pudo sincronizar.",
-  "settings_team_remove_member_import_link": "Importar un paquete sin conexión"
+  "settings_team_remove_member_import_link": "Importar un paquete sin conexión",
+  "settings_usage_month_inspections": "{used} de {cap} inspecciones nuevas este mes",
+  "settings_usage_month_email": "{used} de {cap} correos electrónicos incluidos este mes",
+  "settings_usage_email_own_account": "Enviar desde su propia cuenta de correo"
 }

@@ -12,6 +12,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema, toRawD1 } from '../db';
 import type { HonoConfig } from '../../../server/types/hono';
 import { MeteringService } from '../../../server/services/metering.service';
+import { allowanceWindow } from '../../../server/features/plan-quota/policy';
+import { currentPeriodKey, monthStartUtcMs } from '../../../server/lib/usage/period';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -26,6 +28,9 @@ describe('GET /api/platform/usage', () => {
   let sqlite: ReturnType<typeof createTestDb>['sqlite'];
   let testD1: D1Database;
 
+  async function seedInspection(tenantId: string, id: string, createdAt: Date) {
+    await testDb.insert(schema.inspections).values({ id, tenantId, propertyAddress: '1 Main St', date: '2026-08-05', createdAt } as never);
+  }
   function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/platform', integrationRoutes); return a; }
   async function header() { return signM2mHeader(ENV as Record<string, string | undefined>); }
 
@@ -49,7 +54,10 @@ describe('GET /api/platform/usage', () => {
     const m = new MeteringService(testD1);
     await m.record('t-free', 'inspections', 'lifetime', 3);
     await m.record('t-free', 'sms', '2026-06', 10);
-    await m.record('t-free', 'email', '2026-06', 20);
+    await m.record('t-free', 'email', currentPeriodKey(new Date()), 20);
+    await seedInspection('t-free', 'f1', new Date());
+    await seedInspection('t-free', 'f2', new Date());
+    await seedInspection('t-free', 'f3', new Date());
     await m.record('t-free', 'sms_byo', '2026-06', 5);
     await m.record('t-free', 'email_byo', '2026-06', 7);
     await m.setGauge('t-free', 'r2_bytes', 'lifetime', 2048);
@@ -67,6 +75,7 @@ describe('GET /api/platform/usage', () => {
       tenantId: 't-free', tier: 'free',
       inspections: 3, sms: 10, smsByo: 5, email: 20, emailByo: 7, r2Bytes: 2048,
       caps: { inspections: 5, email: 50 },
+      period: allowanceWindow(new Date()),
     });
 
     const pro = body.data.find((r) => r.tenantId === 't-pro');
@@ -74,7 +83,31 @@ describe('GET /api/platform/usage', () => {
       tenantId: 't-pro', tier: 'pro',
       inspections: 40, sms: 500, smsByo: 0, email: 900, emailByo: 0, r2Bytes: 0,
       caps: null,
+      period: null,
     });
+  });
+
+  it('a free tenant reports the month the cap is enforced on, not lifetime totals', async () => {
+    const m = new MeteringService(testD1);
+    const now = new Date();
+    // 30 emails in each of three months: the cap sees only this month's 30, never the 90 a sum would give.
+    await m.record('t-free', 'email', currentPeriodKey(now), 30);
+    await m.record('t-free', 'email', currentPeriodKey(new Date(monthStartUtcMs(now) - 1)), 30);
+    await m.record('t-free', 'email', '2020-01', 30);
+    await seedInspection('t-free', 'this-1', now);
+    await seedInspection('t-free', 'last-1', new Date(monthStartUtcMs(now) - 1));
+    await seedInspection('t-free', 'last-2', new Date(monthStartUtcMs(now) - 86_400_000));
+    // A paid tenant with the same shape keeps its lifetime sums.
+    await m.record('t-pro', 'email', currentPeriodKey(now), 30);
+    await m.record('t-pro', 'email', '2020-01', 30);
+    await m.record('t-pro', 'inspections', 'lifetime', 9);
+
+    const res = await app().request('/api/platform/usage', { headers: { [M2M_HEADER]: await header() } }, ENV);
+    const body = await res.json() as { data: Array<Record<string, unknown>> };
+    const free = body.data.find((r) => r.tenantId === 't-free');
+    expect(free).toMatchObject({ email: 30, inspections: 1, period: allowanceWindow(now) });
+    const pro = body.data.find((r) => r.tenantId === 't-pro');
+    expect(pro).toMatchObject({ email: 60, inspections: 9, period: null });
   });
 
   it('empty usage_counters -> empty data array', async () => {

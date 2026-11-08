@@ -104,7 +104,7 @@
   "newinsp_schedule_holiday_block": "Cannot schedule on {name} — company holidays are blocked.",
   "newinsp_schedule_holiday_block_generic": "Cannot schedule on a company closed day.",
   "newinsp_quota_title": "Free plan limit reached",
-  "newinsp_quota_body": "You’ve used all 5 free inspections. Everything you created stays fully usable — subscribe to create new ones.",
+  "newinsp_quota_body": "You’ve used all {cap} new inspections for this month. Everything you created stays fully usable, and the allowance renews at 00:00 UTC on the 1st.",
   "newinsp_quota_subscribe": "Subscribe",
   "newinsp_services_label": "Services and pricing",
   "newinsp_services_template_hint": "The Report template you picked decides what the report contains; services decide what the client is charged — nothing here has to match the template.",
@@ -232,5 +232,12 @@
   "team_scope_badge_assigned": "Assigned only",
   "team_defaults_new_inspectors_title": "New inspectors can see all inspections",
   "team_defaults_new_inspectors_desc": "Applies to inspectors you invite from now on. Existing members keep their current setting.",
-  "team_defaults_save_failed": "Could not save this setting. Try again."
+  "team_defaults_save_failed": "Could not save this setting. Try again.",
+  "allowance_resets_utc": "Resets {date} (UTC)",
+  "allowance_resets_local": "{when} your time",
+  "quota_banner_inspections": "{used} of {cap} new inspections used this month.",
+  "quota_banner_inspections_full": "All {cap} new inspections for this month are used. Everything you created stays usable.",
+  "quota_banner_email": "{used} of {cap} built-in emails used this month.",
+  "quota_banner_email_full": "All {cap} built-in emails for this month are used.",
+  "quota_banner_email_own_account": "Send from your own email account"
 }

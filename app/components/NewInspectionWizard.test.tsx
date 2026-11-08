@@ -93,6 +93,19 @@ describe('NewInspectionWizard — at-open quota gate', () => {
         expect(queryByText('Subscribe')).toBeNull();
     });
 
+    it('names the monthly cap and when it renews in the cap panel', () => {
+        const { container } = render(
+            <NewInspectionWizard
+                open
+                onClose={() => {}}
+                quotaExceededAtOpen={null}
+                quotaAllowance={{ cap: 5, resetsAt: '2026-12-01T00:00:00.000Z' }}
+            />,
+        );
+        expect(container.textContent).toMatch(/all 5 new inspections for this month/);
+        expect(container.textContent).toMatch(/Resets Dec 1, 2026 \(UTC\)/);
+    });
+
     it('renders the normal step-1 form when under cap (quotaExceededAtOpen undefined)', () => {
         const { getByText, queryByText } = render(
             <NewInspectionWizard open onClose={() => {}} quotaExceededAtOpen={undefined} />,

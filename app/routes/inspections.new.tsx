@@ -4,6 +4,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { NewInspectionWizard, type WizardTeamMember } from "~/components/NewInspectionWizard";
 import { useSessionContext } from "~/hooks/useSessionContext";
+import { QuotaBanner } from "~/components/QuotaBanner";
 import type { TemplateOption, ServiceOption } from "~/lib/dashboard-schema";
 import { m } from "~/paraglide/messages";
 
@@ -33,6 +34,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     teamMembers: [] as WizardTeamMember[],
     quotaCaps: null as QuotaTriple | null,
     quotaUsage: null as QuotaTriple | null,
+    resetsAt: null as string | null,
   };
   try {
     const api = createApi(context, { token });
@@ -78,11 +80,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
     let quotaCaps: QuotaTriple | null = null;
     let quotaUsage: QuotaTriple | null = null;
+    let resetsAt: string | null = null;
     if (usageRes && usageRes.ok) {
       const ub = (await usageRes.json().catch(() => ({}))) as {
-        data?: { caps?: QuotaTriple | null; usage?: Partial<QuotaTriple> };
+        data?: { caps?: QuotaTriple | null; usage?: Partial<QuotaTriple>; period?: { resetsAt?: string } | null };
       };
       quotaCaps = ub.data?.caps ?? null;
+      resetsAt = ub.data?.period?.resetsAt ?? null;
       if (quotaCaps) {
         quotaUsage = {
           inspections: ub.data?.usage?.inspections ?? 0,
@@ -92,7 +96,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       }
     }
 
-    return { templates, services, teamMembers, quotaCaps, quotaUsage };
+    return { templates, services, teamMembers, quotaCaps, quotaUsage, resetsAt };
   } catch {
     return empty;
   }
@@ -103,7 +107,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function NewInspectionRoute() {
-  const { templates, services, teamMembers, quotaCaps, quotaUsage } = useLoaderData<typeof loader>();
+  const { templates, services, teamMembers, quotaCaps, quotaUsage, resetsAt } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
   const navigate = useNavigate();
 
@@ -119,14 +123,23 @@ export default function NewInspectionRoute() {
       ? billingUrl ?? null
       : undefined;
 
+  // Near the cap (but not at it: the wizard shows its own panel then) a plain note says where the month stands.
+  const nearCapNote = quotaCaps && quotaUsage && quotaExceededAtOpen === undefined && (
+    <QuotaBanner metric="inspections" used={quotaUsage.inspections} cap={quotaCaps.inspections} resetsAt={resetsAt} />
+  );
+
   return (
-    <NewInspectionWizard
-      open
-      onClose={() => navigate("/inspections")}
-      templates={templates}
-      services={services}
-      teamMembers={teamMembers}
-      quotaExceededAtOpen={quotaExceededAtOpen}
-    />
+    <>
+      {nearCapNote}
+      <NewInspectionWizard
+        open
+        onClose={() => navigate("/inspections")}
+        templates={templates}
+        services={services}
+        teamMembers={teamMembers}
+        quotaExceededAtOpen={quotaExceededAtOpen}
+        quotaAllowance={quotaCaps ? { cap: quotaCaps.inspections, resetsAt } : undefined}
+      />
+    </>
   );
 }

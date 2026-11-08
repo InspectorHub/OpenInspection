@@ -9,7 +9,9 @@
  * hasUsageQuota`), the caps those platform metrics are measured against.
  * `caps` is null for every other tenant/deployment — the UI hides progress
  * bars and treats the numbers as pure cumulative counters, matching prior
- * (pre-quota) behavior byte-for-byte.
+ * (pre-quota) behavior byte-for-byte. For a capped tenant the allowances renew
+ * monthly (UTC): `usage.inspections` and `usage.email` are then this month's
+ * figures, and `period` says which month and when it renews.
  *
  * Read-only. Tenant-isolated (filters by the JWT tenantId). `tenantTier` is
  * NOT populated on this JWT-authenticated route (see readTenantTier's own
@@ -18,17 +20,16 @@
  */
 import { requireRole } from '../lib/middleware/rbac';
 import { createRoute } from '@hono/zod-openapi';
-import { count, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
 import type { ApiOf } from '../lib/api-schema';
-import { getDrizzle } from '../lib/route-helpers';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { MeteringService } from '../services/metering.service';
-import { inspections as inspectionsTable } from '../lib/db/schema';
 import { getSeatUsage } from '../features/seat-quota';
 import { readTenantTier } from '../features/plan-quota/guard';
-import { FREE_TIER_CAPS } from '../features/plan-quota/policy';
+import { FREE_TIER_CAPS, allowanceWindow } from '../features/plan-quota/policy';
+import { monthInspectionCounts } from '../features/plan-quota/month-usage';
+import { currentPeriodKey } from '../lib/usage/period';
 
 const summaryRoute = createRoute(withMcpMetadata({
     method:  'get',
@@ -41,7 +42,7 @@ const summaryRoute = createRoute(withMcpMetadata({
         401: { description: 'Unauthorized' },
     },
     operationId: 'getUsageSummary',
-    description: "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against. Available to owner, manager and inspector roles."
+    description: "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against. On a capped plan the inspections and email figures are for the current UTC calendar month, and `period` ({ period: 'YYYY-MM', resetsAt: ISO instant }) names that month and when its allowance renews; `period` is null when nothing is capped. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const app = createApiRouter();
@@ -85,18 +86,23 @@ app.openapi(summaryRoute, async (c) => {
     // it is measured against nothing, and quietly redefining it from "how
     // many they have ever created" to "how many they have now" would change
     // an analytics figure nobody asked to change.
+    const now = new Date();
     const inspectionsUsed = isFreeTierQuota
-        ? (await getDrizzle(c).select({ n: count() }).from(inspectionsTable)
-            .where(eq(inspectionsTable.tenantId, tenantId)).get())?.n ?? 0
+        ? (await monthInspectionCounts(c.env.DB, now, { tenantId })).get(tenantId) ?? 0
         : inspections;
+    // Built-in email is counted per UTC month on the free plan, so the figure shown against its cap is the
+    // current month's bucket, not the all-time sum.
+    const emailUsed = isFreeTierQuota ? await metering.getCount(tenantId, 'email', currentPeriodKey(now)) : email;
 
     return c.json({
         success: true as const,
         data: {
             tier,
             caps: isFreeTierQuota ? FREE_TIER_CAPS : null,
+            // Which month the capped figures belong to and when they renew; null when nothing is capped.
+            period: isFreeTierQuota ? allowanceWindow(now) : null,
             usage: {
-                inspections: inspectionsUsed, sms, email,
+                inspections: inspectionsUsed, sms, email: emailUsed,
                 smsByo, emailByo,
                 aiTranslate, aiTranslateByo,
                 aiAssist, aiAssistByo,

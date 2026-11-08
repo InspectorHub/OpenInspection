@@ -12,6 +12,7 @@ import { AppError, ErrorCode, Errors } from '../../../server/lib/errors';
 import {
     providerOutcomeFor, nextUtcMidnightMs, applyProviderOutcome,
     PROVIDER_DEFERRAL_SENTINEL, RATE_LIMIT_DEFER_REASON, DAILY_QUOTA_DEFER_REASON, MONTHLY_QUOTA_FAIL_REASON,
+    PLAN_EMAIL_ALLOWANCE_FAIL_REASON,
 } from '../../../server/services/automation/provider-deferral';
 
 const quotaError = (quotaWindow?: 'daily' | 'monthly') => new AppError(
@@ -66,7 +67,15 @@ describe('providerOutcomeFor', () => {
         expect(providerOutcomeFor(quotaError(), now)).toBeNull();
     });
 
-    it('leaves a plan quota (no provider window) and every other error alone', () => {
+    it('fails a spent monthly plan allowance (it names its month) rather than leaving it as an unnamed fault', () => {
+        const spent = Errors.QuotaExhausted({
+            metric: 'email', used: 50, cap: 50, billingPortalUrl: null, period: '2026-10', resetsAt: '2026-11-01T00:00:00.000Z',
+        });
+        expect(providerOutcomeFor(spent, now)).toEqual({ action: 'fail', reason: PLAN_EMAIL_ALLOWANCE_FAIL_REASON });
+        expect(PLAN_EMAIL_ALLOWANCE_FAIL_REASON).toMatch(/monthly/i);
+    });
+
+    it('leaves a plan quota that names no month, and every other error, alone', () => {
         expect(providerOutcomeFor(Errors.QuotaExhausted({ metric: 'email', used: 100, cap: 100, billingPortalUrl: null }), now)).toBeNull();
         expect(providerOutcomeFor(new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'x'), now)).toBeNull();
         expect(providerOutcomeFor(new Error('boom'), now)).toBeNull();

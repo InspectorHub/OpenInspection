@@ -5,6 +5,7 @@ import { createApi } from "~/lib/api-client.server";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
+import { AllowanceResetNote } from "~/components/AllowanceResetNote";
 import { formatNumber } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 
@@ -27,6 +28,8 @@ interface UsageCaps {
 interface UsageSummary {
   tier?: string;
   caps?: UsageCaps | null;
+  /** The month the capped figures belong to and when it renews (ISO, UTC month start). */
+  period?: { period: string; resetsAt: string } | null;
   usage?: {
     inspections?: number;
     sms?: number;
@@ -101,7 +104,14 @@ export default function SettingsUsagePage() {
           paid SaaS tenants still see the lifetime-analytics count. */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${isSaas ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
         {isSaas && (caps ? (
-          <CappedMetricCard label={m.settings_usage_metric_inspections()} used={u.inspections ?? 0} cap={caps.inspections} locale={locale} />
+          <CappedMetricCard
+            label={m.settings_usage_metric_inspections()}
+            used={u.inspections ?? 0}
+            cap={caps.inspections}
+            summary={m.settings_usage_month_inspections({ used: u.inspections ?? 0, cap: caps.inspections })}
+            resetsAt={usage.period?.resetsAt}
+            locale={locale}
+          />
         ) : (
           <MetricCard
             label={m.settings_usage_metric_inspections()}
@@ -116,7 +126,16 @@ export default function SettingsUsagePage() {
           sub={m.settings_usage_metric_sms_sub()}
         />
         {caps ? (
-          <CappedMetricCard label={m.settings_usage_metric_email()} used={u.email ?? 0} cap={caps.email} byo={u.emailByo ?? 0} locale={locale} />
+          <CappedMetricCard
+            label={m.settings_usage_metric_email()}
+            used={u.email ?? 0}
+            cap={caps.email}
+            summary={m.settings_usage_month_email({ used: u.email ?? 0, cap: caps.email })}
+            resetsAt={usage.period?.resetsAt}
+            ownAccountLink={{ to: "/settings/integrations/email", label: m.settings_usage_email_own_account() }}
+            byo={u.emailByo ?? 0}
+            locale={locale}
+          />
         ) : (
           <MetricCard
             label={m.settings_usage_metric_email()}
@@ -167,12 +186,21 @@ function CappedMetricCard({
   label,
   used,
   cap,
+  summary,
+  resetsAt,
+  ownAccountLink,
   byo,
   locale,
 }: {
   label: string;
   used: number;
   cap: number;
+  /** "N of M … this month" line, already localised. */
+  summary: string;
+  /** ISO instant the allowance renews; the UTC date and the viewer's local time are both shown. */
+  resetsAt?: string;
+  /** Where the bring-your-own path lives, for a metered built-in send. */
+  ownAccountLink?: { to: string; label: string };
   /** Bring-your-own volume for this metric (sms_byo/email_byo) — uncapped,
    *  metered separately, does not count against the free-plan limit. */
   byo?: number;
@@ -195,9 +223,14 @@ function CappedMetricCard({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <div className={`text-[12px] mt-1 ${atCap ? "text-ih-bad-fg font-semibold" : "text-ih-fg-3"}`}>
-        {atCap ? m.settings_usage_cap_reached() : m.settings_usage_cap_remaining({ count: cap - used })}
-      </div>
+      <div className="text-[12px] text-ih-fg-3 mt-1">{summary}</div>
+      {atCap && <div className="text-[12px] mt-1 text-ih-bad-fg font-semibold">{m.settings_usage_cap_reached()}</div>}
+      {resetsAt && <AllowanceResetNote resetsAt={resetsAt} className="block text-[11px] text-ih-fg-3 mt-0.5" />}
+      {ownAccountLink && (
+        <Link to={ownAccountLink.to} className="block text-[12px] font-semibold text-ih-primary-text hover:underline mt-1">
+          {ownAccountLink.label}
+        </Link>
+      )}
       {byo !== undefined && (
         <div className="text-[11px] text-ih-fg-3 mt-1">{m.settings_usage_byo({ count: formatNumber(byo, { locale }) })}</div>
       )}

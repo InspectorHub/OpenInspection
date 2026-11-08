@@ -2,7 +2,7 @@ import { FREE_TIER_CAPS } from './policy';
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — pure threshold detector for the
- * inspection-creation notice email. Given the lifetime `inspections` count
+ * inspection-creation notice email. Given the this-month `inspections` count
  * just read after a successful create/clone/wizard call, returns which
  * notice (if any) should fire:
  *   - `4` -> the tenant just used their 4th inspection ("one free

@@ -210,7 +210,7 @@
   "settings_statutory_meta_title": "Statutory form PDFs - Settings - OpenInspection",
   "settings_usage_meta_title": "Usage - Settings - OpenInspection",
   "settings_usage_crumb": "Usage",
-  "settings_usage_subtitle_free": "What this account has used on the free plan. Storage is measured once a day.",
+  "settings_usage_subtitle_free": "What this account has used on the free plan. New inspections and built-in emails are counted per calendar month (UTC); storage is measured once a day.",
   "settings_usage_subtitle_saas": "What this account has consumed. Inspections/SMS/email are cumulative totals; storage is measured once a day.",
   "settings_usage_subtitle_standalone": "What this account has consumed. SMS/email are cumulative totals; storage is measured once a day.",
   "settings_usage_metric_inspections": "Inspections",
@@ -222,8 +222,7 @@
   "settings_usage_metric_storage": "Storage used",
   "settings_usage_metric_storage_sub": "Photos & documents — measured daily",
   "settings_usage_back_to_billing": "← Back to billing & plan",
-  "settings_usage_cap_reached": "Free plan limit reached",
-  "settings_usage_cap_remaining": "{count} left on the free plan",
+  "settings_usage_cap_reached": "Monthly limit reached",
   "settings_usage_byo": "via your own account: {count}",
   "settings_team_meta_title": "Team - OpenInspection",
   "settings_team_crumb": "Team",
@@ -313,5 +312,8 @@
   "settings_team_templates_limit": "A company can keep {max} templates. Archive one to save another.",
   "settings_hub_offline_packages_title": "Offline packages",
   "settings_hub_offline_packages_desc": "Import work a team member exported when the app could not sync.",
-  "settings_team_remove_member_import_link": "Import an offline package"
+  "settings_team_remove_member_import_link": "Import an offline package",
+  "settings_usage_month_inspections": "{used} of {cap} new inspections this month",
+  "settings_usage_month_email": "{used} of {cap} built-in emails this month",
+  "settings_usage_email_own_account": "Send from your own email account instead"
 }

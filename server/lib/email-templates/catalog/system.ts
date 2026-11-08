@@ -1,4 +1,5 @@
 import type { EmailTemplateDescriptor } from '../types';
+import { FREE_TIER_CAPS } from '../../../features/plan-quota/policy';
 
 /**
  * Account recovery, workspace invitations, and our own billing notices —
@@ -60,10 +61,10 @@ export const SYSTEM_TEMPLATES: EmailTemplateDescriptor[] = [
     editable: false,
     required: true,
     brand: 'platform',
-    defaultSubject: 'One free inspection left',
+    defaultSubject: 'One free inspection left this month',
     blocks: [
-      { key: 'heading',  label: 'Heading', default: 'One free inspection left',                                                                          multiline: false },
-      { key: 'body',     label: 'Body',    default: 'Your {{workspaceName}} workspace has used 4 of your 5 free inspections. You have one free inspection left.', multiline: true  },
+      { key: 'heading',  label: 'Heading', default: 'One free inspection left this month',                                                                multiline: false },
+      { key: 'body',     label: 'Body',    default: `Your {{workspaceName}} workspace has used ${FREE_TIER_CAPS.inspections - 1} of your ${FREE_TIER_CAPS.inspections} free inspections this month. You have one left.`, multiline: true  },
       { key: 'ctaLabel', label: 'Button',  default: 'Manage subscription',                                                                               multiline: false },
     ],
     variables: [
@@ -80,10 +81,10 @@ export const SYSTEM_TEMPLATES: EmailTemplateDescriptor[] = [
     editable: false,
     required: true,
     brand: 'platform',
-    defaultSubject: "You've used your 5 free inspections",
+    defaultSubject: `You've used your ${FREE_TIER_CAPS.inspections} free inspections this month`,
     blocks: [
-      { key: 'heading',  label: 'Heading', default: "You've used your 5 free inspections",                                                                             multiline: false },
-      { key: 'body',     label: 'Body',    default: 'Your {{workspaceName}} workspace has used all 5 free inspections. Everything you already have stays usable — subscribe to create new ones.', multiline: true  },
+      { key: 'heading',  label: 'Heading', default: `You've used your ${FREE_TIER_CAPS.inspections} free inspections this month`,                                                                  multiline: false },
+      { key: 'body',     label: 'Body',    default: `Your {{workspaceName}} workspace has used its ${FREE_TIER_CAPS.inspections} free inspections for this month. Everything you already have stays usable, and the allowance renews at 00:00 UTC on the 1st.`, multiline: true  },
       { key: 'ctaLabel', label: 'Button',  default: 'Manage subscription',                                                                                             multiline: false },
     ],
     variables: [

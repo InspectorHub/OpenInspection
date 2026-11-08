@@ -207,11 +207,15 @@ export const Errors = {
         new AppError(503, ErrorCode.AI_NOT_CONFIGURED, msg, reason ? { reason } : undefined),
     TenantSuspended: (msg: string = 'This workspace has been suspended. Existing content remains accessible in read-only mode. Contact your administrator to restore full access.') =>
         new AppError(403, ErrorCode.TENANT_SUSPENDED, msg),
-    QuotaExhausted: (details: { metric: string; used: number; cap: number; billingPortalUrl: string | null }) =>
+    // `period` ('YYYY-MM', UTC) and `resetsAt` (ISO instant) are present for the allowances that renew monthly
+    // (inspections, built-in email) and absent for the ones that do not.
+    QuotaExhausted: (details: { metric: string; used: number; cap: number; billingPortalUrl: string | null; period?: string; resetsAt?: string }) =>
         new AppError(
             402,
             ErrorCode.QUOTA_EXHAUSTED,
-            `Free plan limit reached: ${details.used}/${details.cap} ${details.metric}. Subscribe to continue.`,
+            details.period && details.resetsAt
+                ? `Free plan limit reached: ${details.used}/${details.cap} ${details.metric} this month. The allowance renews at 00:00 UTC on ${details.resetsAt.slice(0, 10)}.`
+                : `Free plan limit reached: ${details.used}/${details.cap} ${details.metric}. Subscribe to continue.`,
             details,
         ),
     // Same code and status as a spent allowance, because a client already handles that, but the
