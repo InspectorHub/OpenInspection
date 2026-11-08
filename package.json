@@ -285,7 +285,7 @@
     "typescript-eslint": "^8.68.0",
     "vite": "^8.1.6",
     "vitest": "^4.1.12",
-    "wrangler": "4.147.0"
+    "wrangler": "4.158.0"
   },
   "overrides": {
     "esbuild": "^0.28.1",
