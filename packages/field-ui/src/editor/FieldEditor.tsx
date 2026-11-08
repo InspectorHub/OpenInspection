@@ -55,6 +55,8 @@ import { InspectionSettingsSheet } from "../components/editor/InspectionSettings
 import { VideoCapture } from "../components/media-studio/VideoCapture";
 import { bakePhoto } from "../components/media-studio/bakePhoto";
 import { bakeBatch } from "../components/media-studio/bakeBatch";
+import { photoStudioTarget } from "../components/media-studio/photo-studio-target";
+import type { PhotoEntry } from "../shared/results-doc.types";
 import { PublishGateModal } from "../components/editor/PublishGateModal";
 import { AddMediaChooser } from "../components/editor/AddMediaChooser";
 import { useStructureEdit } from "../hooks/useStructureEdit";
@@ -1856,17 +1858,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  onPhotoStudio={() => {
  if (!state.activeItemId) return;
  const result = state.getResult(state.activeItemId);
- const photos = (result?.photos as string[]) || [];
- if (photos.length > 0) {
-  openPhotoStudio({
-   url: dataSource.urls.photo(String(state.inspection.id), photos[0], "original"),
-   key: photos[0],
-   index: 1,
-   total: photos.length,
-  });
- } else {
-  openPhotoStudio({ url: null, key: null, index: 0, total: 0 });
- }
+ openPhotoStudio(photoStudioTarget(result?.photos as PhotoEntry[] | undefined, String(state.inspection.id), (id, key, size) => dataSource.urls.photo(id, key, size)));
  }}
  onToggleCheatsheet={() =>
  state.setShowCheatsheet(!state.showCheatsheet)
