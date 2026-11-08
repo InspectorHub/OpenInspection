@@ -1,6 +1,7 @@
 import * as Y from 'yjs';
 import { describe, expect, it, vi } from 'vitest';
 import type { EditorData, PendingMediaRecord } from '../data-source';
+import { DEFAULT_INSPECTION_PREFS } from '../hooks/useInspectionPrefs';
 import {
   createEmptyEditorData,
   createFakeAiAssist,
@@ -248,7 +249,7 @@ describe('createFakeDataSource', () => {
       const prefs = createFakePrefs();
       const ds = createFakeDataSource({ data: editorData(), resources: { prefs } });
       const first = await ds.resources.prefs!.load();
-      expect(first.autoAdvance).toBe('always');
+      expect(first.autoAdvance).toBe(DEFAULT_INSPECTION_PREFS.autoAdvance);
       expect(first.pinnedTagIds).toEqual([]);
 
       const res = await ds.resources.prefs!.patch({ autoAdvance: 'off', pinnedTagIds: ['t1'] });
@@ -268,7 +269,11 @@ describe('createFakeDataSource', () => {
       prefs.failPatch('offline');
       const res = await prefs.patch({ autoAdvance: 'keyboard' });
       expect(res).toEqual({ ok: false, error: 'offline' });
-      expect((await prefs.load()).autoAdvance).toBe('always');
+      expect((await prefs.load()).autoAdvance).toBe(DEFAULT_INSPECTION_PREFS.autoAdvance);
+    });
+
+    it('starts from the editor hook defaults, so the fake cannot drift from the real fallback', async () => {
+      expect(await createFakePrefs().load()).toEqual(DEFAULT_INSPECTION_PREFS);
     });
   });
 
