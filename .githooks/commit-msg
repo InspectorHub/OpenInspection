@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # .githooks/commit-msg — openinspection
 #
-# One gate: a commit that changes what a person sees must say that a person
+# Gate one: a commit that changes what a person sees must say that a person
 # looked. See scripts/check-chrome-record.mjs for the grammar, the rule for
 # "user-visible", the escape hatch, and — read this part — a plain statement of
 # what this gate CANNOT do. It cannot tell whether anyone opened a browser.
@@ -19,19 +19,29 @@
 # Bypass (discouraged): git commit --no-verify. Prefer the in-message hatch —
 # `chrome-allow: <reason>` — which leaves a reason behind instead of a hole.
 
-# Never run in CI / non-interactive contexts.
-[ -n "$CI" ] && exit 0
-
 MSG_FILE="$1"
 [ -z "$MSG_FILE" ] && { echo "commit-msg: no message file argument. Failing closed."; exit 1; }
 
-# `fixup!` / `squash!` / `amend!` commits carry a generated subject and no body
-# a person can add lines to; the record belongs in the commit they fold into.
-# Skipped, and the skip is printed rather than silent.
-if head -n 1 "$MSG_FILE" | grep -qE '^(fixup|squash|amend)! '; then
+STATUS=0
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || REPO_ROOT="."
+
+# Gate one (Chrome record). Skipped in CI / non-interactive contexts, as before,
+# and for `fixup!` / `squash!` / `amend!` commits: their subject is generated and
+# the record belongs in the commit they fold into. The skip is printed.
+if [ -n "$CI" ]; then
+    :
+elif head -n 1 "$MSG_FILE" | grep -qE '^(fixup|squash|amend)! '; then
     echo "chrome-record: skipped 1 (fixup/squash commit — the record belongs in the commit it folds into)"
-    exit 0
+else
+    node "$REPO_ROOT/scripts/check-chrome-record.mjs" "$MSG_FILE" || STATUS=1
 fi
 
-REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || REPO_ROOT="."
-node "$REPO_ROOT/scripts/check-chrome-record.mjs" "$MSG_FILE"
+# Gate two: a commit that changes code must say an independent review read the
+# diff first (`Reviewed: ...`, or `review-allow: <reason>`). See
+# scripts/check-reviewed-trailer.mjs for the grammar, what counts as
+# documentation-only, the exemptions and what it cannot prove. It has NO CI skip
+# and no environment switch: it never skips silently. It always runs, so one
+# failure does not hide the other.
+node "$REPO_ROOT/scripts/check-reviewed-trailer.mjs" "$MSG_FILE" || STATUS=1
+
+exit $STATUS
