@@ -14,7 +14,8 @@ export const DEFAULT_INSPECTION_PREFS: InspectionPrefs = {
     // Same value the server enforces when a company never chose one (server/lib/people/agent-repair-access.ts); a
     // test holds the two together, because this package cannot import server code.
     agentRepairAccess: 'read',
-    reportLinkTtl: 'never',
+    // Two years, the same as minting uses for an unset policy (server/lib/report-link-ttl.ts); held to it by a test.
+    reportLinkTtl: { count: 2, unit: 'years' },
 };
 
 /**

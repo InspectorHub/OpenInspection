@@ -7,7 +7,7 @@
  */
 import { z } from '@hono/zod-openapi';
 import { DEFAULT_AGENT_REPAIR_ACCESS } from '../people/agent-repair-access';
-import { REPORT_LINK_TTL_MAX_COUNT } from '../report-link-ttl';
+import { REPORT_LINK_TTL_MAX_COUNT, resolveReportLinkTtl } from '../report-link-ttl';
 
 export const InspectionPrefsSchema = z.object({
     cloneDefault:       z.enum(['rating', 'rating_notes', 'all']),
@@ -31,8 +31,9 @@ export const InspectionPrefsSchema = z.object({
     /** IA-36 ⑤ — how long a report link stays usable, as a DURATION (an
      *  absolute date is the only shape that can land in the past). Applied when
      *  a link is MINTED; changing it never touches links already issued.
-     *  Default `never` — the shipped behaviour, and what migrated customers'
-     *  saved links assume. Rides this prefs blob (no migration), same as
+     *  Default: whatever minting uses for an unset policy (`resolveReportLinkTtl`,
+     *  two years since 2026-08-14), so the settings screen, a saved blob and a newly
+     *  minted link cannot disagree. Rides this prefs blob (no migration), same as
      *  `agentRepairAccess`. */
     reportLinkTtl: z.union([
         z.literal('never'),
@@ -40,7 +41,7 @@ export const InspectionPrefsSchema = z.object({
             count: z.number().int().min(1).max(REPORT_LINK_TTL_MAX_COUNT),
             unit: z.enum(['days', 'months', 'years']),
         }),
-    ]).default('never'),
+    ]).default(() => resolveReportLinkTtl(undefined)),
 }).openapi('InspectionPrefs');
 
 export type InspectionPrefs = z.infer<typeof InspectionPrefsSchema>;
@@ -72,7 +73,7 @@ export const DEFAULT_INSPECTION_PREFS: InspectionPrefs = {
     pinnedTagIds:       [],
     requireDefectFields: 'none',
     agentRepairAccess:  DEFAULT_AGENT_REPAIR_ACCESS,
-    reportLinkTtl:      'never',
+    reportLinkTtl:      resolveReportLinkTtl(undefined),
 };
 
 /** Merge a possibly-partial DB row with the defaults. */

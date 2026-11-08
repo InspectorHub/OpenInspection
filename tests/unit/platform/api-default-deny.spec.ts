@@ -26,6 +26,7 @@ import { isUnauthenticatedPath } from '../../../server/lib/auth/public-paths';
 import { ANONYMOUS_API_ALLOW, AGENT_API_ALLOW, matchesRule } from '../../../server/lib/auth/api-access-policy';
 
 import { resolveAgentRepairAccess } from '../../../server/lib/people/agent-repair-access';
+import { resolveReportLinkTtl } from '../../../server/lib/report-link-ttl';
 const MANAGER_ID = '22222222-0000-4000-8000-000000000003';
 const OTHER_INSPECTOR_ID = '22222222-0000-4000-8000-000000000004';
 const AGENT_ID = '22222222-0000-4000-8000-0000000000a1';
@@ -338,6 +339,26 @@ describe('company external-access policy is owner/manager only (defect 4)', () =
             expect(resolveAgentRepairAccess((await prefs(h))?.p)).toBe('read');
             const after = await (await call('inspector', 'GET', '/api/tenant/inspection-prefs')).json() as { agentRepairAccess: string };
             expect(after.agentRepairAccess).toBe('read');
+        } finally { h.close(); }
+    });
+
+    it('a company that never set the link expiry gets the two-year default, and an unrelated editor-pref save does not store never', async () => {
+        const { h, call } = await setup('standalone');
+        try {
+            const before = await (await call('inspector', 'GET', '/api/tenant/inspection-prefs')).json() as { reportLinkTtl: unknown };
+            expect(before.reportLinkTtl).toEqual({ count: 2, unit: 'years' });
+            expect((await call('inspector', 'PATCH', '/api/tenant/inspection-prefs', { autoAdvance: 'off' })).status).toBe(200);
+            // Minting reads the stored blob through the resolver, so that is the answer that matters.
+            expect(resolveReportLinkTtl((await prefs(h))?.p)).toEqual({ count: 2, unit: 'years' });
+        } finally { h.close(); }
+    });
+
+    it('control: an explicit never survives an unrelated save', async () => {
+        const { h, call } = await setup('standalone');
+        try {
+            expect((await call('manager', 'PATCH', '/api/tenant/inspection-prefs', { reportLinkTtl: 'never' })).status).toBe(200);
+            expect((await call('inspector', 'PATCH', '/api/tenant/inspection-prefs', { autoAdvance: 'off' })).status).toBe(200);
+            expect(resolveReportLinkTtl((await prefs(h))?.p)).toBe('never');
         } finally { h.close(); }
     });
 

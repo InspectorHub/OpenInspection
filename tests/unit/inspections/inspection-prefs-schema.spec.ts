@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { InspectionPrefsSchema, InspectionPrefsPatchSchema, DEFAULT_INSPECTION_PREFS } from '../../../server/lib/validations/inspection-prefs.schema';
 import { DEFAULT_AGENT_REPAIR_ACCESS, resolveAgentRepairAccess } from '../../../server/lib/people/agent-repair-access';
+import { resolveReportLinkTtl } from '../../../server/lib/report-link-ttl';
 import { DEFAULT_INSPECTION_PREFS as FIELD_UI_DEFAULT_PREFS } from '../../../packages/field-ui/src/hooks/useInspectionPrefs';
 
 describe('InspectionPrefsSchema', () => {
@@ -87,5 +88,28 @@ describe('agentRepairAccess default has ONE answer in every layer', () => {
 
     it('the field-ui hook default (used until the tenant prefs load, and offline) agrees with the server', () => {
         expect(FIELD_UI_DEFAULT_PREFS.agentRepairAccess).toBe(DEFAULT_AGENT_REPAIR_ACCESS);
+    });
+});
+
+describe('reportLinkTtl default has ONE answer in every layer', () => {
+    // Same defect as agentRepairAccess: minting resolves an unset policy to two years (decided 2026-08-14), while the
+    // schema, withDefaults and the editor hook said `never`. The settings page then showed Never for a company whose
+    // new links expire in two years, and any save of an unrelated preference persisted `never`, so links stopped expiring.
+    it('the resolver spells the default out: two years', () => {
+        expect(resolveReportLinkTtl(undefined)).toEqual({ count: 2, unit: 'years' });
+    });
+
+    it('the zod default and withDefaults equal what minting uses', () => {
+        const parsed = InspectionPrefsSchema.parse({ cloneDefault: 'rating_notes', autoAdvanceDelayMs: 200, pinnedTagIds: [] });
+        expect(parsed.reportLinkTtl).toEqual(resolveReportLinkTtl(undefined));
+        expect(DEFAULT_INSPECTION_PREFS.reportLinkTtl).toEqual(resolveReportLinkTtl(undefined));
+    });
+
+    it('the field-ui hook default agrees with the server', () => {
+        expect(FIELD_UI_DEFAULT_PREFS.reportLinkTtl).toEqual(resolveReportLinkTtl(undefined));
+    });
+
+    it('an explicit never is still a choice and survives', () => {
+        expect(InspectionPrefsSchema.parse({ cloneDefault: 'rating_notes', autoAdvanceDelayMs: 200, pinnedTagIds: [], reportLinkTtl: 'never' }).reportLinkTtl).toBe('never');
     });
 });
