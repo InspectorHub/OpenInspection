@@ -9,7 +9,7 @@
  * whoever typed it and none at all to a contributor.
  *
  * Scope note: this checks SOURCE. Translations under messages/<locale>/ are the
- * point of having translations, and the private superproject's docs are not
+ * point of having translations, and the project's private docs are not
  * covered by this rule at all.
  *
  * Runs in `npm run lint` (CI's verify job) and deliberately NOT in pre-commit:
@@ -59,7 +59,7 @@ function firstCjkIndex(text) {
  * `retention-policy.ts` failed CI while the SAME quotation in
  * `docs/compliance/retention-policy.md` sat green beside it.
  *
- * This does NOT extend to the private superproject's docs, which are outside
+ * This does NOT extend to the project's private docs, which are outside
  * this tree and outside the rule.
  */
 const EXTS = ['.ts', '.tsx', '.js', '.mjs', '.css', '.html', '.md'];

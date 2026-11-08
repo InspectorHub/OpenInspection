@@ -15,8 +15,9 @@ export interface ReencryptReport {
 
 /**
  * JWT_SECRET rotation / legacy-format convergence. Idempotent: run any number
- * of times; converged rows land in alreadyCurrent. SOP:
- * docs/saas-ops/jwt-secret-rotation-sop.md (superrepo).
+ * of times; converged rows land in alreadyCurrent. It is driven through the
+ * hosted-only `POST /api/platform/secrets/reencrypt` seam (see
+ * server/portal/secrets-reencrypt-handler.ts); the operator of a hosted deployment owns the rotation procedure.
  */
 export async function reencryptAllTenantSecrets(
     store: SecretsStore,

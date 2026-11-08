@@ -9,7 +9,7 @@
  * Tenant isolation: every method takes an explicit `tenantId` and
  * filters by it; the underlying `inspection_units` table has a
  * tenant_id NOT NULL column per multi-tenant rules in
- * apps/core/CLAUDE.md.
+ * CLAUDE.md.
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, asc } from 'drizzle-orm';

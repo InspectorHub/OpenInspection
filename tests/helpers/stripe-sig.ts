@@ -1,7 +1,7 @@
 /**
  * Generates a Stripe-Webhook-Signature header compatible with both:
- *  - apps/core manual HMAC-SHA256 verifier (raw fetch, no SDK)
- *  - apps/portal Stripe SDK verifier (constructEvent)
+ *  - this repository's manual HMAC-SHA256 verifier (raw fetch, no SDK)
+ *  - the hosted control plane's Stripe SDK verifier (constructEvent)
  *
  * Format: t=<unix_seconds>,v1=<hex_hmac>
  * HMAC payload: `${timestamp}.${rawBody}`

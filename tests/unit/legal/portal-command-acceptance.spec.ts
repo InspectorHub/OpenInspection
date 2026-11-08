@@ -1,32 +1,10 @@
 /**
  * A portal command may not CREATE an account without the acceptance it carries.
  *
- * ⚠️ TWICE-AMENDED. The first amendment was wrong, and it is worth keeping the
- * story because of HOW it was wrong.
- *
- * The original header said the portal has been shipping an acceptance block on the
- * credential-bearing `cmd.tenant.update` all along, and that this side discarded
- * it. An amendment then replaced that with the opposite — "`buildCommandAcceptance`
- * does not exist in the portal", "checked by reading that repository's working
- * tree, zero occurrences of either name" — and concluded these specs fence a gap
- * rather than close one.
- *
- * The original was right. `apps/portal/server/lib/legal/acceptance-command.ts` and
- * `server/lib/sync/project-acceptance.ts` both exist; `onboarding-workflow.ts`
- * calls `buildCommandAcceptance` and `apply-envelope.ts` calls `projectAcceptance`.
- * They live on the unmerged `release/2026-08-17-acceptance-and-authority` branch
- * (PR #117), and the portal checkout happened to be sitting on `main`.
- *
- * So the check that produced the amendment — reading the working tree — was a real
- * check that answered a different question than the one asked. That is the part to
- * remember: "I read the files and they are not there" sounds like verification and
- * is not, when a sibling repository can be on any branch. Ask `git ls-tree` of the
- * branch you mean, not the filesystem you happen to have.
- *
- * What this means for these specs: they DO close a gap. Evidence the portal
- * captures and transmits was arriving here and being dropped, and now it is
- * recorded in the same write as the account. The deploy ordering in PR #117 is the
- * matching half — the engine must ship before the portal's block has a reader.
+ * The control plane sends an acceptance block on the credential-bearing `cmd.tenant.update`.
+ * This side must record it in the same write as the account instead of dropping it, so the
+ * evidence it carries survives. The deploy ordering matters: the engine ships before the
+ * control plane's block has a reader.
  *
  * ── The asymmetry is the design, not an oversight ───────────────────────────
  * The INSERT branch creates an account, so it owes an acceptance and refuses

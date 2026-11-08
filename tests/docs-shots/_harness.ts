@@ -77,7 +77,7 @@ export interface ShotSection {
      *
      * ⚠️ There is no such thing as "part 2 of shot X". The publisher joins
      * `<id>.png` to `<!-- shot: <id> | … -->` by exact set equality
-     * (apps/portal/scripts/lib/docs-shots.mjs), so splitting one picture into
+     * (the docs publisher's marker join), so splitting one picture into
      * three means the prose gains three markers and loses one. That is a change
      * in BOTH repositories or it is a failed docs build — a capture the prose
      * does not ask for is reported as "capture with no marker".

@@ -12,7 +12,7 @@
  * header untouched, and passes against an implementation that never signed the
  * actor at all. The tamper tests below decode, edit and re-encode.
  *
- * `m2m-auth.ts` is byte-for-byte identical in apps/portal, so every property
+ * `m2m-auth.ts` is byte-for-byte identical in the hosted control plane, so every property
  * here holds for the portal side of the handshake too.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
