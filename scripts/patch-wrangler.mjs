@@ -2,7 +2,7 @@
 /**
  * Apply the narrow Wrangler compatibility patch after install.
  *
- * Wrangler 4.147.0 includes the upstream ProxyWorker error handling and
+ * Wrangler 4.158.0 includes the upstream ProxyWorker error handling and
  * preserves serialized errors in castErrorCause, but castErrorCause2 still
  * rebuilds them as an empty Error. This patch keeps the posted message, name,
  * and stack on that second path; it does not claim that workers-sdk#15317 is
@@ -17,7 +17,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require_ = createRequire(import.meta.url);
-const expectedVersion = '4.147.0';
+const expectedVersion = '4.158.0';
 const version = require_('wrangler/package.json').version;
 
 if (version !== expectedVersion) {
