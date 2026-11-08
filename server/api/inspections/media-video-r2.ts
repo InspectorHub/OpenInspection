@@ -28,7 +28,8 @@ import { r2Put, r2Head } from '../../lib/r2/objects';
 import { serveVideoClip, serveVideoPoster } from '../../lib/media/serve-video';
 import { MAX_PHOTO_BYTES } from '../../lib/media/store-photo';
 import { headBytes, sniffPosterType, sniffVideoType } from '../../lib/media/sniff';
-import { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, MIME_TO_EXT, mimeToExt } from '../../lib/media/video-types';
+import { ALLOWED_VIDEO_MIMES, MAX_FORM_VIDEO_BYTES, MAX_VIDEO_BYTES, MIME_TO_EXT, mimeToExt } from '../../lib/media/video-types';
+import { declaredLengthRefusal } from '../../lib/declared-length';
 import { ownClipKey, ownPosterKey } from '../../services/video/r2-backend';
 
 // ── MIME / extension helpers (shared with the chunked upload; see lib/media/video-types.ts) ──
@@ -36,6 +37,13 @@ export { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, mimeToExt };
 
 /** Staff session responses are private to the browser; the report link route states its own policy. */
 const STAFF_VIDEO_CACHE = 'private, max-age=86400';
+
+/** The editor has no chunked route to send a larger clip to, so this answer names the limit only (the public route's body names its chunked path). */
+const STAFF_TOO_LARGE = {
+    error: 'Video is too large for a single request (max 64 MiB).',
+    code: 'VIDEO_TOO_LARGE_FOR_FORM',
+    limits: { maxBytes: MAX_FORM_VIDEO_BYTES },
+} as const;
 
 export type StoreVideoResult =
     | { ok: true; mediaId: string; r2Key: string }
@@ -114,13 +122,19 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             return c.json({ error: 'Invalid or expired upload token' }, 401);
         }
 
+        // Refuse a body that declares more than the cap BEFORE it is buffered: reading a 150 MiB upload first would fill the Worker's memory.
+        // A caller behind a session and a signed token that declares no length is still checked after the body is read (storeVideoUpload).
+        const refusedLength = declaredLengthRefusal(c, MAX_FORM_VIDEO_BYTES, STAFF_TOO_LARGE, { requireLength: false });
+        if (refusedLength) return refusedLength;
+
         const formData = await c.req.parseBody();
         const file = formData['file'] as File | undefined;
         if (!file) {
             return c.json({ error: 'file field required' }, 400);
         }
 
-        const stored = await storeVideoUpload(c.env, claims, file);
+        // One request carries the whole clip, so the limit is the single-request one (larger clips use the chunked route).
+        const stored = await storeVideoUpload(c.env, claims, file, MAX_FORM_VIDEO_BYTES);
         if (!stored.ok) return c.json({ error: stored.error }, stored.status);
 
         return c.json({ success: true, data: { mediaId: stored.mediaId, r2Key: stored.r2Key } }, 200);

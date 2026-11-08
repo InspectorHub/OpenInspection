@@ -206,7 +206,9 @@ export class InspectionPhotoService extends InspectionSubService {
             .orderBy(sql`${inspectionMediaPool.uploadedAt} desc`)
             .all();
 
-        const pool = poolRows.map(r => ({
+        // A finished video is placed on its item the moment it is added; a video row left in the pool has no picture to show
+        // and cannot be attached as a photo, so the loose-photo list never offers one.
+        const pool = poolRows.filter(r => r.mediaType !== 'video').map(r => ({
             id:          r.id,
             key:         r.r2Key,
             url:         r.url,
@@ -286,6 +288,8 @@ export class InspectionPhotoService extends InspectionSubService {
             ))
             .get();
         if (!poolRow) throw Errors.NotFound('Pool photo not found');
+        // Attaching writes `{ key: r2Key }` as a photo; for a video that key is the clip, which no image route can serve.
+        if (poolRow.mediaType === 'video') throw Errors.BadRequest('A video cannot be attached as a photo');
 
         // Locate or create the inspection_results row, then append the
         // photo to data[key].photos[].
@@ -316,6 +320,11 @@ export class InspectionPhotoService extends InspectionSubService {
             ));
 
         return { key: poolRow.r2Key, itemId, photoIndex };
+    }
+
+    /** The pure photo ops throw plain errors for an input they cannot honour; say so as a 400, not a 500. */
+    private badRequestOnOpError<T>(op: () => T): T {
+        try { return op(); } catch (err) { throw Errors.BadRequest(err instanceof Error ? err.message : 'invalid photo operation'); }
     }
 
     /**
@@ -366,7 +375,7 @@ export class InspectionPhotoService extends InspectionSubService {
         sectionId?: string,
     ): Promise<void> {
         await this.mutateItemPhotos(inspectionId, tenantId, itemId, sectionId,
-            (photos) => applyReorder(photos, order));
+            (photos) => this.badRequestOnOpError(() => applyReorder(photos, order)));
     }
 
     /**
@@ -398,7 +407,7 @@ export class InspectionPhotoService extends InspectionSubService {
         sectionId?: string,
     ): Promise<void> {
         await this.mutateItemPhotos(inspectionId, tenantId, itemId, sectionId,
-            (photos) => applyRevert(photos, photoIndex));
+            (photos) => this.badRequestOnOpError(() => applyRevert(photos, photoIndex)));
     }
 
     /**

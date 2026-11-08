@@ -3,6 +3,7 @@ import type * as Y from "yjs";
 import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "../components/media-studio/photo-display-key";
 import type { MediaAction } from "../components/media-studio/MediaViewer";
 import { streamThumbUrl } from "../components/media-studio/PosterPicker";
+import type { StripVideoRef } from "../components/media-studio/ItemPhotoStrip";
 import type { GalleryPhoto } from "../shared/inspection-media";
 import { findingKey } from "./findings/shared";
 import type { PhotoCrop } from "../components/media-studio/PhotoCropper";
@@ -22,6 +23,7 @@ import { useFieldDataSource, usePhotoUrlVersion } from "../context";
 import { freeVideoMedia, videoEntryIdentity } from "../lib/video-media-delete";
 import { removeMediaBy as bindingRemoveMediaBy } from "../shared/results-doc-media";
 import { m } from "../i18n";
+import { mediaRef } from "../shared/media-ref";
 import { enqueueMedia } from "../collab/media-upload-queue";
 import type { PendingMediaRecord } from "../media-types";
 import type { PhotoEntry } from "../shared/results-doc.types";
@@ -110,8 +112,13 @@ export function usePhotoOps(ctx: {
 
   /* Plan 7 — resolve a Stream poster thumbnail URL for a video strip thumb. */
   const videoPosterUrl = useCallback(
-    (streamUid: string, posterPct?: number): string | null => {
-      if (!streamCustomerSubdomain) return null;
+    ({ provider, streamUid, mediaId, posterPct }: StripVideoRef): string | null => {
+      if (provider === "r2" || (!streamUid && mediaId)) {
+        // The same derivation the player uses: the host's address for the clip, plus /poster. Null on a host with no such route.
+        const object = mediaId ? urls.videoObject(state.inspection.id, mediaId) : null;
+        return object ? `${object}/poster` : null;
+      }
+      if (!streamCustomerSubdomain || !streamUid) return null;
       // poster sec is unknown without duration here; the thumbnail endpoint accepts
       // a pct-derived time only when we know duration — fall back to time=0s, which
       // Stream maps to the configured thumbnailTimestampPct poster anyway.
@@ -119,7 +126,7 @@ export function usePhotoOps(ctx: {
       void posterPct;
       return streamThumbUrl(streamCustomerSubdomain, streamUid, sec);
     },
-    [streamCustomerSubdomain],
+    [streamCustomerSubdomain, urls, state.inspection.id],
   );
 
   /* Plan 7 — PosterPicker target (a video entry being re-postered). */
@@ -334,9 +341,9 @@ export function usePhotoOps(ctx: {
   const onReorderPhotos = useCallback(
     (itemId: string, order: string[]) => {
       patchItemPhotos(itemId, (photos) => {
-        const byKey = new Map(photos.map((p) => [p.key, p] as const));
+        const byKey = new Map(photos.map((p) => [mediaRef(p), p] as const));
         const reordered = order.map((k) => byKey.get(k)).filter((p): p is ItemPhoto => !!p);
-        return reordered.length === photos.length ? reordered : photos;
+        return reordered.length === photos.length && photos.every((p) => mediaRef(p)) ? reordered : photos;
       });
       if (collabDoc) {
         const fk = docFindingKey(itemId, state.currentSection?.id);
@@ -350,10 +357,11 @@ export function usePhotoOps(ctx: {
    * (indices drift as elements are removed), so resolve each index→key from the
    * PRE-mutation snapshot and remove from the doc. */
   const onBulkDetachPhotos = useCallback(
-    (itemId: string, indices: number[]) => {
+    (itemId: string, selected: number[]) => {
       const sectionId = state.currentSection?.id;
       const fk = docFindingKey(itemId, sectionId);
       const snapshot = getItemPhotos(itemId);
+      const indices = selected.filter((i) => snapshot[i]?.mediaType !== "video"); // clips are not bulk-detached
       const keys = indices
         .map((i) => snapshot[i]?.key)
         .filter((k): k is string => !!k);
@@ -382,11 +390,12 @@ export function usePhotoOps(ctx: {
    * `key`, not index, so resolve index→key from the PRE-mutation snapshot and
    * move each in the doc. The source section is the current one. */
   const onBulkMovePhotos = useCallback(
-    (fromItemId: string, indices: number[], to: { itemId: string; sectionId?: string }) => {
+    (fromItemId: string, selected: number[], to: { itemId: string; sectionId?: string }) => {
       const fromSectionId = state.currentSection?.id;
       const fromFk = docFindingKey(fromItemId, fromSectionId);
       const toFk = docFindingKey(to.itemId, to.sectionId);
       const snapshot = getItemPhotos(fromItemId);
+      const indices = selected.filter((i) => snapshot[i]?.mediaType !== "video"); // clips are not bulk-moved
       const keys = indices
         .map((i) => snapshot[i]?.key)
         .filter((k): k is string => !!k);

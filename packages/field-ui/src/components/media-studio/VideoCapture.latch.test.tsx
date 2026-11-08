@@ -4,12 +4,15 @@
  * so two change events dispatched in ONE frame must reach create-upload once. The busy phase only lands
  * after a render, which is too late for the second event.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, cleanup, act } from "@testing-library/react";
 import { FieldDataSourceProvider } from "../../context";
 import { createEmptyEditorData, createFakeDataSource, createFakeVideo } from "../../testing/fake-data-source";
 import type { FakeVideo } from "../../testing/fake-data-source";
 import { VideoCapture } from "./VideoCapture";
+
+// happy-dom cannot read a video's length, so the probe would wait out its safety net; here the length is simply unknown.
+vi.mock("./video-duration", async (importOriginal) => ({ ...(await importOriginal<typeof import("./video-duration")>()), videoDurationSec: async () => null }));
 
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 30)); });
 const file = new File(["x"], "clip.mp4", { type: "video/mp4" });

@@ -53,6 +53,7 @@ import { InspectorToolsDock } from "../components/editor/InspectorToolsDock";
 import { resolveActivePropertyPreset } from "../shared/property-preset";
 import { InspectionSettingsSheet } from "../components/editor/InspectionSettingsSheet";
 import { VideoCapture } from "../components/media-studio/VideoCapture";
+import { attachUploadedVideo } from "../components/media-studio/attach-uploaded-video";
 import { bakePhoto } from "../components/media-studio/bakePhoto";
 import { bakeBatch } from "../components/media-studio/bakeBatch";
 import { PublishGateModal } from "../components/editor/PublishGateModal";
@@ -1672,7 +1673,9 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  setAddMediaChooser(null);
  libraryInputRef.current?.click();
  }}
- onPickVideo={!caps.video ? undefined : () => {
+ // A clip is added by writing it into the results document, so with no writable document (read-only, locked, not yet
+ // connected) there is nowhere to put one: the entry is not offered rather than letting a long upload end in a clip no one can see.
+ onPickVideo={!caps.video || !writeDoc ? undefined : () => {
  const t = addMediaChooser;
  setAddMediaChooser(null);
  setVideoCaptureTarget(t);
@@ -1687,10 +1690,11 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  provider={videoProvider}
  itemId={videoCaptureTarget.itemId}
  onClose={() => setVideoCaptureTarget(null)}
- onUploaded={() => {
- setVideoCaptureTarget(null);
- dataSource.reload();
- }}
+ onUploaded={(clip) => attachUploadedVideo(clip, videoCaptureTarget.itemId, {
+ addVideoToItem: findings.addVideoToItem,
+ notify: (message, variant, opts) => dataSource.notify(message, variant, opts),
+ reload: () => dataSource.reload(),
+ })}
  />
  )}
  </>

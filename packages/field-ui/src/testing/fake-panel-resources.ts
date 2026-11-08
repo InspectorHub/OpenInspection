@@ -129,7 +129,7 @@ export interface FakeVideo extends VideoResource {
   holdCreateUpload(): () => void;
 }
 
-export function createFakeVideo(): FakeVideo {
+export function createFakeVideo(opts: { maxUploadBytes?: { r2?: number; stream?: number } } = {}): FakeVideo {
   const posters: { inspectionId: string; streamUid: string; posterPct: number }[] = [];
   const createUploads: { inspectionId: string; input: { itemId?: string } }[] = [];
   const uploadedFiles: string[] = [];
@@ -145,6 +145,7 @@ export function createFakeVideo(): FakeVideo {
   let finalizeFailure: { error?: string } | null = null;
   let createGate: Promise<void> | null = null;
   return {
+    ...(opts.maxUploadBytes ? { maxUploadBytes: opts.maxUploadBytes } : {}),
     get posters() {
       return posters;
     },

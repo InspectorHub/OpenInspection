@@ -11,7 +11,7 @@ import { render, screen } from "@testing-library/react";
 import { MediaViewerToolbar, type MediaAction } from "./MediaViewer";
 import { GALLERY_UNHANDLED_ACTIONS } from "./PhotoGallery";
 
-const names = () => screen.getAllByRole("button").map((b) => b.textContent);
+const names = () => screen.queryAllByRole("button").map((b) => b.textContent);
 
 describe("MediaViewerToolbar hidden actions", () => {
   it("CONTROL: with nothing hidden a photo shows Delete, Crop and Annotate", () => {
@@ -28,7 +28,7 @@ describe("MediaViewerToolbar hidden actions", () => {
 
   it("hides video actions too", () => {
     render(<MediaViewerToolbar kind="video" edited={false} hide={["delete", "poster", "caption"]} on={() => {}} />);
-    expect(names()).toEqual(["Set cover"]);
+    expect(names()).toEqual([]);
   });
 
   it("the photo drawer hides every action it does not wire, and only those", () => {

@@ -3,6 +3,10 @@ import Sortable from "sortablejs";
 import { Button } from "@core/shared-ui";
 import { resolvePhotoDisplayKey } from "./photo-display-key";
 import { m } from "../../i18n";
+import { mediaRef } from "../../shared/media-ref";
+import { formatDuration, isDrawableVideo, type StripVideoRef } from "./strip-video";
+
+export type { StripVideoRef };
 
 export interface StripPhoto {
   key: string;
@@ -10,8 +14,12 @@ export interface StripPhoto {
   annotatedKey?: string;
   /** Plan 7 — media discriminator. Absent ⇒ photo. */
   mediaType?: "photo" | "video";
+  /** Video backend: Stream (by `streamUid`) or R2 (by `mediaId`). Absent on legacy Stream entries. */
+  provider?: "stream" | "r2";
   /** Plan 7 — Cloudflare Stream UID (video entries). */
   streamUid?: string;
+  /** R2 video entries: the pool row id every serve and delete route addresses the clip by. */
+  mediaId?: string;
   /** Plan 7 — poster timestamp (0..1) for the Stream poster thumbnail. */
   posterPct?: number;
   /** Plan 7 — duration in seconds, rendered as an m:ss badge. */
@@ -24,14 +32,6 @@ export interface StripPhoto {
   pendingKind?: "photo" | "crop" | "annotate";
 }
 
-/** Plan 7 — format a duration in seconds as m:ss (e.g. 75 → "1:15"). */
-function formatDuration(sec: number): string {
-  const s = Math.max(0, Math.round(sec));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${r.toString().padStart(2, "0")}`;
-}
-
 export interface ItemPhotoStripProps {
   inspectionId: string;
   itemId: string;
@@ -42,8 +42,8 @@ export interface ItemPhotoStripProps {
   onAddPhoto?: () => void;
   onOpen: (index: number) => void;
   /**
-   * Emit the new photo order. CONTRACT: the array is the ORIGINAL `key` order
-   * (NOT displayKey) — the server `reorderItemPhotos` route matches the stored
+   * Emit the new photo order. CONTRACT: the array is the ORIGINAL `key` order (a clip or pending photo, which has no key, is
+   * named by `mediaRef`) (NOT displayKey) — the server `reorderItemPhotos` route matches the stored
    * `photos[].key`. We render the <img> from displayKey but reorder by key.
    */
   onReorder?: (order: string[]) => void;
@@ -67,11 +67,11 @@ export interface ItemPhotoStripProps {
    */
   onBulkMove?: (indices: number[], to: { itemId: string; sectionId?: string }) => void;
   /**
-   * Plan 7 — resolve a Stream poster thumbnail URL for a video entry. Returns
-   * null when the Stream customer subdomain is unavailable (fail closed) — the
-   * strip then shows a neutral video placeholder instead of a broken image.
+   * Resolve a poster thumbnail URL for a video entry (a Stream clip by uid, an R2 clip by media id). Returns null when the host
+   * has no address for it (no Stream subdomain, or a native client with no object route): fail closed — the strip then shows a
+   * neutral video placeholder instead of a broken image.
    */
-  videoPosterUrl?: (streamUid: string, posterPct?: number) => string | null;
+  videoPosterUrl?: (video: StripVideoRef) => string | null;
   /**
    * #181 PR-G — resolve the LOCAL blob objectURL for a pending (offline) entry's
    * `pendingId`. Returns undefined when this client does not own the blob (the
@@ -127,6 +127,8 @@ export function ItemPhotoStrip({
 
   const startLongPress = (i: number) => {
     if (!selectable) return;
+    // A video never joins a selection (bulk detach and move address photos by key, and a video has none).
+    if (isDrawableVideo(photos[i])) return;
     clearTimeout(lp.current);
     lp.current = setTimeout(() => {
       setSelecting(true);
@@ -154,7 +156,7 @@ export function ItemPhotoStrip({
       onEnd: (evt) => {
         if (evt.oldIndex == null || evt.newIndex == null || evt.oldIndex === evt.newIndex) return;
         // Build the ORIGINAL-key order (server matches photos[].key, NOT displayKey).
-        const keys = photosRef.current.map((p) => p.key);
+        const keys = photosRef.current.map((p) => mediaRef(p));
         const [moved] = keys.splice(evt.oldIndex, 1);
         keys.splice(evt.newIndex, 0, moved);
         onReorderRef.current?.(keys);
@@ -166,6 +168,7 @@ export function ItemPhotoStrip({
     // Sortable instance (which would break a drag mid-gesture).
   }, [onReorder]);
 
+  const hasVideo = photos.some(isDrawableVideo);
   const showSelectToggle = selectable && (!!onBulkDetach || !!onBulkMove) && photos.length > 0;
 
   return (
@@ -226,6 +229,11 @@ export function ItemPhotoStrip({
           )}
         </div>
       )}
+      {selecting && hasVideo && (
+        <p data-testid="video-bulk-hint" className="mb-2 text-[11px] text-ih-fg-3">
+          {m.media_strip_videos_not_bulk()}
+        </p>
+      )}
       <div
         ref={rowRef}
         className="flex flex-wrap items-center gap-2 overflow-x-auto"
@@ -237,8 +245,11 @@ export function ItemPhotoStrip({
           const checked = sel.has(i);
           // Plan 7 — video entries render the Stream poster as the thumb + a
           // play-glyph + an m:ss duration badge; the cover ring is preserved.
-          const isVideo = p.mediaType === "video" && !!p.streamUid;
-          const posterSrc = isVideo ? (videoPosterUrl?.(p.streamUid!, p.posterPct) ?? null) : null;
+          const isVideo = isDrawableVideo(p);
+          const posterSrc = isVideo
+            ? (videoPosterUrl?.({ provider: p.provider, streamUid: p.streamUid, mediaId: p.mediaId, posterPct: p.posterPct }) ?? null)
+            : null;
+          const lockedInSelect = selecting && isVideo;
           // #181 PR-G — pending (offline) entry. Prefer the LOCAL blob URL; fall
           // back to the base key (pending crop/annotate keep their base) or a
           // placeholder (another device's offline capture — no local blob).
@@ -250,7 +261,8 @@ export function ItemPhotoStrip({
               key={dk || p.pendingId || `idx-${i}`}
               type="button"
               data-testid={`thumb-${i}`}
-              onClick={() => (selecting ? toggle(i) : onOpen(i))}
+              aria-disabled={lockedInSelect ? true : undefined}
+              onClick={() => (selecting ? (isVideo ? undefined : toggle(i)) : onOpen(i))}
               onPointerDown={() => startLongPress(i)}
               onPointerUp={cancelLongPress}
               onPointerLeave={cancelLongPress}
@@ -260,7 +272,7 @@ export function ItemPhotoStrip({
                   : checked
                     ? "border-ih-primary"
                     : "border-ih-border hover:border-ih-primary/60"
-              }`}
+              } ${lockedInSelect ? "opacity-40 cursor-not-allowed" : ""}`}
             >
               {isVideo ? (
                 <>
@@ -320,7 +332,7 @@ export function ItemPhotoStrip({
                   draggable={false}
                 />
               )}
-              {selecting && (
+              {selecting && !isVideo && (
                 <span
                   data-testid={`check-${i}`}
                   onClick={(e) => {

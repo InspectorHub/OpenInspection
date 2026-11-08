@@ -51,10 +51,18 @@ export function assignPhotoNumbers(sections: SectionLike[]): {
   const numberByKey = new Map<string, number>();
   let next = 1;
 
+  /** A video has no still: its key is empty (it is addressed by media id or stream uid) and the report draws a player or poster. */
+  const isStill = (p: ReportPhotoLike): boolean => {
+    if (!p.key) return false;
+    const kind = (p.media as { kind?: string } | undefined)?.kind;
+    return kind === undefined || kind === 'image';
+  };
+
   const stamp = (
     p: ReportPhotoLike,
     ctx: { sectionId: string; sectionTitle: string; itemId: string; itemLabel: string },
-  ): ReportPhotoLike & { photoNo: number } => {
+  ): ReportPhotoLike & { photoNo?: number } => {
+    if (!isStill(p)) return { ...p };
     let no = numberByKey.get(p.key);
     if (no === undefined) {
       no = next++;

@@ -149,7 +149,7 @@ describe('ItemPhotoStrip', () => {
         photoUrl: (k: string) => `/u/${k}`,
         onAddPhoto: vi.fn(),
         onOpen: vi.fn(),
-        videoPosterUrl: (uid: string) => `https://sub.cloudflarestream.com/${uid}/thumbnails/thumbnail.jpg?time=0s`,
+        videoPosterUrl: (v: { streamUid?: string }) => `https://sub.cloudflarestream.com/${v.streamUid}/thumbnails/thumbnail.jpg?time=0s`,
       }),
     );
     // thumb-1 is the video: play-glyph + duration badge present
