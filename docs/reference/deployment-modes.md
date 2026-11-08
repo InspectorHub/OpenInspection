@@ -39,7 +39,7 @@ that way.
 | `fixedTenantId` | `SINGLE_TENANT_ID`, or an all-zero UUID when unset | none — resolved per request | The single tenant every request resolves to. Standalone has exactly one; saas resolves a tenant per request. |
 | `hasBilling` | no | yes | Subscription billing surfaces exist (Settings → Billing). |
 | `hasSeatQuota` | no | yes | The number of team members is capped by a plan. |
-| `hasUsageQuota` | no | yes | Metered usage is capped by a plan. |
+| `hasUsageQuota` | no | yes | Metered usage is capped by a plan. On a capped plan, new inspections and built-in emails are counted per calendar month in UTC: the allowance renews at 00:00 UTC on the 1st, an inspection counts for the month it was created in (deleting one created this month returns its place, deleting an older one does not), and an email counts for the month it was sent in. Sending from your own email account is not counted. A standalone deployment has no such limits. |
 | `billingPortalUrl` | none | derived from `PORTAL_API_URL` | Where the browser is sent to manage a subscription. |
 | `loginRedirectBase` | none — local login form | derived from `PORTAL_API_URL` | Where the browser is sent to sign in. Standalone serves its own login form; saas bounces to the portal and `POST /api/auth/login` returns 410. |
 | `identitySignOutUrl` | none — sign-out ends at the local login form | derived from `PORTAL_API_URL` | Where an explicit staff sign-out is sent so the identity service ends its own session too. Null without a base. Server-only. |
