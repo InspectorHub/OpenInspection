@@ -10,11 +10,13 @@ import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import * as Y from 'yjs';
 import type { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
+import type { StateExport, StateImportBody } from '../../server/durable-objects/inspection-doc-state-transfer';
 
 interface TestBindings {
     INSPECTION_DOC: DurableObjectNamespace<InspectionDocDO>;
 }
-const b = env as unknown as TestBindings;
+// The generated Env does not list this binding; a narrowing assertion adds it without going through unknown.
+const b = env as typeof env & TestBindings;
 
 const IDENTITY = { tenantId: 't-1', inspectionId: 'i-1', reportId: 'r-1' };
 const SNAPSHOTS = [{ seq: 1, atMs: 1700000000000, byUserId: 'u-1', reason: 'manual', projection: { marker: 'restore-point' } }];
@@ -46,7 +48,7 @@ describe('InspectionDocDO state transfer', () => {
         const bytes = await seedSource('src-1');
         const exported = await stub('src-1').fetch(url('state-export'));
         expect(exported.status).toBe(200);
-        const payload = (await exported.json()) as { ydoc: string; identity: unknown; snapshots: unknown };
+        const payload = (await exported.json()) as StateExport;
         expect(payload.identity).toEqual(IDENTITY);
         expect(payload.snapshots).toEqual(SNAPSHOTS);
 
@@ -70,7 +72,7 @@ describe('InspectionDocDO state transfer', () => {
         const target = stub('dst-2');
         expect((await target.fetch(url('state-import'), { method: 'POST', body: payload })).status).toBe(200);
 
-        const other = JSON.parse(payload) as { snapshots: unknown[] };
+        const other = JSON.parse(payload) as StateImportBody;
         other.snapshots = [];
         const again = await target.fetch(url('state-import'), { method: 'POST', body: JSON.stringify(other) });
         expect(again.status).toBe(409);

@@ -57,7 +57,7 @@ import { isNonEmptyProjection, logDivergence, projectionsEqual } from './results
 import { loadTemplateSnapshot, renameLegacyKeysResponse } from './inspection-doc-legacy-keys';
 import { matchSnapshotBySeqPath } from './inspection-doc-snapshot-path';
 import { ACK_TAG, AckTracker, ackTags, logPersistFailure } from './inspection-doc-ack';
-import { exportStoredState, parseStateImport, writeImportedState } from './inspection-doc-state-transfer';
+import { exportStoredState, parseStateImport, writeImportedState, type StateImportBody } from './inspection-doc-state-transfer';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -380,7 +380,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             return Response.json(await exportStoredState(this.ctx.storage, STATE_KEYS));
         }
         if (url.pathname.endsWith('/state-import') && req.method === 'POST') {
-            const parsed = parseStateImport(await req.json().catch(() => null));
+            const parsed = parseStateImport(await req.json<StateImportBody | null>().catch(() => null));
             if (!parsed) return new Response('invalid body', { status: 400 });
             if ((await writeImportedState(this.ctx.storage, STATE_KEYS, parsed)) === 'not-empty') return new Response('target not empty', { status: 409 });
             Y.applyUpdate(this.doc, parsed.bytes, HYDRATE_ORIGIN);

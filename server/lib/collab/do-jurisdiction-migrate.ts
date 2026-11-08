@@ -34,10 +34,16 @@ export async function listCollabDocRefs(d1: D1Database): Promise<CollabDocRef[]>
     return rows.flatMap((r) => (r.reportId ? [{ tenantId: r.tenantId, reportId: r.reportId }] : []));
 }
 
-export async function migrateCollabDocs(
+/** What the copy needs from a namespace. A real `DurableObjectNamespace` is one (`Id` = `DurableObjectId`); so is a test double. */
+export interface DocNamespace<Id> {
+    idFromName(name: string): Id;
+    get(id: Id): { fetch(url: string, init?: RequestInit): Promise<Response> };
+}
+
+export async function migrateCollabDocs<Id>(
     refs: CollabDocRef[],
-    from: DurableObjectNamespace,
-    to: DurableObjectNamespace,
+    from: DocNamespace<Id>,
+    to: DocNamespace<Id>,
     opts: { dryRun: boolean },
 ): Promise<MigrationReport> {
     const report: MigrationReport = { total: refs.length, copied: 0, wouldCopy: 0, alreadyThere: 0, empty: 0, failed: [] };
@@ -56,7 +62,7 @@ export async function migrateCollabDocs(
             if (res.status === 409) report.alreadyThere++;
             else if (res.ok) report.copied++;
             else report.failed.push(`${name}: import returned ${res.status}`);
-        } catch (e: unknown) {
+        } catch (e) {
             report.failed.push(`${name}: ${e instanceof Error ? e.message : 'unknown error'}`);
         }
     }

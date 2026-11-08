@@ -1,15 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
-import { pinDurableObjects, readDoJurisdiction } from '../../../server/lib/collab/do-jurisdiction';
+import { describe, expect, it } from 'vitest';
+import { pinDurableObjects, readDoJurisdiction, type DoJurisdiction, type PinnableNamespace } from '../../../server/lib/collab/do-jurisdiction';
 
 /** A namespace stand-in that records which jurisdiction it was narrowed to. */
-function fakeNs(label: string) {
-    const ns = {
-        label,
-        pinnedTo: null as string | null,
-        idFromName: (n: string) => `${label}:${n}`,
-        jurisdiction: vi.fn((j: string) => ({ ...ns, label: `${label}@${j}`, pinnedTo: j })),
-    };
-    return ns;
+interface FakeNs extends PinnableNamespace {
+    label: string;
+    pinnedTo: DoJurisdiction | null;
+}
+
+function fakeNs(label: string, pinnedTo: DoJurisdiction | null = null): FakeNs {
+    return { label, pinnedTo, jurisdiction: (j) => fakeNs(`${label}@${j}`, j) };
 }
 
 describe('readDoJurisdiction', () => {
@@ -40,16 +39,17 @@ describe('pinDurableObjects', () => {
     it('narrows each Durable Object namespace to the jurisdiction and leaves other bindings alone', () => {
         const env = { DO_JURISDICTION: 'us', INSPECTION_DOC: fakeNs('doc'), INSPECTION_PRESENCE: fakeNs('presence'), TENANT_PRESENCE: fakeNs('tenant'), INSPECTOR_MCP: fakeNs('mcp'), DB: { d1: true } };
         const pinned = pinDurableObjects(env);
-        for (const k of ['INSPECTION_DOC', 'INSPECTION_PRESENCE', 'TENANT_PRESENCE', 'INSPECTOR_MCP'] as const) {
-            expect((pinned[k] as unknown as { pinnedTo: string }).pinnedTo).toBe('us');
-        }
+        expect(pinned.INSPECTION_DOC.pinnedTo).toBe('us');
+        expect(pinned.INSPECTION_PRESENCE.pinnedTo).toBe('us');
+        expect(pinned.TENANT_PRESENCE.pinnedTo).toBe('us');
+        expect(pinned.INSPECTOR_MCP.pinnedTo).toBe('us');
         expect(pinned.DB).toBe(env.DB);
     });
 
     it('keeps the original, unpinned collab namespace reachable for the one-off state copy', () => {
         const doc = fakeNs('doc');
         const pinned = pinDurableObjects({ DO_JURISDICTION: 'us', INSPECTION_DOC: doc });
-        expect((pinned as unknown as { INSPECTION_DOC_UNPINNED: unknown }).INSPECTION_DOC_UNPINNED).toBe(doc);
+        expect(pinned.INSPECTION_DOC_UNPINNED).toBe(doc);
     });
 
     it('is stable: the same env gives the same pinned object, so a mutation made through it survives the next request', () => {
@@ -58,8 +58,8 @@ describe('pinDurableObjects', () => {
     });
 
     it('skips a binding that is not bound or is not a namespace, rather than throwing', () => {
-        const env = { DO_JURISDICTION: 'us', INSPECTION_DOC: undefined, TENANT_PRESENCE: { notANamespace: true } };
-        expect(() => pinDurableObjects(env as never)).not.toThrow();
+        // @ts-expect-error TENANT_PRESENCE is deliberately not a namespace: pinning must skip it, not trust it.
+        expect(() => pinDurableObjects({ DO_JURISDICTION: 'us', INSPECTION_DOC: undefined, TENANT_PRESENCE: { notANamespace: true } })).not.toThrow();
     });
 
     it('throws on a bad jurisdiction value, on every call', () => {

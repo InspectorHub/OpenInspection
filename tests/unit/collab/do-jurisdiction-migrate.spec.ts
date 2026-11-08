@@ -1,18 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { migrateCollabDocs, type CollabDocRef } from '../../../server/lib/collab/do-jurisdiction-migrate';
+import { migrateCollabDocs, type CollabDocRef, type DocNamespace } from '../../../server/lib/collab/do-jurisdiction-migrate';
 import { collabDocName } from '../../../server/lib/collab/doc-name';
 
-type Payload = { ydoc: string | null; identity: unknown; snapshots: unknown[] };
+interface Identity { tenantId: string; inspectionId: string }
+interface Payload { ydoc: string | null; identity: Identity | null; snapshots: object[] }
 
-/** A namespace whose objects are plain records, speaking the two verbs the migration uses. */
-function fakeNamespace(initial: Record<string, Payload>, opts: { failImportFor?: string } = {}) {
+/** A namespace whose objects are plain records, speaking the two verbs the migration uses. The object id is the name itself. */
+interface FakeNamespace extends DocNamespace<string> {
+    store: Map<string, Payload>;
+    calls: string[];
+}
+
+function fakeNamespace(initial: Record<string, Payload>, opts: { failImportFor?: string } = {}): FakeNamespace {
     const store = new Map(Object.entries(initial));
     const calls: string[] = [];
     return {
         store, calls,
-        idFromName: (n: string) => n,
-        get: (name: string) => ({
-            fetch: async (url: string, init?: RequestInit) => {
+        idFromName: (n) => n,
+        get: (name) => ({
+            fetch: async (url, init) => {
                 calls.push(`${init?.method ?? 'GET'} ${new URL(url).pathname} ${name}`);
                 if (new URL(url).pathname === '/state-export') {
                     return Response.json(store.get(name) ?? { ydoc: null, identity: null, snapshots: [] });
@@ -23,7 +29,7 @@ function fakeNamespace(initial: Record<string, Payload>, opts: { failImportFor?:
                 return Response.json({ ok: true });
             },
         }),
-    } as unknown as DurableObjectNamespace & { store: Map<string, Payload>; calls: string[] };
+    };
 }
 
 const ref = (t: string, r: string): CollabDocRef => ({ tenantId: t, reportId: r });

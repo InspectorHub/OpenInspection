@@ -11,14 +11,24 @@ export interface StateKeys { ydoc: string; identity: string; snapshots: string }
 
 export interface TransferIdentity { tenantId: string; inspectionId: string; reportId?: string | null }
 
+/** Restore points are carried through untouched; this module never reads inside one. */
+export type SnapshotRecord = object;
+
 export interface StateExport {
     /** Base64 of the encoded Y.Doc, or null when the object holds no document. */
     ydoc:      string | null;
     identity:  TransferIdentity | null;
-    snapshots: unknown[];
+    snapshots: SnapshotRecord[];
 }
 
-export interface ParsedStateImport { bytes: Uint8Array; identity: TransferIdentity; snapshots: unknown[] }
+/** What an import body may carry. Every field is optional because the body comes from a caller: `parseStateImport` checks it. */
+export interface StateImportBody {
+    ydoc?:      string;
+    identity?:  Partial<TransferIdentity> | null;
+    snapshots?: SnapshotRecord[];
+}
+
+export interface ParsedStateImport { bytes: Uint8Array; identity: TransferIdentity; snapshots: SnapshotRecord[] }
 
 export function bytesToBase64(b: Uint8Array): string {
     let s = '';
@@ -47,13 +57,13 @@ export async function exportStoredState(storage: DurableObjectStorage, keys: Sta
 }
 
 /** Null when the body is not a usable export. */
-export function parseStateImport(body: unknown): ParsedStateImport | null {
-    if (typeof body !== 'object' || body === null) return null;
-    const { ydoc, identity, snapshots } = body as { ydoc?: unknown; identity?: unknown; snapshots?: unknown };
+export function parseStateImport(body: StateImportBody | null): ParsedStateImport | null {
+    if (!body || typeof body !== 'object') return null;
+    const { ydoc, identity, snapshots } = body;
     if (typeof ydoc !== 'string' || !ydoc) return null;
-    const id = identity as TransferIdentity | null | undefined;
-    if (!id || typeof id.tenantId !== 'string' || typeof id.inspectionId !== 'string') return null;
-    return { bytes: base64ToBytes(ydoc), identity: id, snapshots: Array.isArray(snapshots) ? snapshots : [] };
+    if (!identity || typeof identity.tenantId !== 'string' || typeof identity.inspectionId !== 'string') return null;
+    const { tenantId, inspectionId, reportId } = identity;
+    return { bytes: base64ToBytes(ydoc), identity: reportId === undefined ? { tenantId, inspectionId } : { tenantId, inspectionId, reportId }, snapshots: Array.isArray(snapshots) ? snapshots : [] };
 }
 
 /** `not-empty` when the target already holds a document: nothing is written. */

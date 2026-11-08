@@ -18,32 +18,48 @@ const PINNED_BINDINGS = ['INSPECTION_DOC', 'INSPECTION_PRESENCE', 'TENANT_PRESEN
 /** The collab namespace as it was before pinning, kept only so objects created without a jurisdiction can be read once and copied. */
 export const UNPINNED_COLLAB_BINDING = 'INSPECTION_DOC_UNPINNED';
 
-export function readDoJurisdiction(env: { DO_JURISDICTION?: string }): DoJurisdiction | null {
+export function readDoJurisdiction(env: Pick<JurisdictionEnv, 'DO_JURISDICTION'>): DoJurisdiction | null {
     const raw = env.DO_JURISDICTION?.trim().toLowerCase();
     if (!raw) return null;
     if ((JURISDICTIONS as readonly string[]).includes(raw)) return raw as DoJurisdiction;
     throw new Error(`DO_JURISDICTION must be one of ${JURISDICTIONS.join(', ')}; got "${env.DO_JURISDICTION}"`);
 }
 
-function isNamespace(v: unknown): v is { jurisdiction: (j: string) => unknown } {
-    return typeof v === 'object' && v !== null && typeof (v as { jurisdiction?: unknown }).jurisdiction === 'function';
+/** What pinning needs from a namespace. A real `DurableObjectNamespace` satisfies it, and so does a test double. */
+export interface PinnableNamespace {
+    jurisdiction(jurisdiction: DoJurisdiction): PinnableNamespace;
+}
+
+/** The bindings pinning reads. All optional: a deployment binds only the classes it uses. */
+export interface JurisdictionEnv {
+    DO_JURISDICTION?: string;
+    INSPECTION_DOC?: PinnableNamespace;
+    INSPECTION_PRESENCE?: PinnableNamespace;
+    TENANT_PRESENCE?: PinnableNamespace;
+    INSPECTOR_MCP?: PinnableNamespace;
+}
+
+/** The pinned env also carries the collab namespace as it was before pinning. */
+export interface PinnedExtras {
+    INSPECTION_DOC_UNPINNED?: PinnableNamespace;
 }
 
 const cache = new WeakMap<object, object>();
 
-export function pinDurableObjects<E extends object>(env: E): E {
-    const jurisdiction = readDoJurisdiction(env as { DO_JURISDICTION?: string });
+export function pinDurableObjects<E extends JurisdictionEnv>(env: E): E & PinnedExtras {
+    const jurisdiction = readDoJurisdiction(env);
     if (!jurisdiction) return env;
     const hit = cache.get(env);
-    if (hit) return hit as E;
+    if (hit) return hit as E & PinnedExtras;
 
-    const pinned: Record<string, unknown> = { ...(env as Record<string, unknown>) };
+    const pinned: JurisdictionEnv & PinnedExtras = { ...env };
     for (const name of PINNED_BINDINGS) {
-        const ns = (env as Record<string, unknown>)[name];
-        if (!isNamespace(ns)) continue;
-        if (name === 'INSPECTION_DOC') pinned[UNPINNED_COLLAB_BINDING] = ns;
+        const ns = env[name];
+        // A binding that is absent, or is not a namespace, is left alone rather than trusted.
+        if (!ns || typeof ns.jurisdiction !== 'function') continue;
+        if (name === 'INSPECTION_DOC') pinned.INSPECTION_DOC_UNPINNED = ns;
         pinned[name] = ns.jurisdiction(jurisdiction);
     }
     cache.set(env, pinned);
-    return pinned as E;
+    return pinned as E & PinnedExtras;
 }
