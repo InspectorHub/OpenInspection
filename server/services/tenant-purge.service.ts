@@ -53,6 +53,10 @@ export interface PurgeDurableObjects {
     // where both of these actually come from, hands over the union.
     INSPECTION_DOC?:  DurableObjectNamespace | undefined;
     TENANT_PRESENCE?: DurableObjectNamespace | undefined;
+    // The same two classes as they were before objects were pinned to a jurisdiction (set only when pinning is on). A pinned
+    // namespace cannot name an object created before pinning, so the same names are purged here too.
+    INSPECTION_DOC_UNPINNED?:  DurableObjectNamespace | undefined;
+    TENANT_PRESENCE_UNPINNED?: DurableObjectNamespace | undefined;
 }
 
 /**
@@ -286,19 +290,24 @@ export class TenantPurgeService {
             ...reportIds.map(r => [this.dos.INSPECTION_DOC, collabDocName(tenantId, r)] as [DurableObjectNamespace | undefined, string]),
             [this.dos.TENANT_PRESENCE, tenantId],
         ];
-        for (const [ns, name] of doTargets) {
+        // Pre-pinning objects: same names, not counted again. A name that never existed there purges as a no-op.
+        const legacyTargets: Array<[DurableObjectNamespace | undefined, string]> = [
+            ...reportIds.map(r => [this.dos.INSPECTION_DOC_UNPINNED, collabDocName(tenantId, r)] as [DurableObjectNamespace | undefined, string]),
+            [this.dos.TENANT_PRESENCE_UNPINNED, tenantId],
+        ];
+        for (const [ns, name, counted] of [...doTargets.map(([n, m]) => [n, m, true] as const), ...legacyTargets.map(([n, m]) => [n, m, false] as const)]) {
             // An unbound namespace is a deployment without that feature, so
             // there is no object of that class to destroy. Recording it as
             // incomplete would make every standalone purge cry wolf, and an
             // alarm that always fires is read as noise by the second week.
             if (!ns) {
-                logger.info('Durable Object namespace unbound, nothing to purge', { tenantId, name });
+                if (counted) logger.info('Durable Object namespace unbound, nothing to purge', { tenantId, name });
                 continue;
             }
             try {
                 const res = await ns.get(ns.idFromName(name)).fetch('https://do/purge', { method: 'POST' });
                 if (!res.ok) throw new Error(`purge returned ${res.status}`);
-                durableObjects++;
+                if (counted) durableObjects++;
             } catch (err) {
                 logger.error('Durable Object purge failed', { tenantId, name }, err instanceof Error ? err : undefined);
                 if (!incompleteStores.includes('durable_objects')) incompleteStores.push('durable_objects');

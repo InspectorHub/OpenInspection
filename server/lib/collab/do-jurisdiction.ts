@@ -15,8 +15,13 @@ export type DoJurisdiction = (typeof JURISDICTIONS)[number];
 /** The namespaces that hold personal data and so must follow the jurisdiction. */
 const PINNED_BINDINGS = ['INSPECTION_DOC', 'INSPECTION_PRESENCE', 'TENANT_PRESENCE', 'INSPECTOR_MCP'] as const;
 
-/** The collab namespace as it was before pinning, kept only so objects created without a jurisdiction can be read once and copied. */
+/**
+ * The namespaces that store personal data as they were before pinning. Kept so objects created without a jurisdiction can be
+ * read once and copied (collab) and so deletion can still reach them (collab and tenant presence): a pinned namespace mints
+ * different ids, so it cannot name an object that was created before pinning.
+ */
 export const UNPINNED_COLLAB_BINDING = 'INSPECTION_DOC_UNPINNED';
+export const UNPINNED_TENANT_PRESENCE_BINDING = 'TENANT_PRESENCE_UNPINNED';
 
 export function readDoJurisdiction(env: Pick<JurisdictionEnv, 'DO_JURISDICTION'>): DoJurisdiction | null {
     const raw = env.DO_JURISDICTION?.trim().toLowerCase();
@@ -39,9 +44,10 @@ export interface JurisdictionEnv {
     INSPECTOR_MCP?: PinnableNamespace;
 }
 
-/** The pinned env also carries the collab namespace as it was before pinning. */
+/** The pinned env also carries the namespaces that hold stored state as they were before pinning. */
 export interface PinnedExtras {
     INSPECTION_DOC_UNPINNED?: PinnableNamespace;
+    TENANT_PRESENCE_UNPINNED?: PinnableNamespace;
 }
 
 const cache = new WeakMap<object, object>();
@@ -58,6 +64,7 @@ export function pinDurableObjects<E extends JurisdictionEnv>(env: E): E & Pinned
         // A binding that is absent, or is not a namespace, is left alone rather than trusted.
         if (!ns || typeof ns.jurisdiction !== 'function') continue;
         if (name === 'INSPECTION_DOC') pinned.INSPECTION_DOC_UNPINNED = ns;
+        if (name === 'TENANT_PRESENCE') pinned.TENANT_PRESENCE_UNPINNED = ns;
         pinned[name] = ns.jurisdiction(jurisdiction);
     }
     cache.set(env, pinned);

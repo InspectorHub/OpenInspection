@@ -1,5 +1,6 @@
 import { logger } from '../../lib/logger';
 import { collabDocName } from '../../lib/collab/doc-name';
+import type { CollabNamespaces } from '../../lib/collab/collab-namespaces';
 
 /**
  * What happened to the collaborative-document storage of a deleted inspection.
@@ -24,21 +25,27 @@ export type CollabPurgeOutcome = 'ok' | 'failed' | 'skipped';
  * must not turn a completed delete into an error. It is not silent either: it is
  * logged with the inspection id (never content) and returned, so the caller can
  * record it on the audit event.
+ *
+ * `legacy` is the namespace as it was before objects were pinned to a jurisdiction. A pinned namespace mints
+ * different ids for the same name, so an object created before pinning can only be named through this one. The
+ * same names are purged there too; a name that never existed is an empty object and the purge is a no-op, so
+ * the call is idempotent and needs no existence check.
  */
 export async function purgeCollabDocs(
-    ns: DurableObjectNamespace | undefined,
+    namespaces: CollabNamespaces | undefined,
     tenantId: string,
     inspectionId: string,
     reportIds: readonly string[],
 ): Promise<CollabPurgeOutcome> {
-    if (!ns || reportIds.length === 0) return 'skipped';
-    const results = await Promise.allSettled(reportIds.map(async (reportId) => {
+    if (!namespaces || reportIds.length === 0) return 'skipped';
+    const targets = namespaces.legacy ? [namespaces.pinned, namespaces.legacy] : [namespaces.pinned];
+    const results = await Promise.allSettled(targets.flatMap((n) => reportIds.map(async (reportId) => {
         const name = collabDocName(tenantId, reportId);
-        const res = await ns.get(ns.idFromName(name)).fetch('https://do/purge', { method: 'POST' });
+        const res = await n.get(n.idFromName(name)).fetch('https://do/purge', { method: 'POST' });
         if (!res.ok) throw new Error(`purge returned ${res.status}`);
-    }));
+    })));
     const failed = results.filter((r) => r.status === 'rejected').length;
     if (failed === 0) return 'ok';
-    logger.warn('Collab document purge failed after inspection delete', { tenantId, inspectionId, failed, reports: reportIds.length });
+    logger.warn('Collab document purge failed after inspection delete', { tenantId, inspectionId, failed, reports: reportIds.length, namespaces: targets.length });
     return 'failed';
 }

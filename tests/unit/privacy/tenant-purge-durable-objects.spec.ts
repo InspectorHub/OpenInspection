@@ -220,4 +220,35 @@ describe('TenantPurgeService — Durable Objects', () => {
         expect(out.durableObjects).toBe(1);
         expect(out.incompleteStores).toEqual([]);
     });
+
+    it('also empties the objects the same names have in the pre-pinning namespaces, without counting them as purged twice', async () => {
+        const pinned: string[] = [];
+        const legacyDoc: string[] = [];
+        const legacyPresence: string[] = [];
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
+            INSPECTION_DOC: stubNamespace((n) => pinned.push(n)),
+            TENANT_PRESENCE: stubNamespace((n) => pinned.push(n)),
+            INSPECTION_DOC_UNPINNED: stubNamespace((n) => legacyDoc.push(n)),
+            TENANT_PRESENCE_UNPINNED: stubNamespace((n) => legacyPresence.push(n)),
+        });
+
+        const out = await svc.purge(TENANT);
+
+        expect(legacyDoc).toEqual([`${TENANT}:${REPORT_A}`, `${TENANT}:${REPORT_B}`]);
+        expect(legacyPresence).toEqual([TENANT]);
+        expect(legacyDoc.some((n) => n.includes('report-other'))).toBe(false);
+        expect(out.durableObjects).toBe(3);
+        expect(out.incompleteStores).toEqual([]);
+    });
+
+    it('marks the destruction incomplete when only the pre-pinning object refuses to purge', async () => {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
+            INSPECTION_DOC: stubNamespace(() => {}),
+            TENANT_PRESENCE: stubNamespace(() => {}),
+            INSPECTION_DOC_UNPINNED: stubNamespace(() => {}, false),
+        });
+        const out = await svc.purge(TENANT);
+        expect(out.incompleteStores).toContain('durable_objects');
+        expect(out.durableObjects).toBe(3);
+    });
 });

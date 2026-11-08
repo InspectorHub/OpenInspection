@@ -9,6 +9,7 @@ import type { SyncEnvelope } from '../lib/sync-events/envelope';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
 import integrationRoutes from './integration.routes';
 import statutoryAdminRoutes from './statutory-admin.routes';
+import collabAdminRoutes from './collab-admin.routes';
 import { flushOutboxOnce, OutboxService } from './outbox.service';
 import { logger } from '../lib/logger';
 
@@ -32,6 +33,8 @@ export function registerPortalIntegration(app: OpenAPIHono<HonoConfig>): void {
     // about one tenant's lifecycle, these are about the catalogue and the
     // documents produced from it, and the file next door is at its size cap.
     app.route('/api/platform', statutoryAdminRoutes);
+    // The routes that act on collaborative-document objects: the batched jurisdiction migration and the one-object purge.
+    app.route('/api/platform', collabAdminRoutes);
 }
 
 /**

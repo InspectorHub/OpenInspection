@@ -26,7 +26,10 @@ export interface NativeRouteException {
     reason: string;
 }
 
-export const MAX_ENTRIES = 84;
+// 85 (was 84): an explicit owner decision, not drift. `POST /api/platform/collab-migrate` (the batched Durable Object jurisdiction copy,
+// category m2m-hold) is a platform control-plane route. Every platform route is plain Hono behind the signed service-binding header, and
+// describing it with `createRoute` would publish it in the public OpenAPI document, which is the one thing that must not happen.
+export const MAX_ENTRIES = 85;
 
 export const NATIVE_ROUTE_EXCEPTIONS: readonly NativeRouteException[] = [
     { key: 'GET /api/inspections/{id}/collab/ws', category: 'websocket', reason: 'WebSocket upgrade for the collaborative editor; answers 426 to a plain request' },
@@ -95,6 +98,7 @@ export const NATIVE_ROUTE_EXCEPTIONS: readonly NativeRouteException[] = [
     { key: 'PATCH /api/platform/tenants/{slug}', category: 'm2m-hold', reason: 'Platform control-plane route kept out of the public document' },
     { key: 'POST /api/platform/tenants/{slug}/purge', category: 'm2m-hold', reason: 'Platform control-plane route kept out of the public document' },
     { key: 'POST /api/platform/tenants/{slug}/inspection-doc/purge', category: 'm2m-hold', reason: 'Platform control-plane route kept out of the public document' },
+    { key: 'POST /api/platform/collab-migrate', category: 'm2m-hold', reason: 'Platform control-plane route kept out of the public document' },
     { key: 'GET /api/platform/destruction-records', category: 'm2m-hold', reason: 'Platform control-plane route kept out of the public document' },
     { key: 'POST /api/platform/discovery-objections', category: 'm2m-hold', reason: 'Platform control-plane route kept out of the public document' },
     { key: 'DELETE /api/platform/discovery-objections', category: 'm2m-hold', reason: 'Platform control-plane route kept out of the public document' },

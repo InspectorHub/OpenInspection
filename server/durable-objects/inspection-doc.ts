@@ -44,7 +44,6 @@ import {
     loadResultsProjection,
     removeFindingKeys,
 } from '@core/field-ui/shared/results-doc';
-import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 import { followupResponse } from '../lib/collab/followup-patch';
 import { findingKeysFromTemplateSnapshot } from '@core/field-ui/shared/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
@@ -55,9 +54,10 @@ import { writeResultsProjection } from './inspection-doc-d1';
 import { importResponse, newestImportSeq, resolvePendingResponse } from './inspection-doc-import';
 import { isNonEmptyProjection, logDivergence, projectionsEqual } from './results-divergence';
 import { loadTemplateSnapshot, renameLegacyKeysResponse } from './inspection-doc-legacy-keys';
+import { asSnapshotArray, type ResultsSnapshot, type ResultsSnapshotMeta, type SnapshotReason } from './inspection-doc-snapshots';
 import { matchSnapshotBySeqPath } from './inspection-doc-snapshot-path';
 import { ACK_TAG, AckTracker, ackTags, logPersistFailure } from './inspection-doc-ack';
-import { exportStoredState, parseStateImport, writeImportedState, type StateImportBody } from './inspection-doc-state-transfer';
+import { handleStateTransfer, type ParsedStateImport, type TransferHost } from './inspection-doc-state-transfer';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -88,7 +88,13 @@ const IDENTITY_KEY = 'identity';
 /** DO storage key for the JSON array of projection snapshots (version history). */
 const SNAPSHOTS_KEY = 'snapshots';
 
-const STATE_KEYS = { ydoc: STORAGE_KEY, identity: IDENTITY_KEY, snapshots: SNAPSHOTS_KEY } as const;
+/** Stored `true` while the document was built from the database and no client has changed it since (see the transfer module). */
+const DERIVED_KEY = 'derived-from-d1';
+
+const STATE_KEYS = { ydoc: STORAGE_KEY, identity: IDENTITY_KEY, snapshots: SNAPSHOTS_KEY, derived: DERIVED_KEY, backup: 'replaced-derived-backup' } as const;
+
+/** Origin of the changes made while building the document from the database: persisted like any other, but not a client edit. */
+const D1_ORIGIN: unique symbol = Symbol('collab-d1-origin');
 
 /** Maximum snapshots retained; oldest are dropped when the cap is exceeded. */
 const SNAPSHOT_CAP = 25;
@@ -126,46 +132,6 @@ const RESTORE_ORIGIN: unique symbol = Symbol('collab-restore-origin');
  * read-back is a no-op by construction.
  */
 const HYDRATE_ORIGIN: unique symbol = Symbol('collab-hydrate-origin');
-
-/**
- * One persisted projection snapshot — a point-in-time copy of the doc projected
- * to the `inspection_results.data` JSON shape. Snapshots are doc-replacement
- * restore points (Condition B): restore rebuilds a fresh Y.Doc from `projection`
- * rather than replaying CRDT updates.
- */
-interface ResultsSnapshot {
-    seq:        number;
-    atMs:       number;
-    byUserId:   string | null;
-    /**
-     * Why the snapshot was taken (see #181 PR-H):
-     *   'periodic' — the auto every-SNAPSHOT_EVERY capture in onDocUpdate.
-     *   'manual'   — an on-demand POST capture or restore's pre-restore capture.
-     *   'connect'  — the pre-merge boundary capture taken when a client reconnects,
-     *                BEFORE its buffered offline edits merge (preserves the
-     *                about-to-be-overwritten value for the H2 compare/recover UI).
-     *   'import'   — the mandatory capture before an offline client's update is applied.
-     *   'pre-rename' — the capture before legacy finding keys are renamed inside the document.
-     * Optional so legacy snapshots persisted before this field stay readable.
-     */
-    reason?:    SnapshotReason;
-    projection: ResultsProjection;
-}
-
-/** Discriminator for why a snapshot was captured. */
-type SnapshotReason = 'periodic' | 'manual' | 'connect' | 'import' | 'pre-rename';
-
-/** Snapshot metadata (the list view omits the heavy `projection` payload). */
-type ResultsSnapshotMeta = Omit<ResultsSnapshot, 'projection'>;
-
-/**
- * Narrow an `unknown` value loaded from DO storage to a snapshot array. DO
- * storage round-trips structured-clone, so the shape is trusted, but a defensive
- * guard keeps the no-`any` rule and tolerates a missing/legacy key.
- */
-function asSnapshotArray(value: unknown): ResultsSnapshot[] {
-    return Array.isArray(value) ? (value as ResultsSnapshot[]) : [];
-}
 
 /** Shape of the persisted identity stored across hibernation. */
 interface PersistedIdentity {
@@ -220,6 +186,8 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      * D1 blob is imported ONLY when this is false (no prior collab state).
      */
     private hadStoredState: boolean = false;
+    /** Mirrors the stored `derived-from-d1` marker: nothing but the database has shaped this document yet. */
+    private derivedFromD1: boolean = false;
     /**
      * Memoizes the one-time D1 hydration so concurrent first connects await the
      * same load (one D1 read per DO lifetime). Lazily created in hydrateFromD1Once.
@@ -260,6 +228,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         // survived hibernation already applied these updates, and one
         // reconnecting gets them through sync — there is nobody to tell.
         if (origin === HYDRATE_ORIGIN) return;
+        if (this.derivedFromD1 && origin !== D1_ORIGIN) { this.derivedFromD1 = false; this.ctx.storage.put(DERIVED_KEY, false).catch((err: Error) => logger.error('collab: could not clear the database-built marker', { tenantId: this.tenantId, inspectionId: this.inspectionId }, err)); }
 
         this.broadcastDocUpdate(update, origin);
         this.schedulePersist();
@@ -374,23 +343,9 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                 : new Response('snapshot not found', { status: 404 });
         }
 
-        // One-off copy into an object in another jurisdiction (see do-jurisdiction.ts); import refuses a non-empty target.
-        if (url.pathname.endsWith('/state-export') && req.method === 'GET') {
-            if (this.ctx.getWebSockets().length > 0) await this.persist();
-            return Response.json(await exportStoredState(this.ctx.storage, STATE_KEYS));
-        }
-        if (url.pathname.endsWith('/state-import') && req.method === 'POST') {
-            const parsed = parseStateImport(await req.json<StateImportBody | null>().catch(() => null));
-            if (!parsed) return new Response('invalid body', { status: 400 });
-            if ((await writeImportedState(this.ctx.storage, STATE_KEYS, parsed)) === 'not-empty') return new Response('target not empty', { status: 409 });
-            Y.applyUpdate(this.doc, parsed.bytes, HYDRATE_ORIGIN);
-            this.hadStoredState = true;
-            this.tenantId = parsed.identity.tenantId;
-            this.inspectionId = parsed.identity.inspectionId;
-            this.reportId = parsed.identity.reportId ?? null;
-            this.identityPersisted = true;
-            return Response.json({ ok: true, bytes: parsed.bytes.length });
-        }
+        // One-off copy into an object in another jurisdiction (see do-jurisdiction.ts and ./inspection-doc-state-transfer.ts).
+        const transfer = await handleStateTransfer(req, url.pathname, this.transferHost());
+        if (transfer) return transfer;
 
         // Stores what the open sockets have sent, without locking: a caller about to decide something from the database (is the
         // report unchanged since its last version?) asks for this first, because the debounce may not have run yet.
@@ -861,10 +816,12 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      * webSocketMessage fires or alarm() runs.
      */
     private async hydrate(): Promise<void> {
-        const [stored, identity] = await Promise.all([
+        const [stored, identity, derived] = await Promise.all([
             this.ctx.storage.get<Uint8Array>(STORAGE_KEY),
             this.ctx.storage.get<PersistedIdentity>(IDENTITY_KEY),
+            this.ctx.storage.get<boolean>(DERIVED_KEY),
         ]);
+        this.derivedFromD1 = derived === true;
 
         if (stored instanceof Uint8Array && stored.length > 0) {
             // HYDRATE_ORIGIN, not a bare apply — see the symbol.
@@ -882,6 +839,31 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             this.reportId          = identity.reportId ?? null;
             this.identityPersisted = true; // already in storage — WS repairs legacy identities
         }
+    }
+
+    /** What the state-transfer verbs need from this object. */
+    private transferHost(): TransferHost {
+        return {
+            storage: this.ctx.storage, keys: STATE_KEYS,
+            // Live: sockets are open, or changes are waiting to be stored. What is already stored is judged from storage itself.
+            live:  () => this.ctx.getWebSockets().length > 0 || this.persistTimer !== null,
+            flush: async () => { if (this.ctx.getWebSockets().length > 0) await this.persist(); },
+            adopt: (imported, derived) => this.adoptImported(imported, derived),
+        };
+    }
+
+    /** The imported document replaces whatever the in-memory one was (it is empty or still only database-derived: no sockets). */
+    private adoptImported({ bytes, identity }: ParsedStateImport, derived: boolean): void {
+        this.doc.off('update', this.onDocUpdate);
+        this.doc = new Y.Doc();
+        this.doc.on('update', this.onDocUpdate);
+        Y.applyUpdate(this.doc, bytes, HYDRATE_ORIGIN);
+        this.hadStoredState = true;
+        this.derivedFromD1 = derived;
+        this.tenantId = identity.tenantId;
+        this.inspectionId = identity.inspectionId;
+        this.reportId = identity.reportId ?? null;
+        this.identityPersisted = true;
     }
 
     /**
@@ -941,21 +923,23 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         const findingKeys = findingKeysFromTemplateSnapshot(
             inspectionRow?.templateSnapshot ?? null,
         );
-        if (findingKeys.length > 0) {
-            seedResultsDoc(
-                this.doc,
-                findingKeys.map((key) => ({ findingKey: key })),
-            );
-        }
-
-        // ── NO-WIPE import: only when there is NO prior collab state. When prior
-        // collab state existed (hadStoredState), the doc is authoritative and
-        // ahead of D1 — importing the stale blob would clobber unflushed edits.
-        if (!this.hadStoredState) {
-            const blob = resultsRow?.data;
-            if (isNonEmptyProjection(blob)) {
-                loadResultsProjection(this.doc, blob);
+        // D1_ORIGIN: everything below is derived from the database, so it must not read as a client edit (see DERIVED_KEY).
+        this.doc.transact(() => {
+            if (findingKeys.length > 0) {
+                seedResultsDoc(
+                    this.doc,
+                    findingKeys.map((key) => ({ findingKey: key })),
+                );
             }
+            // ── NO-WIPE import: only when there is NO prior collab state. When prior
+            // collab state existed (hadStoredState), the doc is authoritative and
+            // ahead of D1 — importing the stale blob would clobber unflushed edits.
+            const blob = resultsRow?.data;
+            if (!this.hadStoredState && isNonEmptyProjection(blob)) loadResultsProjection(this.doc, blob);
+        }, D1_ORIGIN);
+        if (!this.hadStoredState) {
+            this.derivedFromD1 = true;
+            await this.ctx.storage.put(DERIVED_KEY, true);
         } else {
             // The blob is deliberately not imported here; say so when it disagrees with the document.
             await logDivergence(this.env.DB, { tenantId, inspectionId, reportId: this.reportId }, resultsRow?.data, this.doc);

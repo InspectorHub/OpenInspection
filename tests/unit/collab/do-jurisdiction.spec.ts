@@ -52,6 +52,13 @@ describe('pinDurableObjects', () => {
         expect(pinned.INSPECTION_DOC_UNPINNED).toBe(doc);
     });
 
+    it('keeps the original tenant presence namespace reachable too, because those objects hold storage that a purge must reach', () => {
+        const presence = fakeNs('tenant');
+        const pinned = pinDurableObjects({ DO_JURISDICTION: 'us', TENANT_PRESENCE: presence });
+        expect(pinned.TENANT_PRESENCE_UNPINNED).toBe(presence);
+        expect(pinned.TENANT_PRESENCE?.pinnedTo).toBe('us');
+    });
+
     it('is stable: the same env gives the same pinned object, so a mutation made through it survives the next request', () => {
         const env = { DO_JURISDICTION: 'us', INSPECTION_DOC: fakeNs('doc') };
         expect(pinDurableObjects(env)).toBe(pinDurableObjects(env));

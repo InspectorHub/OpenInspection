@@ -3,7 +3,8 @@
  *
  * A jurisdiction-pinned object has a different id from the unpinned one with the same name, so its stored state has to be
  * copied across once. Covers: content, identity and restore points arrive intact; a second import is refused so it can never
- * overwrite newer edits; a malformed import writes nothing.
+ * overwrite newer edits (409 with a reason code); a malformed import, including bytes that are not a Yjs document, writes nothing
+ * and leaves the object able to take a good import afterwards.
  */
 
 import { env, runInDurableObject } from 'cloudflare:test';
@@ -27,7 +28,7 @@ function stub(name: string) {
 
 function sourceBytes(): Uint8Array {
     const doc = new Y.Doc();
-    doc.getMap('probe').set('finding', 'cracked flashing');
+    doc.getMap('results').set('finding', 'cracked flashing');
     return Y.encodeStateAsUpdate(doc);
 }
 
@@ -92,6 +93,47 @@ describe('InspectionDocDO state transfer', () => {
 
     it('exporting an object with no state returns nulls rather than failing', async () => {
         const res = await stub('src-empty').fetch(url('state-export'));
-        expect(await res.json()).toEqual({ ydoc: null, identity: null, snapshots: [] });
+        expect(await res.json()).toEqual({ ydoc: null, identity: null, snapshots: [], derivedFromD1: false });
+    });
+
+    it('rejects bytes that are not a Yjs document BEFORE writing anything, so the object stays importable', async () => {
+        const target = stub('dst-bad-bytes');
+        const bad = { ydoc: btoa('this is not a yjs update'), identity: IDENTITY, snapshots: SNAPSHOTS };
+        const res = await target.fetch(url('state-import'), { method: 'POST', body: JSON.stringify(bad) });
+        expect(res.status).toBe(400);
+        const stored = await runInDurableObject(target, (_i, state) => state.storage.list());
+        expect([...stored.keys()]).toEqual([]);
+
+        await seedSource('src-good');
+        const good = await (await stub('src-good').fetch(url('state-export'))).text();
+        expect((await target.fetch(url('state-import'), { method: 'POST', body: good })).status).toBe(200);
+    });
+
+    it('rejects text that is not base64 and a document with the wrong top-level shape', async () => {
+        const target = stub('dst-bad-shape');
+        const wrong = new Y.Doc();
+        wrong.getMap('somethingElse').set('x', 1);
+        for (const ydoc of ['%%%', btoa(String.fromCharCode(...Y.encodeStateAsUpdate(wrong)))]) {
+            const res = await target.fetch(url('state-import'), { method: 'POST', body: JSON.stringify({ ydoc, identity: IDENTITY }) });
+            expect(res.status).toBe(400);
+        }
+        expect(await runInDurableObject(target, (_i, state) => state.storage.get('ydoc'))).toBeUndefined();
+    });
+
+    it('answers 409 with a distinguishable reason and the target size, and also refuses a target holding only restore points', async () => {
+        await seedSource('src-409');
+        const payload = await (await stub('src-409').fetch(url('state-export'))).text();
+
+        const holding = stub('dst-409-ydoc');
+        await seedSource('dst-409-ydoc');
+        const refused = await holding.fetch(url('state-import'), { method: 'POST', body: payload });
+        expect(refused.status).toBe(409);
+        expect(await refused.json()).toMatchObject({ error: 'target-not-empty', reason: 'target-has-state', targetBytes: sourceBytes().length });
+
+        const partial = stub('dst-409-snapshots');
+        await runInDurableObject(partial, async (_i, state) => { await state.storage.put('snapshots', SNAPSHOTS); });
+        const second = await partial.fetch(url('state-import'), { method: 'POST', body: payload });
+        expect(second.status).toBe(409);
+        expect(await runInDurableObject(partial, (_i, state) => state.storage.get('ydoc'))).toBeUndefined();
     });
 });
