@@ -80,9 +80,16 @@ describe("ServicesCatalogPanel", () => {
         expect(screen.getByText(/Residential Standard/)).toBeTruthy();
     });
 
-    it("warns that a service with no template breaks online booking", () => {
+    it("warns that a service with no template does not appear on the booking page", () => {
         renderPanel([{ ...base, templateId: null }]);
-        expect(screen.getByText(/online booking fails/i)).toBeTruthy();
+        // The public profile hides such a service, so the customer-facing failure this used to
+        // announce no longer happens; the owner's problem is that the service is missing.
+        expect(screen.getByText(/needs a template to appear on your booking page/i)).toBeTruthy();
+    });
+
+    it("shows no such warning for a service that has a template", () => {
+        renderPanel([{ ...base, templateId: "tpl-1" }]);
+        expect(screen.queryByText(/needs a template to appear/i)).toBeNull();
     });
 });
 

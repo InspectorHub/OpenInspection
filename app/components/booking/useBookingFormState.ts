@@ -248,6 +248,10 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
         setMessage({ text: m.helper_booking_submit_success(), ok: true });
         setStep(3);
       } else {
+        // A company that cannot take another booking right now (for example, at its monthly inspection allowance)
+        // answers 409 with a neutral message, and this is where the visitor first sees it. That is a deliberate
+        // product choice: the public profile does not reveal a company's internal usage in advance, so the page
+        // cannot know before the submit. Do not add a pre-submit hint without revisiting that choice.
         const d = await res.json().catch(() => ({}));
         setMessage({ text: (d as { error?: { message?: string } })?.error?.message || m.helper_booking_submit_error(), ok: false });
       }

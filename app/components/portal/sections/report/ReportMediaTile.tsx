@@ -8,11 +8,12 @@
  * Plan 7 — when the server resolved a video kind, branch: web report → lazy
  * Stream <iframe> at a fixed 16/9 aspect (no CLS); PDF render path → poster
  * <img> + QR + "Watch the walk-through" link. Photo / legacy / no-subdomain
- * fall through to the existing <img> with its onError/aspect-[4/3]/alt
- * hardening intact.
+ * fall through to the <img> in <ReportPhotoImage> (retry once, then collapse
+ * via onPhotoFailed) inside the aspect-[4/3] box.
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
+import { useEffect, useRef, useState } from "react";
 import { photoDisplayName, withDownload } from "@core/field-ui/shared/photo-name";
 import { m } from "~/paraglide/messages";
 import { qrToSvg } from "../../../../../server/lib/qr";
@@ -25,6 +26,47 @@ export interface ReportMediaTileProps {
   printMode: boolean;
   onOpenLightbox: (url: string) => void;
   onPhotoFailed: (key: string) => void;
+}
+
+/**
+ * One photo thumbnail that survives a transient failed load.
+ *
+ * A failure gets ONE more request, made by re-mounting the <img> under a new key with the same URL (no
+ * cache-busting parameter: the URL is a signed report link and a changed query would be a different
+ * resource). If the retry also fails the photo is reported through `onPhotoFailed`, and the report collapses
+ * the tile exactly as it always has (a photo removed upstream must not leave a hole or a broken glyph in a
+ * client's report).
+ *
+ * The mount check matters as much as `onError`: an image that fails while the server-rendered HTML is
+ * still being parsed errors BEFORE React hydrates, so no handler ever sees the event and the broken glyph
+ * stays. Such an image is `complete` with a `naturalWidth` of 0 once the component mounts.
+ */
+function ReportPhotoImage({ photo, alt, name, printMode, onOpenLightbox, onPhotoFailed }: Pick<ReportMediaTileProps, "photo" | "alt" | "printMode" | "onOpenLightbox" | "onPhotoFailed"> & { name: string }) {
+  const [attempt, setAttempt] = useState(0);
+  const ref = useRef<HTMLImageElement>(null);
+  const fail = () => (attempt === 0 ? setAttempt(1) : onPhotoFailed(photo.key));
+
+  useEffect(() => {
+    const el = ref.current;
+    // `currentSrc` set: an offscreen lazy image that has not started loading has nothing to judge yet.
+    if (el && el.complete && el.currentSrc !== "" && el.naturalWidth === 0) fail();
+    // Re-check after the retry: the re-mounted element can also have failed before this effect runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attempt]);
+
+  return (
+    <img
+      key={attempt}
+      ref={ref}
+      src={`${photo.url}&w=${printThumbWidth(printMode)}`}
+      alt={alt}
+      title={name}
+      className="w-full h-full object-cover cursor-pointer"
+      loading={printMode ? "eager" : "lazy"}
+      onClick={() => onOpenLightbox(photo.url)}
+      onError={fail}
+    />
+  );
 }
 
 export function ReportMediaTile({ photo, alt, idx, printMode, onOpenLightbox, onPhotoFailed }: ReportMediaTileProps) {
@@ -98,18 +140,10 @@ export function ReportMediaTile({ photo, alt, idx, printMode, onOpenLightbox, on
     );
   }
 
-  // Image branch (photo / legacy / fail-closed video) — unchanged hardening.
+  // Image branch (photo / legacy / fail-closed video): retry once, then collapse via onPhotoFailed.
   return (
     <div key={photo.key} className={`group relative aspect-[4/3] overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
-      <img
-        src={`${photo.url}&w=${printThumbWidth(printMode)}`}
-        alt={alt}
-        title={name}
-        className="w-full h-full object-cover cursor-pointer"
-        loading={printMode ? "eager" : "lazy"}
-        onClick={() => onOpenLightbox(photo.url)}
-        onError={() => onPhotoFailed(photo.key)}
-      />
+      <ReportPhotoImage photo={photo} alt={alt} name={name} printMode={printMode} onOpenLightbox={onOpenLightbox} onPhotoFailed={onPhotoFailed} />
       <a
         href={withDownload(photo.url)}
         download={name}

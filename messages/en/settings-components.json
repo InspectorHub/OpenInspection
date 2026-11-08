@@ -477,7 +477,7 @@
   "settings_services_template_label": "Report template",
   "settings_services_template_none": "No template",
   "settings_services_template_prefix": "Template:",
-  "settings_services_no_template_warning": "No template — online booking fails when a customer picks this service",
+  "settings_services_no_template_warning": "No template — this service needs a template to appear on your booking page",
   "settings_mcw_provisioning_status": "Provisioning status",
   "settings_mcw_step_business_profile": "Business profile (TCR)",
   "settings_mcw_step_brand": "Brand registration (10DLC)",
