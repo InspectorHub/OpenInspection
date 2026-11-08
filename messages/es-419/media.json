@@ -93,6 +93,7 @@
   "media_strip_select": "Seleccionar",
   "media_strip_uploading": "Subiendo",
   "media_strip_cover": "Portada",
+  "media_strip_videos_not_bulk": "Los videos no se pueden mover ni eliminar en lote",
   "media_strip_add_photo_aria": "Agregar foto",
   "media_cropper_rotate_left": "Girar a la izquierda",
   "media_cropper_rotate_right": "Girar a la derecha",

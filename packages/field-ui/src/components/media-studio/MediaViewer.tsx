@@ -14,12 +14,15 @@ export const ALL_MEDIA_ACTIONS: readonly MediaAction[] = ["crop", "annotate", "r
 /** Bottom toolbar — single place all per-media actions live (field-tablet: bottom, 44px). */
 export function MediaViewerToolbar({
   kind,
+  provider,
   edited,
   on,
   hide,
   compact = false,
 }: {
   kind: "photo" | "video";
+  /** Video backend. An R2 clip has no poster picker (its poster is the frame captured at upload); absent means Stream. */
+  provider?: "stream" | "r2";
   edited: boolean;
   on: (a: MediaAction) => void;
   /** A narrow screen: 44px targets that keep their label on one line and never shrink (the bar wraps instead). */
@@ -38,13 +41,12 @@ export function MediaViewerToolbar({
       {label}
     </button>
   );
-  // Plan 7 — video gets a LOCKED minimal toolbar: poster · cover · caption ·
-  // delete. NO crop / annotate / rotate / revert (out of v1). Photo unchanged.
+  // A video gets a LOCKED minimal toolbar: poster frame (Stream only) · caption · delete. No crop / annotate / rotate / revert,
+  // and never "cover": the report cover is a still image. Photo unchanged.
   if (kind === "video") {
     return (
       <>
-        {btn("poster", m.media_viewer_poster())}
-        {btn("cover", m.media_viewer_cover())}
+        {provider === "r2" ? null : btn("poster", m.media_viewer_poster())}
         {btn("caption", m.media_viewer_caption())}
         {btn("delete", m.common_delete())}
       </>
@@ -85,6 +87,7 @@ export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSu
         <MediaViewerToolbar
           key="tb"
           kind={kind}
+          provider={viewed.provider}
           edited={!!viewed.annotated}
           hide={hideActions}
           compact={compact}

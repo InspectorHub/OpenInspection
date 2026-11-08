@@ -90,8 +90,15 @@ export function uploadWithProgressBody(
     });
 }
 
+/**
+ * The most bytes the engine's single-request R2 upload route takes (one request, buffered whole). Kept equal to the server's
+ * `MAX_FORM_VIDEO_BYTES` by a test, because this client file does not import server code.
+ */
+export const WEB_R2_VIDEO_MAX_BYTES = 64 * 1024 * 1024;
+
 export function createWebVideo(fetchImpl: typeof fetch = (input, init) => fetch(input, init)): VideoStore {
     return {
+        maxUploadBytes: { r2: WEB_R2_VIDEO_MAX_BYTES },
         async createUpload(inspectionId, input): Promise<CommandResult<VideoUploadTicket>> {
             try {
                 // busy-controls-allow: the caller (VideoCapture) takes its same-frame latch before it calls; each create-upload mints a pool row and an upload URL

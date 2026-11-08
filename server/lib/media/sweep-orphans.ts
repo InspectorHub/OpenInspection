@@ -159,11 +159,14 @@ export async function sweepOrphanedMedia(
         continue;
       }
       const pool = await db
-        .select({ r2Key: inspectionMediaPool.r2Key })
+        .select({ r2Key: inspectionMediaPool.r2Key, posterKey: inspectionMediaPool.posterKey })
         .from(inspectionMediaPool)
         .where(and(eq(inspectionMediaPool.inspectionId, insp.id), eq(inspectionMediaPool.tenantId, insp.tenantId)))
         .all();
-      for (const r of pool) live.add(r.r2Key);
+      for (const r of pool) {
+        live.add(r.r2Key);
+        if (r.posterKey) live.add(r.posterKey);
+      }
     }
 
     calls++;

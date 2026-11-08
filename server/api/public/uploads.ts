@@ -43,17 +43,13 @@ import { logger } from '../../lib/logger';
 import { imagesBinding } from '../../lib/media/serve-photo';
 import { MAX_PHOTO_BYTES, isSignedPhotoExt, sniffedPhotoExt, storePhotoAtKey } from '../../lib/media/store-photo';
 import { storeVideoUpload } from '../inspections/media-video-r2';
-import { MAX_FORM_VIDEO_BYTES } from '../../lib/media/video-types';
+import { MAX_FORM_VIDEO_BYTES, VIDEO_TOO_LARGE_FOR_FORM } from '../../lib/media/video-types';
 import { videoChunkedRoutes } from './video-chunked';
 import { declaredLengthRefusal } from '../../lib/declared-length';
 import { relativizeSerialized } from '../../lib/report-link-keys';
 
 /** The single-request route buffers the clip, so larger ones go through the chunked route. */
-const FORM_TOO_LARGE = {
-    error: 'Video is too large for a single request; use the chunked upload.',
-    code: 'VIDEO_TOO_LARGE_FOR_FORM',
-    limits: { maxBytes: MAX_FORM_VIDEO_BYTES, chunkedPath: '/api/public/uploads/video/chunked' },
-} as const;
+const FORM_TOO_LARGE = VIDEO_TOO_LARGE_FOR_FORM;
 
 const INVALID_TOKEN = { error: 'Invalid or expired upload token' } as const;
 

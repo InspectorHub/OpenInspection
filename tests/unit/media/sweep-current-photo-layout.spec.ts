@@ -117,6 +117,22 @@ describe('sweepOrphanedMedia - current photo layout', () => {
         expect(await recorded()).toEqual([]);
     });
 
+    it('keeps the poster file a video pool row names, as it keeps the clip file', async () => {
+        const clip = `${T}/${I}/vclip.mp4`;
+        const poster = `${T}/${I}/vclip.poster.jpg`;
+        await db.insert(schema.inspectionMediaPool).values({
+            id: 'vp', tenantId: T, inspectionId: I, r2Key: clip, url: '', uploadedAt: new Date(NOW),
+            mediaType: 'video', provider: 'r2', posterKey: poster,
+        });
+        const listing = { [`${T}/${I}/`]: [clip, poster, `${T}/${I}/stray-old.jpg`] };
+        await sweep(makeR2(listing), NOW);
+        const late = makeR2(listing);
+        await sweep(late, NOW + ORPHAN_GRACE_MS * 2);
+        // Control: the sweep ran and does reap the unreferenced file beside them.
+        expect(late.delete.mock.calls.map((c) => c[0])).toEqual([`${T}/${I}/stray-old.jpg`]);
+        expect(await recorded()).toEqual([]);
+    });
+
     describe('call budget', () => {
         const IDS = ['i2', 'i3', 'i4', 'i5', 'i6'];
         beforeEach(async () => {

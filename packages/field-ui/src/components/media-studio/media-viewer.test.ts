@@ -51,16 +51,16 @@ describe('MediaViewerToolbar', () => {
       expect(buttonByName(new RegExp(n, 'i'))).not.toBeNull());
   });
 
-  it('renders the LOCKED minimal video toolbar (poster · cover · caption · delete) — no crop/annotate/rotate/revert', () => {
+  it('renders the LOCKED minimal video toolbar (poster · caption · delete; never cover) — no crop/annotate/rotate/revert', () => {
     mount(createElement(MediaViewerToolbar, { kind: 'video', edited: true, on: vi.fn() }));
-    // present: exactly the four video actions
-    ['poster frame', 'set cover', 'caption', 'delete'].forEach((n) =>
+    // present: exactly the three video actions
+    ['poster frame', 'caption', 'delete'].forEach((n) =>
       expect(buttonByName(new RegExp(n, 'i'))).not.toBeNull());
     // absent: photo-only editing actions are NOT offered for video
-    ['crop', 'annotate', 'rotate', 'revert'].forEach((n) =>
+    ['crop', 'annotate', 'rotate', 'revert', 'set cover'].forEach((n) =>
       expect(buttonByName(new RegExp(`^${n}$`, 'i'))).toBeNull());
-    // exactly four buttons in the video toolbar
+    // exactly three buttons in the video toolbar
     const buttons = Array.from(container!.querySelectorAll('button'));
-    expect(buttons).toHaveLength(4);
+    expect(buttons).toHaveLength(3);
   });
 });

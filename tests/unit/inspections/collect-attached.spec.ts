@@ -28,4 +28,13 @@ describe('collectAttachedPhotos', () => {
     const data = { 'item-roof': { photos: [null, { nope: 1 }, { key: 'ok' }] } } as never;
     expect(collectAttachedPhotos(data, meta, url).map(p => p.originalKey)).toEqual(['ok']);
   });
+
+  it('skips video entries: they are not photos and have no file key to show', () => {
+    const data = { 'item-roof': {
+      photos: [{ key: 'p0' }, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'm1' }, { key: '', mediaType: 'video', streamUid: 'u1' }],
+      tabs: { defects: { d1: { photos: [{ key: '', mediaType: 'video', provider: 'r2', mediaId: 'm2' }, { key: 'cd' }] } } },
+    } } as never;
+    const out = collectAttachedPhotos(data, meta, url);
+    expect(out.map(p => p.originalKey)).toEqual(['p0', 'cd']);
+  });
 });

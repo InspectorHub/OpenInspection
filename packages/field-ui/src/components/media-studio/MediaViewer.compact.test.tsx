@@ -29,7 +29,7 @@ const buttons = () => screen.getAllByRole("button");
 describe("MediaViewerToolbar compact", () => {
   it.each(["photo", "video"] as const)("%s: every button is a 44px target that keeps its label on one line and never shrinks", (kind) => {
     render(<MediaViewerToolbar kind={kind} edited compact on={() => {}} />);
-    expect(buttons().length).toBeGreaterThanOrEqual(4);
+    expect(buttons().length).toBeGreaterThanOrEqual(3);
     for (const b of buttons()) for (const c of NARROW) expect(b.className, b.textContent ?? "").toContain(c);
   });
 

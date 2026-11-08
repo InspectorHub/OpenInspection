@@ -93,6 +93,7 @@
   "media_strip_select": "Select",
   "media_strip_uploading": "Uploading",
   "media_strip_cover": "Cover",
+  "media_strip_videos_not_bulk": "Videos can't be moved or deleted in bulk",
   "media_strip_add_photo_aria": "Add photo",
   "media_cropper_rotate_left": "Rotate left",
   "media_cropper_rotate_right": "Rotate right",

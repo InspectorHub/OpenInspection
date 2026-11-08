@@ -4,6 +4,13 @@ export interface PhotoEntry {
   crop?: { aspect: string; orientation: 'landscape' | 'portrait'; x: number; y: number; width: number; height: number };
   annotatedKey?: string;
   annotationsJson?: string;
+  /** 'video' entries have no file key; every other value (or none) is a photo. */
+  mediaType?: 'photo' | 'video';
+  /** A video entry is named by one of these, not by `key` (which is empty). */
+  provider?: 'stream' | 'r2';
+  streamUid?: string;
+  mediaId?: string;
+  posterKey?: string;
 }
 export interface AttachedPhoto {
   key: string;          // displayKey = annotatedKey || croppedKey || key (what the report/grid shows)
@@ -37,6 +44,8 @@ export function collectAttachedPhotos(
   const out: AttachedPhoto[] = [];
   const push = (itemId: string, sectionFallback: string | undefined, p: PhotoEntry | null, idx: number, defectId?: string) => {
     if (!p || typeof p.key !== 'string') return;
+    // A video entry has no file key (it is addressed by media id or stream uid) and is not a photo.
+    if (p.mediaType === 'video') return;
     const meta = itemMeta.get(itemId) ?? { itemLabel: itemId, sectionId: sectionFallback || 'unknown', sectionTitle: 'Unsectioned' };
     const displayKey = p.annotatedKey || p.croppedKey || p.key;
     const attached: AttachedPhoto = {

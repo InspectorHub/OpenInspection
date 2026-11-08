@@ -284,6 +284,46 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
         expect(r2Mock.delete).toHaveBeenCalledWith(other.key);
     });
 
+    describe('a finished video is on its item, not in the loose pool', () => {
+        const insertVideoRow = () => testDb.insert(schema.inspectionMediaPool).values({
+            id: 'vid-pool', inspectionId: INSPECTION_ID, tenantId: TENANT,
+            r2Key: `${TENANT}/inspections/${INSPECTION_ID}/videos/vid-pool.mp4`, url: '',
+            uploadedAt: new Date(), mediaType: 'video', provider: 'r2',
+            posterKey: `${TENANT}/inspections/${INSPECTION_ID}/videos/vid-pool.poster.jpg`,
+        });
+
+        it('does not list a video row in the pool (it would show as a photo with no picture)', async () => {
+            await insertVideoRow();
+            const photo = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, new File([JPEG_BYTES], 'a.jpg', { type: 'image/jpeg' }));
+            const out = await svc.getMediaCenter(INSPECTION_ID, TENANT);
+            // Control: the photo row is listed, so the empty video answer is the filter and not an empty pool.
+            expect(out.pool.map((p) => p.id)).toEqual([photo.id]);
+        });
+
+        it('refuses to attach a video row as a photo, and leaves the row and the results alone', async () => {
+            await insertVideoRow();
+            await expect(svc.attachPoolPhoto(INSPECTION_ID, TENANT, 'vid-pool', 'item-cover')).rejects.toThrow(/video/i);
+            const rows = await testDb.select().from(schema.inspectionMediaPool);
+            expect(rows.map((r) => r.id)).toContain('vid-pool');
+            expect(await testDb.select().from(schema.inspectionResults)).toHaveLength(0);
+        });
+    });
+
+    it('the reorder and revert routes answer 400 (not 500) for an order that names a clip, and a revert of a clip leaves it as it was', async () => {
+        const clip = { key: '', mediaType: 'video', provider: 'r2', mediaId: 'm1' };
+        await testDb.insert(schema.inspectionResults).values({
+            id: 'res-clip', tenantId: TENANT, inspectionId: INSPECTION_ID,
+            data: { 'item-cover': { photos: [{ key: 'a' }, clip, { key: 'b' }] } } as never, lastSyncedAt: new Date(),
+        });
+        await expect(svc.reorderItemPhotos(INSPECTION_ID, TENANT, 'item-cover', ['a', 'm:m1'])).rejects.toMatchObject({ status: 400 });
+        await expect(svc.revertPhotoEdits(INSPECTION_ID, TENANT, 'item-cover', 1)).rejects.toMatchObject({ status: 400 });
+        // Control: a valid reorder of the keyed photos works and the clip keeps its place.
+        await svc.reorderItemPhotos(INSPECTION_ID, TENANT, 'item-cover', ['b', 'a']);
+        const row = await testDb.select().from(schema.inspectionResults).get();
+        const data = typeof row!.data === 'string' ? JSON.parse(row!.data) : row!.data;
+        expect((data['item-cover'].photos as Array<{ key: string; mediaId?: string }>).map(p => p.mediaId ?? p.key)).toEqual(['b', 'm1', 'a']);
+    });
+
     it('tenant isolation — pool rows for another tenant are invisible to attach/list/delete', async () => {
         // Seed a pool row that belongs to a *different* tenant + inspection.
         await testDb.insert(schema.inspectionMediaPool).values({

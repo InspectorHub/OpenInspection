@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { VideoUploadTicket } from "@core/field-ui/data-source-types";
-import { apiErrorReason, createWebVideo, posterRoute, uploadWithProgressBody, VIDEO_UPLOAD_TIMEOUT_MS } from "./web-video";
+import { apiErrorReason, createWebVideo, posterRoute, uploadWithProgressBody, VIDEO_UPLOAD_TIMEOUT_MS, WEB_R2_VIDEO_MAX_BYTES } from "./web-video";
 
 const ok = (body: unknown = { success: true }) =>
     new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
@@ -256,5 +256,15 @@ describe("createWebVideo.remove", () => {
         const result = await createWebVideo(asFetch(async () => ok())).remove("i", "r");
         expect(result.ok).toBe(false);
         expect(result.error).toMatch(/not wired/);
+    });
+});
+
+describe("createWebVideo.maxUploadBytes", () => {
+    it("holds an r2 clip to the single-request limit the engine enforces, and leaves Stream (direct upload) at the default", async () => {
+        const { MAX_FORM_VIDEO_BYTES } = await import("../../../server/lib/media/video-types");
+        const limit = createWebVideo().maxUploadBytes;
+        expect(limit?.r2).toBe(MAX_FORM_VIDEO_BYTES);
+        expect(WEB_R2_VIDEO_MAX_BYTES).toBe(MAX_FORM_VIDEO_BYTES);
+        expect(limit?.stream).toBeUndefined();
     });
 });

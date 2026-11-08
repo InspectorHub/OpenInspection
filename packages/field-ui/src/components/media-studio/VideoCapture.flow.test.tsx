@@ -107,11 +107,32 @@ describe("VideoCapture flow", () => {
         expect(onUploaded).toHaveBeenCalledWith({ provider: "stream", poolId: "pool-1", streamUid: "uid-1", durationSec: 12.5 });
     });
 
-    it("r2 refuses a clip over its single-request limit, naming the limit; stream does not apply that limit", async () => {
+    it("a host that gives no limit accepts a 100 MB r2 clip (the native client uploads large clips in parts), and refuses one over the 200 MB default", async () => {
+        const clipOf = (mb: number) => {
+            const f = new File(["x"], "c.mp4", { type: "video/mp4" });
+            Object.defineProperty(f, "size", { value: mb * 1024 * 1024 });
+            return f;
+        };
+        const video = createFakeVideo();
+        const first = mount(video, "r2");
+        first.pick(clipOf(100));
+        await settle();
+        expect(video.createUploads).toHaveLength(1);
+        cleanup();
+
+        const second = createFakeVideo();
+        const m2 = mount(second, "r2");
+        m2.pick(clipOf(201));
+        await settle();
+        expect(second.createUploads).toEqual([]);
+        expect(errorText()).toMatch(/200 MB/);
+    });
+
+    it("a host that sets an r2 limit has r2 refuse a clip over it, naming the limit; stream does not apply that limit", async () => {
         const big = new File(["x"], "big.mp4", { type: "video/mp4" });
         Object.defineProperty(big, "size", { value: 65 * 1024 * 1024 });
 
-        const r2 = createFakeVideo();
+        const r2 = createFakeVideo({ maxUploadBytes: { r2: 64 * 1024 * 1024 } });
         const first = mount(r2, "r2");
         first.pick(big);
         await settle();

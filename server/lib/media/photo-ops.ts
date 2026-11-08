@@ -1,14 +1,25 @@
 import type { PhotoEntry } from './collect-attached';
 
-/** Reorder photos[] to match `order` (by key). The key multiset must be identical. */
+/**
+ * Reorder photos[] to match `order` (by key). The key multiset of the keyed photos must be identical. A video entry has no key, so it
+ * is not part of the order: it keeps the position it has, and the photos are permuted among the other positions.
+ */
 export function applyReorder(photos: PhotoEntry[], order: string[]): PhotoEntry[] {
-  const have = photos.map(p => p.key).slice().sort();
+  if (order.some(k => !k)) throw new Error('order names an entry that is not a photo key');
+  const keyed = photos.filter(p => p.key);
+  const have = keyed.map(p => p.key).sort();
   const want = order.slice().sort();
   if (have.length !== want.length || have.some((k, i) => k !== want[i])) {
-    throw new Error('photo order mismatch — reorder cannot add or drop photos');
+    // A name that is no photo's key and looks like a clip or pending reference gets the clearer answer; a real key is never read as one.
+    const haveSet = new Set(have);
+    throw new Error(order.some(k => !haveSet.has(k) && /^[msp]:/.test(k))
+      ? 'order names an entry that is not a photo key'
+      : 'photo order mismatch — reorder cannot add or drop photos');
   }
-  const byKey = new Map(photos.map(p => [p.key, p]));
-  return order.map(k => byKey.get(k)!);
+  const byKey = new Map(keyed.map(p => [p.key, p]));
+  const next = order.map(k => byKey.get(k)!);
+  let at = 0;
+  return photos.map(p => (p.key ? next[at++] : p));
 }
 
 /** Remove one entry by index (detach). Returns the new array (does not touch R2). */
@@ -20,6 +31,7 @@ export function applyDetach(photos: PhotoEntry[], index: number): PhotoEntry[] {
 /** Revert one entry to its original: drop derivatives (annotatedKey/annotationsJson). */
 export function applyRevert(photos: PhotoEntry[], index: number): PhotoEntry[] {
   if (index < 0 || index >= photos.length) throw new Error('photo index out of range');
+  if (photos[index]?.mediaType === 'video') throw new Error('a video has no edits to revert');
   return photos.map((p, i) => (i === index ? { key: p.key } : p));
 }
 

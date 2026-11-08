@@ -12,6 +12,7 @@ export function videoEntryFrom(clip: VideoUploaded): VideoEntry | null {
   if (!clip.poolId) return null;
   const length = clip.durationSec === undefined ? {} : { durationSec: clip.durationSec };
   if (clip.provider === "stream") {
+    if (!clip.streamUid) return null; // a clip with no identity cannot be placed (appendVideo refuses it)
     return { key: "", mediaType: "video", provider: "stream", streamUid: clip.streamUid, ...length };
   }
   return {
@@ -41,13 +42,28 @@ const ATTACH_FAILED_MS = 10_000;
 export function attachUploadedVideo(clip: VideoUploaded, itemId: string, deps: AttachDeps): void {
   const entry = videoEntryFrom(clip);
   if (!entry) {
-    deps.reload();
+    // Nothing queued on the device (no pool id): quiet refresh. A pool id with no placeable identity is a failure the person must see.
+    if (!clip.poolId) deps.reload();
+    else failed(deps);
     return;
   }
-  if (deps.addVideoToItem(itemId, entry)) {
+  if (writeOk(deps, itemId, entry)) {
     deps.notify(m.editor_video_added(), "success");
     return;
   }
+  failed(deps);
+}
+
+/** A document write that throws (it refuses an entry with no clip identity) is the same failure as one that answers false. */
+function writeOk(deps: AttachDeps, itemId: string, entry: VideoEntry): boolean {
+  try {
+    return deps.addVideoToItem(itemId, entry);
+  } catch {
+    return false;
+  }
+}
+
+function failed(deps: AttachDeps): void {
   deps.notify(m.editor_video_attach_failed(), "error", { durationMs: ATTACH_FAILED_MS });
   deps.reload();
 }

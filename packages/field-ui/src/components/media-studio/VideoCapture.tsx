@@ -33,10 +33,9 @@ import { videoDurationSec } from "./video-duration";
 
 export const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB
 /**
- * R2 takes the clip in ONE request that the Worker buffers whole (the engine's single-request video limit is the same 64 MiB), so a
- * larger clip would fail late and on a bad connection. Stream receives the file directly, so it keeps the larger limit.
+ * The limit is the host's to state (`resources.video.maxUploadBytes`): the web host's R2 upload takes the clip in ONE request that
+ * the Worker buffers whole, so it sets 64 MiB; the native client uploads in parts and sets none. No host limit means the default.
  */
-export const MAX_R2_VIDEO_BYTES = 64 * 1024 * 1024; // 64 MB
 /** A length reading a little over the limit is rounding, not a long clip. */
 const LENGTH_TOLERANCE_SEC = 0.5;
 export const MAX_VIDEO_SEC = 30;
@@ -63,17 +62,17 @@ export type VideoUploaded =
 
 type Phase = "pick" | "uploading" | "finalizing";
 
-/** The size limit that applies to a backend. */
-export function maxVideoBytes(provider: "stream" | "r2"): number {
-  return provider === "r2" ? MAX_R2_VIDEO_BYTES : MAX_VIDEO_BYTES;
+/** The size limit that applies to a backend: the host's, else the default. */
+export function maxVideoBytes(provider: "stream" | "r2", host?: { r2?: number; stream?: number }): number {
+  return host?.[provider] ?? MAX_VIDEO_BYTES;
 }
 
 /** Pure validation (type + size). Length is checked from the file's metadata in `handleFile`; Stream also enforces it server-side. */
-export function validateVideoFile(file: File, provider: "stream" | "r2" = "stream"): string | null {
+export function validateVideoFile(file: File, provider: "stream" | "r2" = "stream", host?: { r2?: number; stream?: number }): string | null {
   if (!(ALLOWED_VIDEO_TYPES as readonly string[]).includes(file.type)) {
     return m.media_video_err_format();
   }
-  const max = maxVideoBytes(provider);
+  const max = maxVideoBytes(provider, host);
   if (file.size > max) {
     return m.media_video_err_too_large({ maxMb: Math.round(max / (1024 * 1024)) });
   }
@@ -96,7 +95,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
   const handleFile = async (file: File) => {
     setError(null);
     // Validate type + size client-side (eager-after-error inline message).
-    const ve = validateVideoFile(file, provider);
+    const ve = validateVideoFile(file, provider, video?.maxUploadBytes);
     if (ve) {
       setError(ve);
       return;
@@ -257,7 +256,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
           </button>
         )}
 
-        <p className="mt-3 text-[11px] text-ih-fg-3">{m.media_video_formats_hint({ maxMb: Math.round(maxVideoBytes(provider) / (1024 * 1024)), maxSec: MAX_VIDEO_SEC })}</p>
+        <p className="mt-3 text-[11px] text-ih-fg-3">{m.media_video_formats_hint({ maxMb: Math.round(maxVideoBytes(provider, video?.maxUploadBytes) / (1024 * 1024)), maxSec: MAX_VIDEO_SEC })}</p>
       </div>
     </div>
   );

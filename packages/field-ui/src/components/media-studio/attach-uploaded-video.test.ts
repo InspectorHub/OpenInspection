@@ -74,4 +74,20 @@ describe("attachUploadedVideo", () => {
     expect(d.notify).not.toHaveBeenCalled();
     expect(d.reload).toHaveBeenCalledTimes(1);
   });
+
+  it("a Stream clip that arrives without its stream uid cannot be placed: the error message, no write, a refresh", () => {
+    const d = deps(true);
+    attachUploadedVideo({ provider: "stream", poolId: "pool-9", streamUid: "" }, "item-7", d);
+    expect(d.added).toEqual([]);
+    expect(d.notify).toHaveBeenCalledWith(expect.stringMatching(/could not be added/i), "error", expect.anything());
+    expect(d.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("a document write that throws is the same failure, not an uncaught error", () => {
+    const d = { ...deps(true), addVideoToItem: () => { throw new Error("no clip identity"); } };
+    attachUploadedVideo({ provider: "r2", poolId: "pool-1" }, "item-7", d);
+    expect(d.notify).toHaveBeenCalledWith(expect.stringMatching(/could not be added/i), "error", expect.anything());
+    expect(d.notify).not.toHaveBeenCalledWith(expect.stringMatching(/video added/i), "success");
+    expect(d.reload).toHaveBeenCalledTimes(1);
+  });
 });
