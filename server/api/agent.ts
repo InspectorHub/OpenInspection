@@ -8,6 +8,7 @@ import { inspections } from '../lib/db/schema/inspection';
 import { contacts } from '../lib/db/schema/contact';
 import { inspectionPeople, contactRoleProfiles } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { refuseVisitorOnSpentAllowance } from './inspections/create-support';
 import { isAdminRole } from '../lib/auth/roles';
 import {
     AgentReportsQuerySchema,
@@ -189,7 +190,7 @@ const conciergeBookRoute = createRoute(withMcpMetadata({
         400: { description: 'Invalid input' },
         401: { description: 'Unauthorized' },
         403: { description: 'Forbidden — agent not linked to tenant' },
-        404: { description: 'Inspector contact not found' },
+        404: { description: 'Inspector contact not found' }, 409: { description: 'Company is not taking bookings right now (monthly allowance spent)' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "createAgentConciergeBook",
@@ -331,8 +332,7 @@ app.openapi(getLeaderboardRoute, async (c) => {
         .groupBy(inspections.referredByContactId, contacts.name, contacts.agency, contacts.email)
         .orderBy(sql`count(*) DESC`);
 
-    // Exclude rows where agentId is null (un-referred inspections)
-    const leaderboard = rows.filter((r) => r.agentId !== null);
+    const leaderboard = rows.filter((r) => r.agentId !== null); // un-referred inspections have no agent
 
     return c.json({
         success: true,
@@ -377,7 +377,7 @@ app.openapi(conciergeBookRoute, async (c) => {
         ...(inspectorContactId ? { inspectorContactId } : {}),
         ...(services?.length ? { services } : {}),
         ...(clientPhone ? { clientPhone } : {}),
-    });
+    }).catch((err: unknown) => refuseVisitorOnSpentAllowance(c, rest.tenantId, err)); // the service has verified the link before it consumes quota
     return c.json({ success: true as const, data: result }, 200);
 });
 app.openapi(referralsRoute, async (c) => {

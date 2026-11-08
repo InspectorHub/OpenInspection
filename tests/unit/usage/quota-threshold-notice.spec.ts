@@ -4,7 +4,7 @@
  * Covers the parts `noticeFor` (pure-function spec) doesn't reach:
  *  - the tenant-owner recipient lookup,
  *  - the 4-vs-5 copy branch,
- *  - the KV dedup key (`quota-notice:{tenantId}:{n}`) so a retry never
+ *  - the KV dedup key (`quota-notice:{tenantId}:{n}:{YYYY-MM}`) so a retry never
  *    double-sends,
  *  - and — the safety-critical property from the brief — that this send
  *    NEVER records against the tenant's own `email`/`email_byo` metering
@@ -37,11 +37,15 @@ const baseEnv: EmailServiceEnv = {
 };
 
 /** Minimal in-memory KVNamespace stand-in — enough for get/put dedup checks. */
+const ttls = new Map<string, number>();
 function makeFakeKv(): KVNamespace {
   const store = new Map<string, string>();
   return {
     get: async (key: string) => store.get(key) ?? null,
-    put: async (key: string, value: string) => { store.set(key, value); },
+    put: async (key: string, value: string, opts?: { expirationTtl?: number }) => {
+      store.set(key, value);
+      if (opts?.expirationTtl !== undefined) ttls.set(key, opts.expirationTtl);
+    },
   } as unknown as KVNamespace;
 }
 
@@ -88,8 +92,8 @@ describe('sendQuotaThresholdNotice', () => {
     const [, init] = vi.mocked(fetch).mock.calls[0];
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.to).toEqual(['owner4@example.com']);
-    expect(body.subject).toBe('One free inspection left');
-    expect(body.html).toContain('one free inspection left');
+    expect(body.subject).toBe('One free inspection left this month');
+    expect(body.html).toContain('You have one left');
     // It goes through the shared branded layout now, not a bare `<p>` —
     // the whole point of moving it onto a registry template.
     expect(body.html).toContain('<!DOCTYPE html>');
@@ -106,8 +110,8 @@ describe('sendQuotaThresholdNotice', () => {
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
     const [, init] = vi.mocked(fetch).mock.calls[0];
     const body = JSON.parse((init as RequestInit).body as string);
-    expect(body.subject).toBe("You've used your 5 free inspections");
-    expect(body.html).toContain('subscribe to create new ones');
+    expect(body.subject).toBe("You've used your 5 free inspections this month");
+    expect(body.html).toContain('renews at 00:00 UTC on the 1st');
   });
 
   it('never records against the tenant email metering counter (unmetered by construction)', async () => {
@@ -133,6 +137,22 @@ describe('sendQuotaThresholdNotice', () => {
     await svc.sendQuotaThresholdNotice(5, { db: testD1, kv, tenantId: 'tenant-dedupe', billingPortalUrl: null });
 
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('dedupes per month: the same month sends once, a new month notifies again, and the marker expires', async () => {
+    await seedOwner('tenant-month', 'owner@example.com');
+    const env: EmailServiceEnv = { ...baseEnv, DB: testD1 };
+    const svc = assembleTenantEmailService(env, { dbSecrets: {} });
+    const kv = makeFakeKv();
+    const base = { db: testD1, kv, tenantId: 'tenant-month', billingPortalUrl: null };
+
+    await svc.sendQuotaThresholdNotice(5, { ...base, period: '2026-11' });
+    await svc.sendQuotaThresholdNotice(5, { ...base, period: '2026-11' });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+
+    await svc.sendQuotaThresholdNotice(5, { ...base, period: '2026-12' });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+    expect(ttls.get('quota-notice:tenant-month:5:2026-11')).toBeGreaterThan(31 * 24 * 60 * 60);
   });
 
   it('is a no-op when the tenant has no owner row', async () => {

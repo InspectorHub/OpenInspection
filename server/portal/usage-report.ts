@@ -5,7 +5,9 @@ import type { HonoConfig } from '../types/hono';
 import { tenants } from '../lib/db/schema';
 import { usageCounters } from '../lib/db/schema/usage';
 import { aggregateUsage } from '../lib/usage/aggregate';
-import { FREE_TIER_CAPS } from '../features/plan-quota/policy';
+import { FREE_TIER_CAPS, allowanceWindow } from '../features/plan-quota/policy';
+import { monthInspectionCounts } from '../features/plan-quota/month-usage';
+import { currentPeriodKey } from '../lib/usage/period';
 import { logger } from '../lib/logger';
 
 /**
@@ -16,12 +18,25 @@ import { logger } from '../lib/logger';
  * for a free tenant only — the free-tier caps those platform metrics are
  * measured against (`null` for pro/enterprise, since the cap never applies to
  * them). M2M-guarded at the mount (requireServiceBinding).
+ *
+ * A FREE tenant's `inspections` and `email` are the figures its monthly caps are enforced against (inspections created
+ * this UTC month, built-in emails sent this UTC month), not lifetime sums, and `period` names that month and when it
+ * renews; for every other tenant `period` is null and the sums are unchanged.
  */
 export async function usageReportHandler(c: Context<HonoConfig>) {
     try {
         const db = drizzle(c.env.DB);
         const rows = await db.select().from(usageCounters).all();
         const usage = aggregateUsage(rows);
+        const now = new Date();
+        const window = allowanceWindow(now);
+        const monthKey = currentPeriodKey(now);
+        // This month's built-in email per tenant, grouped once rather than re-filtering every row per tenant.
+        const monthEmail = new Map<string, number>();
+        for (const r of rows) {
+            if (r.metric === 'email' && r.periodKey === monthKey) monthEmail.set(r.tenantId, (monthEmail.get(r.tenantId) ?? 0) + r.value);
+        }
+        const monthInspections = await monthInspectionCounts(c.env.DB, now, { freeTenants: true });
 
         const tenantIds = usage.map((u) => u.tenantId);
         const tierRows = tenantIds.length
@@ -31,16 +46,18 @@ export async function usageReportHandler(c: Context<HonoConfig>) {
 
         const data = usage.map((u) => {
             const tier = tierByTenant.get(u.tenantId) ?? 'free';
+            const capped = tier === 'free';
             return {
                 tenantId:    u.tenantId,
                 tier,
-                inspections: u.inspections,
+                inspections: capped ? monthInspections.get(u.tenantId) ?? 0 : u.inspections,
                 sms:         u.sms,
                 smsByo:      u.smsByo,
-                email:       u.email,
+                email:       capped ? monthEmail.get(u.tenantId) ?? 0 : u.email,
                 emailByo:    u.emailByo,
                 r2Bytes:     u.r2Bytes,
-                caps:        tier === 'free' ? FREE_TIER_CAPS : null,
+                caps:        capped ? FREE_TIER_CAPS : null,
+                period:      capped ? window : null,
             };
         });
 

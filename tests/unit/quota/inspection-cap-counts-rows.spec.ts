@@ -10,6 +10,7 @@ const fakeD1 = lazyD1();
 import { PlanQuotaGuard } from '../../../server/features/plan-quota/guard';
 import { MeteringService } from '../../../server/services/metering.service';
 import { FREE_TIER_CAPS } from '../../../server/features/plan-quota/policy';
+import { currentPeriodKey } from '../../../server/lib/usage/period';
 
 /**
  * The inspection cap is enforced by a single conditional upsert whose WHERE
@@ -258,7 +259,8 @@ describe('PlanQuotaGuard.consumeInspection counts rows, not creates', () => {
 
         // And the messaging gate still reads that tally, with zero rows anywhere
         // to count — converting it to a row count would silently uncap it.
-        await metering.record('t1', 'email', '2026-08', FREE_TIER_CAPS.email);
+        // The gate reads the CURRENT month's counter (the allowance renews monthly), so top up that bucket.
+        await metering.record('t1', 'email', currentPeriodKey(new Date()), FREE_TIER_CAPS.email);
         await expect(guard.checkMessagingQuota('t1', 'free', 'email')).rejects.toMatchObject({
             code: 'QUOTA_EXHAUSTED',
         });

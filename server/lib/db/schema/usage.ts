@@ -2,10 +2,13 @@ import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlit
 
 /**
  * Per-tenant usage meter (Phase 1, SaaS-only — inert in standalone).
- * Flows (sms/email/sms_byo/email_byo/inspections): period_key = 'YYYY-MM',
- * except 'inspections' which uses the STOCK_PERIOD sentinel ('lifetime') since
- * it is a running lifetime total, not a monthly flow. Stock (r2_bytes):
- * period_key = 'lifetime', overwritten by the daily measurement job.
+ * On a capped plan the 'inspections' row (period_key 'lifetime') holds this UTC month's count, not a lifetime total.
+ * Flows (sms/email/sms_byo/email_byo): period_key = 'YYYY-MM' (UTC calendar
+ * month), and the capped `email` allowance is read from the current month's row
+ * only. The inspection cap itself counts inspection rows, not that cached value;
+ * elsewhere the 'inspections' row (STOCK_PERIOD) is a running total kept for
+ * analytics. Stock (r2_bytes): period_key = 'lifetime', overwritten by the daily
+ * measurement job.
  * `sms_byo`/`email_byo` count sends made through a tenant's own credentials
  * (bring-your-own), tracked separately from platform-metered `sms`/`email`.
  * `ai_translate`/`ai_assist` carry the same split for AI work, and are two

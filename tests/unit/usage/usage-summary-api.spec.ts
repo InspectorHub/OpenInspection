@@ -24,6 +24,8 @@ const fakeD1 = lazyD1();
 // eslint-disable-next-line import/order
 import usageRoutes from '../../../server/api/usage';
 import { MeteringService } from '../../../server/services/metering.service';
+import { allowanceWindow } from '../../../server/features/plan-quota/policy';
+import { currentPeriodKey, monthStartUtcMs } from '../../../server/lib/usage/period';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = 't-usage-1';
@@ -103,7 +105,7 @@ describe('GET /api/usage/summary', () => {
         const m = new MeteringService(testD1);
         await m.record(TENANT, 'inspections', 'lifetime', 3);
         await m.record(TENANT, 'sms', '2026-06', 10);
-        await m.record(TENANT, 'email', '2026-06', 20);
+        await m.record(TENANT, 'email', currentPeriodKey(new Date()), 20);
         await m.record(TENANT, 'sms_byo', '2026-06', 500);
         await m.record(TENANT, 'email_byo', '2026-06', 250);
         await m.record(TENANT, 'r2_bytes', 'lifetime', 4096);
@@ -122,6 +124,7 @@ describe('GET /api/usage/summary', () => {
         expect(body.data).toEqual({
             tier: 'free',
             caps: { inspections: 5, email: 50 },
+            period: allowanceWindow(new Date()),
             usage: {
                 inspections: 3, sms: 10, email: 20,
                 smsByo: 500, emailByo: 250,
@@ -148,6 +151,27 @@ describe('GET /api/usage/summary', () => {
         expect(body.data.usage.inspections).toBe(1);
     });
 
+    it('a capped tenant sees THIS month only: earlier months are not counted', async () => {
+        await seedTenant(TENANT, { tier: 'free' });
+        await seedInspections(TENANT, 2);
+        await testDb.insert(schema.inspections).values({
+            id: 'old-1', tenantId: TENANT, propertyAddress: '1 Main St', date: '2026-01-05',
+            createdAt: new Date(monthStartUtcMs(new Date()) - 1),
+        });
+        const m = new MeteringService(testD1);
+        await m.record(TENANT, 'email', currentPeriodKey(new Date()), 7);
+        await m.record(TENANT, 'email', '2020-01', 40);
+
+        const app = buildApp(testDb, SAAS_PROFILE);
+        const env = { DB: testD1 } as unknown as HonoConfig['Bindings'];
+        const res = await app.request('/api/usage/summary', {}, env, makeExecCtx());
+        const body = await res.json() as { data: { usage: { inspections: number; email: number }; period: { period: string; resetsAt: string } } };
+        expect(body.data.usage.inspections).toBe(2);
+        expect(body.data.usage.email).toBe(7);
+        expect(body.data.period.period).toBe(currentPeriodKey(new Date()));
+        expect(new Date(body.data.period.resetsAt).getTime()).toBeGreaterThan(Date.now());
+    });
+
     it('an UNcapped tenant keeps the cumulative lifetime counter', async () => {
         // With `caps: null` the figure is measured against nothing, so it stays
         // "how many they have ever created" — redefining it to a row count would
@@ -162,6 +186,7 @@ describe('GET /api/usage/summary', () => {
         const body = await res.json() as { data: { usage: { inspections: number } } };
         expect(body.data.usage.inspections).toBe(9);
     });
+
 
     it('caps is null for a pro tenant even on a hasUsageQuota profile', async () => {
         await seedTenant(TENANT, { tier: 'pro' });

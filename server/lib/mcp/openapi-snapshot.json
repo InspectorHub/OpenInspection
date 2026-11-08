@@ -10597,7 +10597,7 @@
       "body": null
     },
     "summary": "Get the current tenant's usage summary (inspections/sms/email/storage/seats + free-tier caps)",
-    "description": "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against. Available to owner, manager and inspector roles."
+    "description": "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against. On a capped plan the inspections and email figures are for the current UTC calendar month, and `period` ({ period: 'YYYY-MM', resetsAt: ISO instant }) names that month and when its allowance renews; `period` is null when nothing is capped. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "getVisibleInspections",

@@ -5,7 +5,7 @@
  *  - `assembleTenantEmailService` tags the meter 'email_byo' for a resolved
  *    own-mode (BYO) send and 'email' for a platform-mode send.
  *  - The pre-flight quota gate (`EmailBaseService.sendEmail` -> `quota.preflight()`)
- *    blocks a free tenant already at the 50 lifetime platform-email cap with a
+ *    blocks a free tenant already at the 50 platform-email cap for the month with a
  *    402 QUOTA_EXHAUSTED, BEFORE any provider request and BEFORE any meter record.
  *  - BYO sends are uncapped even when the platform `email` counter is at 50 —
  *    quota is only wired for platform-mode sends (see FREE_TIER_CAPS).
@@ -28,6 +28,7 @@ import {
 } from '../../../server/lib/email/build-email-service';
 import { MeteringService } from '../../../server/services/metering.service';
 import { PlanQuotaGuard } from '../../../server/features/plan-quota/guard';
+import { currentPeriodKey } from '../../../server/lib/usage/period';
 import { ACCOUNT_EMAIL_CLASSES } from '../../../server/lib/email/outbound-cooling-window';
 
 const baseEnv: EmailServiceEnv = {
@@ -107,9 +108,9 @@ describe('free-tier pre-flight cap (platform-mode only)', () => {
     vi.restoreAllMocks();
   });
 
-  it('free tenant at 50 lifetime platform emails: sendEmail rejects 402 and provider fetch is not called', async () => {
+  it('free tenant at 50 built-in emails this month: sendEmail rejects 402 and provider fetch is not called', async () => {
     const m = new MeteringService(testD1);
-    await m.record('tenant-free', 'email', '2026-06', 50);
+    await m.record('tenant-free', 'email', currentPeriodKey(new Date()), 50);
     const record = vi.spyOn(MeteringService.prototype, 'record');
     const guard = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
     const env: EmailServiceEnv = { ...baseEnv, DB: testD1 };
@@ -127,7 +128,7 @@ describe('free-tier pre-flight cap (platform-mode only)', () => {
 
   it('byo config bypasses the cap even at 50', async () => {
     const m = new MeteringService(testD1);
-    await m.record('tenant-free-byo', 'email', '2026-06', 50);
+    await m.record('tenant-free-byo', 'email', currentPeriodKey(new Date()), 50);
     const guard = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
     const env: EmailServiceEnv = { ...baseEnv, DB: testD1 };
 
@@ -141,7 +142,7 @@ describe('free-tier pre-flight cap (platform-mode only)', () => {
 
   it('a free tenant at the cap still gets account and statutory mail, and nothing else', async () => {
     const m = new MeteringService(testD1);
-    await m.record('tenant-capped', 'email', '2026-06', 50);
+    await m.record('tenant-capped', 'email', currentPeriodKey(new Date()), 50);
     const guard = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
     const env: EmailServiceEnv = { ...baseEnv, DB: testD1 };
     const svc = assembleTenantEmailService(env, platformCfg, 'tenant-capped', guard, 'free');
