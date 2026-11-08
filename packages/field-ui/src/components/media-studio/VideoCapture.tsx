@@ -4,6 +4,7 @@ import { useFieldDataSource } from "../../context";
 import type { VideoFinalizeInput } from "../../data-source-types";
 import { m } from "../../i18n";
 import { posterKeyIfAdmissible } from "./video-poster";
+import { videoDurationSec } from "./video-duration";
 
 /**
  * Plan 7 — video walk-through capture (pluggable backend: Stream or R2).
@@ -31,6 +32,13 @@ import { posterKeyIfAdmissible } from "./video-poster";
  */
 
 export const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB
+/**
+ * R2 takes the clip in ONE request that the Worker buffers whole (the engine's single-request video limit is the same 64 MiB), so a
+ * larger clip would fail late and on a bad connection. Stream receives the file directly, so it keeps the larger limit.
+ */
+export const MAX_R2_VIDEO_BYTES = 64 * 1024 * 1024; // 64 MB
+/** A length reading a little over the limit is rounding, not a long clip. */
+const LENGTH_TOLERANCE_SEC = 0.5;
 export const MAX_VIDEO_SEC = 30;
 export const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"] as const;
 
@@ -42,21 +50,32 @@ export interface VideoCaptureProps {
   itemId?: string;
   onClose: () => void;
   /**
-   * Called after finalize succeeds. Receives the finalize result so the host
-   * can refetch the pool row or refresh state.
+   * Called after finalize succeeds, with what the host needs to put the clip on the item: its identity (`poolId` for R2, `streamUid`
+   * for Stream), the poster when one was stored, and the length when the browser could read it. An empty `poolId` means the host
+   * queued the upload for later (native, offline): there is nothing to attach yet.
    */
-  onUploaded: (result: { poolId: string; provider: "stream" | "r2" }) => void;
+  onUploaded: (result: VideoUploaded) => void;
 }
+
+export type VideoUploaded =
+  | { provider: "r2"; poolId: string; posterKey?: string; durationSec?: number }
+  | { provider: "stream"; poolId: string; streamUid: string; durationSec?: number };
 
 type Phase = "pick" | "uploading" | "finalizing";
 
-/** Pure validation (type + size). Duration is enforced server-side by Stream. */
-export function validateVideoFile(file: File): string | null {
+/** The size limit that applies to a backend. */
+export function maxVideoBytes(provider: "stream" | "r2"): number {
+  return provider === "r2" ? MAX_R2_VIDEO_BYTES : MAX_VIDEO_BYTES;
+}
+
+/** Pure validation (type + size). Length is checked from the file's metadata in `handleFile`; Stream also enforces it server-side. */
+export function validateVideoFile(file: File, provider: "stream" | "r2" = "stream"): string | null {
   if (!(ALLOWED_VIDEO_TYPES as readonly string[]).includes(file.type)) {
     return m.media_video_err_format();
   }
-  if (file.size > MAX_VIDEO_BYTES) {
-    return m.media_video_err_too_large();
+  const max = maxVideoBytes(provider);
+  if (file.size > max) {
+    return m.media_video_err_too_large({ maxMb: Math.round(max / (1024 * 1024)) });
   }
   return null;
 }
@@ -77,7 +96,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
   const handleFile = async (file: File) => {
     setError(null);
     // Validate type + size client-side (eager-after-error inline message).
-    const ve = validateVideoFile(file);
+    const ve = validateVideoFile(file, provider);
     if (ve) {
       setError(ve);
       return;
@@ -93,6 +112,14 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
     try {
       // A host without the video flow cannot upload; say so rather than doing nothing.
       if (!video) return fail(undefined, m.media_video_err_upload());
+
+      // Refuse a clip that is over the length limit BEFORE it is sent: finding out after a long upload is the worst time. A clip whose
+      // length the browser cannot read is uploaded as it is (Stream still enforces the limit on its side).
+      const lengthSec = await videoDurationSec(file);
+      if (lengthSec !== null && lengthSec > MAX_VIDEO_SEC + LENGTH_TOLERANCE_SEC) {
+        return fail(m.media_video_err_too_long({ actual: Math.round(lengthSec), maxSec: MAX_VIDEO_SEC }), m.media_video_err_upload());
+      }
+      const length = lengthSec === null ? {} : { durationSec: Math.round(lengthSec * 10) / 10 };
 
       // Step 1: mint an upload URL + a backend ref.
       const created = await video.createUpload(inspectionId, itemId ? { itemId } : {});
@@ -133,7 +160,12 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
       setPhase("finalizing");
       const finalized = await video.finalize(inspectionId, finalRef);
       if (!finalized.ok) return fail(finalized.error, m.media_video_err_upload());
-      onUploaded({ poolId: finalized.data?.poolId ?? "", provider: finalRef.provider });
+      const poolId = finalized.data?.poolId ?? "";
+      onUploaded(
+        finalRef.provider === "r2"
+          ? { provider: "r2", poolId, ...(finalRef.posterKey ? { posterKey: finalRef.posterKey } : {}), ...length }
+          : { provider: "stream", poolId, streamUid: finalRef.streamUid, ...length },
+      );
       onClose();
     } catch {
       fail(undefined, m.media_video_err_upload());
@@ -225,7 +257,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
           </button>
         )}
 
-        <p className="mt-3 text-[11px] text-ih-fg-3">{m.media_video_formats_hint({ maxSec: MAX_VIDEO_SEC })}</p>
+        <p className="mt-3 text-[11px] text-ih-fg-3">{m.media_video_formats_hint({ maxMb: Math.round(maxVideoBytes(provider) / (1024 * 1024)), maxSec: MAX_VIDEO_SEC })}</p>
       </div>
     </div>
   );

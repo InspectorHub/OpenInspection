@@ -17,6 +17,7 @@ import type * as Y from 'yjs';
 import { findingKey } from '../shared/finding-key';
 import { orderPhotoBatch as docOrderPhotoBatch, type BatchPhotoName } from '../shared/photo-batch-order';
 import { cloneByScope } from '../shared/findings-shared';
+import type { VideoEntry } from '../shared/results-doc';
 import type {
     AttachedRepairItem,
     CustomCommentEntry,
@@ -30,6 +31,7 @@ import {
     toggleCanned as bindingToggleCanned,
     setDefectFields as bindingSetDefectFields,
     appendPhoto as bindingAppendPhoto,
+    appendVideo as bindingAppendVideo,
     appendNote as bindingAppendNote,
     addCustomDefect as bindingAddCustomDefect,
     toggleCustomDefect as bindingToggleCustomDefect,
@@ -119,6 +121,9 @@ export interface CollabFindingsApi {
         levelId: string,
     ) => number;
     addPhotoToItem: (itemId: string, photoKey: string) => void;
+    /** Add a finished clip to the item. `true` when it was written into the document, `false` when it could not be (an item the
+     *  editor cannot place): the caller must not tell the user it worked. */
+    addVideoToItem: (itemId: string, video: VideoEntry) => boolean;
     addPhotoToDefect: (
         itemId: string,
         target: { kind: 'canned' | 'custom'; id: string },
@@ -282,6 +287,14 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
         setDirty(true);
     };
 
+    const addVideoToItem = (itemId: string, video: VideoEntry): boolean => {
+        const sid = sectionIdForItem(itemId);
+        if (!sid) return false;
+        bindingAppendVideo(doc, sid, itemId, video, unit);
+        setDirty(true);
+        return true;
+    };
+
     const addPhotoToDefect = (
         itemId: string,
         target: { kind: 'canned' | 'custom'; id: string },
@@ -364,6 +377,7 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
         cloneLast,
         batchSetRating,
         addPhotoToItem,
+        addVideoToItem,
         addPhotoToDefect,
         orderPhotoBatch,
         getPhotoCount,

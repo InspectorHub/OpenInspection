@@ -251,6 +251,29 @@ describe('collab-findings-api – nested writes reflect in doc', () => {
         expect(projectResults(doc)[FK_I1].photos?.some((p) => p.key === 'r2/photo.jpg')).toBe(true);
     });
 
+    it('addVideoToItem puts the clip on the item, marks the document dirty, and says it worked', () => {
+        const { doc, api, setDirty } = makeHarness();
+        const written = api.addVideoToItem('i1', { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1', posterKey: 'poster-1' });
+        expect(written).toBe(true);
+        expect(setDirty).toHaveBeenCalledWith(true);
+        expect(projectResults(doc)[FK_I1].photos).toMatchObject([{ mediaType: 'video', provider: 'r2', mediaId: 'pool-1', posterKey: 'poster-1' }]);
+    });
+
+    it('addVideoToItem for an item the editor cannot place writes nothing and says so', () => {
+        const { doc, api, setDirty } = makeHarness();
+        const written = api.addVideoToItem('no-such-item', { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1' });
+        expect(written).toBe(false);
+        expect(setDirty).not.toHaveBeenCalled();
+        expect(projectResults(doc)[FK_I1].photos ?? []).toEqual([]);
+    });
+
+    it('two clips added to one item stay two entries', () => {
+        const { doc, api } = makeHarness();
+        api.addVideoToItem('i1', { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1' });
+        api.addVideoToItem('i1', { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-2' });
+        expect((projectResults(doc)[FK_I1].photos ?? []).map((p) => p.mediaId)).toEqual(['pool-1', 'pool-2']);
+    });
+
     it('addPhotoToDefect attaches a photo to a canned defect', () => {
         const { doc, api } = makeHarness();
         api.toggleCannedComment('s1', 'i1', 'defects', 'd1', true);

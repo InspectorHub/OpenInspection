@@ -301,6 +301,35 @@ export function pushPendingPhoto(
     });
 }
 
+/**
+ * A finished video clip on an item. Videos carry no R2 `key` (`key` is `''`): their identity is `mediaId`
+ * (R2: the id of the media-pool row finalize created, which every serve and delete route looks up) or
+ * `streamUid` (Stream).
+ */
+export type VideoEntry = PhotoEntry & { mediaType: 'video' } & (
+    | { provider: 'r2'; mediaId: string }
+    | { provider: 'stream'; streamUid: string }
+);
+
+/**
+ * Add a video clip to the item's `photos`, upserted by its own identity (`mediaId` or `streamUid`), never by `key`.
+ *
+ * `appendPhoto` upserts by `key`, and every video's key is `''`, so a second clip would merge into the first.
+ * Here a retry of the same clip updates its entry and two different clips are two entries.
+ */
+export function appendVideo(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    video: VideoEntry,
+): void {
+    const identityField = video.provider === 'stream' ? 'streamUid' : 'mediaId';
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        upsertElement(getOrCreateArray(item, 'photos'), identityField, { ...video });
+    });
+}
+
 /** Apply a partial patch to the photo Y.Map matching `key`. */
 export function updatePhoto(
     doc: Y.Doc,

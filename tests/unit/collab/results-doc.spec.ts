@@ -10,6 +10,7 @@ import {
   updatePhoto,
   removePhoto,
   pushPendingPhoto,
+  appendVideo,
   revertPhoto,
   replacePhoto,
   reorderPhotos,
@@ -490,6 +491,42 @@ describe('results-doc', () => {
     removeMediaBy(doc, FK, 'streamUid', 'absent');
 
     expect((projectResults(doc)[FK].photos ?? []).map((p) => p.key + '|' + (p.streamUid ?? ''))).toEqual(['p1|', '|u3']);
+  });
+
+  it('appendVideo keeps two clips on one item apart, even though both are keyless', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'p1' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1', posterKey: 'poster-1' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-2' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'stream', streamUid: 'uid-1', durationSec: 12 });
+
+    const photos = projectResults(doc)[FK].photos ?? [];
+    expect(photos.map((p) => p.mediaId ?? p.streamUid ?? p.key)).toEqual(['p1', 'pool-1', 'pool-2', 'uid-1']);
+    expect(photos[1]).toMatchObject({ mediaType: 'video', provider: 'r2', posterKey: 'poster-1' });
+  });
+
+  it('appendVideo is idempotent per clip: a retry of the same pool id updates, never duplicates', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1', posterKey: 'late-poster' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'stream', streamUid: 'uid-1' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'stream', streamUid: 'uid-1', durationSec: 9 });
+
+    const photos = projectResults(doc)[FK].photos ?? [];
+    expect(photos).toHaveLength(2);
+    expect(photos[0]).toMatchObject({ mediaId: 'pool-1', posterKey: 'late-poster' });
+    expect(photos[1]).toMatchObject({ streamUid: 'uid-1', durationSec: 9 });
+  });
+
+  it('a clip added with appendVideo can be removed again by its identity', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-2' });
+    removeMediaBy(doc, FK, 'mediaId', 'pool-1');
+    expect((projectResults(doc)[FK].photos ?? []).map((p) => p.mediaId)).toEqual(['pool-2']);
   });
 
   it('#181 PR-G a pending PhotoEntry round-trips through projectResults/loadResultsProjection', () => {

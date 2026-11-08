@@ -3,12 +3,18 @@
  * The capture flow on a fake data source: createUpload -> uploadFile -> (r2: uploadPoster) -> finalize, what each
  * step is sent, what a refusal at each step shows, and what the host is told when it works.
  */
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, cleanup, act, screen } from "@testing-library/react";
 import { FieldDataSourceProvider } from "../../context";
 import { createEmptyEditorData, createFakeDataSource, createFakeVideo } from "../../testing/fake-data-source";
 import type { FakeVideo } from "../../testing/fake-data-source";
 import { VideoCapture } from "./VideoCapture";
+import { videoDurationSec } from "./video-duration";
+
+// happy-dom has no video decoder, so the length probe is replaced; each test says what it reads.
+vi.mock("./video-duration", async (importOriginal) => ({ ...(await importOriginal<typeof import("./video-duration")>()), videoDurationSec: vi.fn() }));
+const readsLength = vi.mocked(videoDurationSec);
+beforeEach(() => { readsLength.mockReset(); readsLength.mockResolvedValue(null); });
 
 afterEach(() => {
     cleanup();
@@ -45,7 +51,7 @@ describe("VideoCapture flow", () => {
         expect(video.uploadedFiles).toEqual(["clip.mp4"]);
         expect(video.posterUploads).toBe(0);
         expect(video.finalizes).toEqual([{ inspectionId: "insp-1", input: { provider: "stream", streamUid: "uid-1" } }]);
-        expect(onUploaded).toHaveBeenCalledWith({ poolId: "pool-1", provider: "stream" });
+        expect(onUploaded).toHaveBeenCalledWith({ provider: "stream", poolId: "pool-1", streamUid: "uid-1" });
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 
@@ -68,7 +74,56 @@ describe("VideoCapture flow", () => {
         await act(async () => { await vi.advanceTimersByTimeAsync(9000); });
         expect(video.finalizes).toEqual([{ inspectionId: "insp-1", input: { provider: "r2", mediaId: "media-1", r2Key: "r2/media-1.mp4" } }]);
         expect(video.posterUploads).toBe(0);
-        expect(onUploaded).toHaveBeenCalledWith({ poolId: "pool-1", provider: "r2" });
+        expect(onUploaded).toHaveBeenCalledWith({ provider: "r2", poolId: "pool-1" });
+    });
+
+    it("a clip longer than the limit is refused before anything is sent, with its length and the limit in the message", async () => {
+        readsLength.mockResolvedValue(48);
+        const video = createFakeVideo();
+        const { pick, onUploaded } = mount(video, "r2");
+        pick(clip());
+        await settle();
+        expect(video.createUploads).toEqual([]);
+        expect(errorText()).toMatch(/48/);
+        expect(errorText()).toMatch(/30/);
+        expect(onUploaded).not.toHaveBeenCalled();
+    });
+
+    it("a clip whose length the browser cannot read is not refused for it", async () => {
+        readsLength.mockResolvedValue(null);
+        const video = createFakeVideo();
+        const { pick } = mount(video, "stream");
+        pick(clip());
+        await settle();
+        expect(video.createUploads).toHaveLength(1);
+    });
+
+    it("the length that was read is reported with the stream clip", async () => {
+        readsLength.mockResolvedValue(12.5);
+        const video = createFakeVideo();
+        const { onUploaded, pick } = mount(video, "stream", "item-1");
+        pick(clip());
+        await settle();
+        expect(onUploaded).toHaveBeenCalledWith({ provider: "stream", poolId: "pool-1", streamUid: "uid-1", durationSec: 12.5 });
+    });
+
+    it("r2 refuses a clip over its single-request limit, naming the limit; stream does not apply that limit", async () => {
+        const big = new File(["x"], "big.mp4", { type: "video/mp4" });
+        Object.defineProperty(big, "size", { value: 65 * 1024 * 1024 });
+
+        const r2 = createFakeVideo();
+        const first = mount(r2, "r2");
+        first.pick(big);
+        await settle();
+        expect(r2.createUploads).toEqual([]);
+        expect(errorText()).toMatch(/64 MB/);
+        cleanup();
+
+        const stream = createFakeVideo();
+        const second = mount(stream, "stream");
+        second.pick(big);
+        await settle();
+        expect(stream.createUploads).toHaveLength(1);
     });
 
     it("shows the host's reason when create-upload is refused, and its own sentence when the host gave none", async () => {
