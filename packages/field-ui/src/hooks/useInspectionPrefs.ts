@@ -11,7 +11,9 @@ export const DEFAULT_INSPECTION_PREFS: InspectionPrefs = {
     autoAdvanceDelayMs: 200,
     pinnedTagIds:       [],
     requireDefectFields: 'none',
-    agentRepairAccess: 'readwrite',
+    // Same value the server enforces when a company never chose one (server/lib/people/agent-repair-access.ts); a
+    // test holds the two together, because this package cannot import server code.
+    agentRepairAccess: 'read',
     reportLinkTtl: 'never',
 };
 

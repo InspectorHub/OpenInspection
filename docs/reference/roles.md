@@ -361,7 +361,7 @@ Five, keyed on `RoleKind` and overridable per role profile
 
 \* The stored default is `off`, but the effective value is the **stricter** of
 this bit and the tenant's `agentRepairAccess` policy (Settings → Inspection),
-which defaults to `readwrite`. So an agent's repair-list access is a company
+which defaults to `read` (view only). So an agent's repair-list access is a company
 setting first and a per-person exception second.
 
 An unknown `RoleKind` fails closed — no report, no account — rather than
