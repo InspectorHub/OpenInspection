@@ -14,6 +14,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { deleteInspectionCascade } from '../../../server/services/inspection/inspection-cascade';
 import { collabDocName } from '../../../server/lib/collab/doc-name';
+import { collabNamespaces } from '../../../server/lib/collab/collab-namespaces';
 import { logger } from '../../../server/lib/logger';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -71,7 +72,7 @@ describe('deleteInspectionCascade: collaborative document storage', () => {
     });
 
     const run = (ns?: DurableObjectNamespace) =>
-        deleteInspectionCascade(db as unknown as DrizzleD1Database, r2, TENANT, INSP, ns);
+        deleteInspectionCascade(db as unknown as DrizzleD1Database, r2, TENANT, INSP, collabNamespaces({ INSPECTION_DOC: ns }));
 
     it('purges the object of each report the inspection owned, once each, with a POST to /purge', async () => {
         const { ns, seen } = fakeNamespace(db);
@@ -138,5 +139,40 @@ describe('deleteInspectionCascade: collaborative document storage', () => {
         const { ns, seen } = fakeNamespace(db);
         expect(await run(ns)).toBe('skipped');
         expect(seen).toEqual([]);
+    });
+
+    describe('objects created before Durable Objects were pinned to a jurisdiction', () => {
+        const runBoth = (ns?: DurableObjectNamespace, legacy?: DurableObjectNamespace) =>
+            deleteInspectionCascade(db as unknown as DrizzleD1Database, r2, TENANT, INSP, collabNamespaces({ INSPECTION_DOC: ns, INSPECTION_DOC_UNPINNED: legacy }));
+
+        it('purges the same report names in the pre-pinning namespace as well, once each', async () => {
+            const pinned = fakeNamespace(db);
+            const legacy = fakeNamespace(db);
+            expect(await runBoth(pinned.ns, legacy.ns)).toBe('ok');
+            const expected = [collabDocName(TENANT, 'rep-a'), collabDocName(TENANT, 'rep-b')];
+            expect(legacy.seen.map((s) => s.name).sort()).toEqual(expected);
+            expect(legacy.seen.every((s) => s.method === 'POST' && s.url === 'https://do/purge')).toBe(true);
+            expect(pinned.seen.map((s) => s.name).sort()).toEqual(expected);
+        });
+
+        it('a name that never existed there is a no-op that still answers ok', async () => {
+            const pinned = fakeNamespace(db);
+            const legacy = fakeNamespace(db, () => Response.json({ purged: true }));
+            expect(await runBoth(pinned.ns, legacy.ns)).toBe('ok');
+        });
+
+        it('a failure in the pre-pinning object is reported as failed, and the delete still happened', async () => {
+            vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+            const pinned = fakeNamespace(db);
+            const legacy = fakeNamespace(db, (name) => (name.endsWith('rep-b') ? new Response('nope', { status: 500 }) : Response.json({ purged: true })));
+            expect(await runBoth(pinned.ns, legacy.ns)).toBe('failed');
+            expect((await db.select().from(schema.inspections).all()).map((i) => i.id)).toEqual([OTHER_INSP]);
+        });
+
+        it('with no pre-pinning namespace bound, behaves exactly as before', async () => {
+            const pinned = fakeNamespace(db);
+            expect(await runBoth(pinned.ns, undefined)).toBe('ok');
+            expect(pinned.seen).toHaveLength(2);
+        });
     });
 });

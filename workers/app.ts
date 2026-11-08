@@ -5,6 +5,8 @@
 import { Hono, type Context } from "hono";
 import { createRequestHandler, RouterContextProvider } from "react-router";
 import { buildOAuthHandler } from "../server/lib/mcp/oauth-provider";
+// Imports nothing: narrows the Durable Object namespaces to DO_JURISDICTION once per isolate; a no-op when unset.
+import { pinDurableObjects } from "../server/lib/collab/do-jurisdiction";
 // Safe at the top level despite this entry's tiny-import-graph rule:
 // `deployment-profile.ts` imports nothing at all — it is two constants and a
 // resolver over `ProfileEnv`. Pulling it in does not drag the API graph in
@@ -294,7 +296,7 @@ app.all("*", ssr);
 export default {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fetch: (req: Request, env: any, ctx: ExecutionContext) =>
-    buildOAuthHandler(app.fetch as never, env, req).fetch(req, env, ctx),
+    buildOAuthHandler(app.fetch as never, pinDurableObjects(env), req).fetch(req, pinDurableObjects(env), ctx),
   // Imported DIRECTLY, not through `getApi()`. The cron tick decides which jobs
   // are due and enqueues one message each — it never touches a route. Reaching
   // it through server/index.ts meant evaluating the whole API graph first: all
@@ -309,7 +311,7 @@ export default {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   scheduled: async (controller: any, env: any, ctx: any) => {
     const { scheduled: runScheduled } = await import("../server/scheduled");
-    return runScheduled(controller, env, ctx);
+    return runScheduled(controller, pinDurableObjects(env), ctx);
   },
   // Imported DIRECTLY, like `scheduled` above and for the same reason: the
   // dispatcher reads `batch.queue` and hands off, so it never needed the route
@@ -322,7 +324,7 @@ export default {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   queue: async (batch: any, env: any, ctx: any) => {
     const { queue: runQueue } = await import("../server/queue");
-    return runQueue(batch, env, ctx);
+    return runQueue(batch, pinDurableObjects(env), ctx);
   },
 };
 

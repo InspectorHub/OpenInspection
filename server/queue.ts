@@ -1,6 +1,7 @@
 import type { HonoConfig } from './types/hono';
 import type { ImagesBinding } from './lib/media/strip-exif';
 import { signingKeySecrets } from './lib/signing-key-secrets';
+import { purgeDurableObjectsFromEnv } from './lib/collab/collab-namespaces';
 
 /**
  * The queue entry point, for all four consumers this worker owns.
@@ -50,7 +51,7 @@ export async function queue(
         // SYNC_QUEUE carries replies (A-21 batch 2); PHOTOS/EXPORTS serve
         // offboarding (batch 3) and the DOs let purge empty them; the last
         // argument is the secret a report amendment is signed with (cmd-batch.ts).
-        await handleCmdBatch(env.DB, env.TENANT_CACHE, batch, env.SYNC_QUEUE, { photos: env.PHOTOS, exports: env.EXPORTS_BUCKET }, { INSPECTION_DOC: env.INSPECTION_DOC, TENANT_PRESENCE: env.TENANT_PRESENCE }, env, env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET, signingKeySecrets(env).previous);
+        await handleCmdBatch(env.DB, env.TENANT_CACHE, batch, env.SYNC_QUEUE, { photos: env.PHOTOS, exports: env.EXPORTS_BUCKET }, purgeDurableObjectsFromEnv(env), env, env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET, signingKeySecrets(env).previous);
         return;
     }
     // Imported dynamically, and from `./portal/sync-dlq` rather than from
