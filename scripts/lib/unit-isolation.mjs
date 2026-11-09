@@ -116,12 +116,13 @@ function candidates(base) {
     return [base, `${base}.ts`, `${base}.tsx`, `${base}.mjs`, `${base}.js`, join(base, 'index.ts'), join(base, 'index.tsx')];
 }
 
-function resolveSpecifier(root, from, spec) {
+function resolveSpecifier(root, from, spec, opts = {}) {
     let base;
     if (spec.startsWith('.')) base = resolve(dirname(from), spec);
     else if (spec.startsWith('~/')) base = join(root, 'app', spec.slice(2));
     else if (spec.startsWith('@core/field-ui')) base = join(root, 'packages/field-ui/src', spec.slice('@core/field-ui'.length));
     else if (spec === '@core/offline-package') base = join(root, 'packages/offline-package/index.ts');
+    else if (opts.sharedUi && spec.startsWith('@core/shared-ui')) base = join(root, 'packages/shared-ui/src', spec.slice('@core/shared-ui'.length));
     else return null;
     for (const c of candidates(base)) {
         try {
@@ -135,8 +136,16 @@ function resolveSpecifier(root, from, spec) {
 
 const IMPORT_RE = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*|^\s*import\s+)['"]([^'"]+)['"]/gm;
 
-/** Source files a spec reaches through relative / alias imports (bare packages are not followed). */
-export function reachableFiles(root, specFile, cache = new Map()) {
+/** `import type ... from 'x'` / `export type ... from 'x'`: erased at build time, so no module is loaded. */
+const TYPE_ONLY_IMPORT_RE = /^[ \t]*(?:import|export)\s+type\b(?:\s*\*(?:\s+as\s+\w+)?|\s*\{[^}]*\}|\s+\w+(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+\w+))?)\s*from\s*['"][^'"]+['"]/gm;
+
+/**
+ * Source files a spec reaches through relative / alias imports (bare packages are not followed).
+ * `opts.sharedUi` also resolves `@core/shared-ui`; `opts.skipTypeImports` ignores type-only imports.
+ * Both default to off, which is the unit suite's behaviour. A `cache` must not be shared between
+ * callers that pass different options.
+ */
+export function reachableFiles(root, specFile, cache = new Map(), opts = {}) {
     const seen = new Set();
     const stack = [specFile];
     while (stack.length) {
@@ -152,8 +161,9 @@ export function reachableFiles(root, specFile, cache = new Map()) {
             } catch {
                 /* unreadable: no edges */
             }
+            if (opts.skipTypeImports) text = text.replace(TYPE_ONLY_IMPORT_RE, (m) => m.replace(/[^\n]/g, ' '));
             for (const m of text.matchAll(IMPORT_RE)) {
-                const r = resolveSpecifier(root, f, m[1]);
+                const r = resolveSpecifier(root, f, m[1], opts);
                 if (r) deps.push(r);
             }
             cache.set(f, deps);

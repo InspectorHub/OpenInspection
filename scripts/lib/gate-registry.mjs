@@ -266,6 +266,11 @@ export const SCRIPT_GATES = [
     // point a branch is shared, not on every commit. The CI shuffled run of the shared project is the
     // dynamic half of the same check.
     { key: 'unitisolation', label: 'lint:unit-isolation', script: 'check-unit-isolation.mjs', fix: 'npm run lint:unit-isolation', rung: PUSH },
+    // The web suite's counterpart of the row above: every spec in tests/web-isolation.json still obeys the
+    // rules that made it shareable, and sits in the project of the environment it declares. PUSH for the
+    // same reasons (about 2 s over ~900 specs; the failure lands in a neighbour). The CI shuffled run of
+    // the two shared web projects is the dynamic half.
+    { key: 'webisolation', label: 'lint:web-isolation', script: 'check-web-isolation.mjs', fix: 'npm run lint:web-isolation', rung: PUSH },
     // The other direction of `tests` above, and the most expensive entry in
     // this list by an order of magnitude: it spawns `playwright test --list`
     // once per playwright config (5 today, ~10-15s in total) because Playwright

@@ -30,7 +30,7 @@ Collection is enforced in **both** directions, by two gates rather than one:
 
 | Location | Suite | Command | Config | Runtime |
 |---|---|---|---|---|
-| `app/**/*.test.{ts,tsx}` (co-located) | web unit | `test:web` | `vitest.config.ts` | happy-dom |
+| `app/**/*.test.{ts,tsx}` (co-located) | web unit | `test:web` | `vitest.config.ts` | happy-dom (per-file docblock; node by default) |
 | `tests/unit/<domain>/**/*.spec.ts` | api/service unit | `test:unit` | `vitest.api.config.ts` | node (+ better-sqlite3) |
 | `tests/workers/**/*.spec.ts` | worker-runtime | `test:workers` | `vitest.workers.config.ts` | real `workerd` |
 | `tests/contract/<party>/*.contract.spec.ts` | contract (offline) | `test:contract` | `vitest.contract.config.ts` | node, no network |
@@ -118,6 +118,39 @@ tests/
   different thing from where `npm run dev` listens. That the two disagree is a
   real defect in that fallback rather than in this sentence — the number is
   recorded here so a reader can tell the two apart.
+
+- **Three vitest projects.** `vitest.config.ts` splits the web specs by `tests/web-isolation.json`:
+  `web-node-shared` and `web-dom-shared` run with `isolate: false` (the files one worker handles
+  reuse its module graph, and in the dom project the same happy-dom window, which removes most of
+  the import and environment cost) and `web-isolated` is the historical one-fresh-graph-per-file
+  behaviour (node by default; a `@vitest-environment happy-dom` docblock still selects the DOM per
+  file). A spec is shareable only if it has no module mock, registry reset, global stub or write,
+  fake timers, storage, location or `document` structure write, hand-made React root or
+  wall-clock bound, and reaches no module that keeps state (type-only imports are not followed).
+  The manifest splits the shareable specs by the environment their docblock declares, and the
+  gate fails when a spec sits in the wrong list. `npm run lint:web-isolation` fails when a listed
+  spec breaks those rules; `npm run gen:web-isolation` regenerates the lists (a spec that passes
+  the rules but fails or flakes when shared goes under `forcedIsolated` with a reason, and stays
+  there). A new spec is isolated until the generator lists it, so nothing breaks by default.
+- **Module state that is allowed is listed by name, with one reason each**
+  (`WEB_BENIGN_MODULE_STATE` in `scripts/lib/web-isolation.mjs`): the overlay layer stack, the
+  toast listener list, a counter of mounted navs. Each is state that is only touched inside
+  effects and is back to empty once the component unmounts, or a memo whose value does not depend
+  on the test. Do not add a module to the list without reading it and writing why.
+- **The shared dom project cleans up and checks.** `tests/setup-web-shared.ts` runs
+  testing-library's `cleanup()` after every test (its own automatic cleanup is registered by an
+  import that happens once per worker when the registry is shared, so only the first file of a
+  worker would get it) and then fails the test if `<body>` still has children, an overlay layer is
+  still registered, the scroll lock is still on `<body>`, or `data-mobile-nav` is still on
+  `<html>`. A leaked mount therefore fails in the spec that leaked it, not in its neighbour.
+- **CI re-runs the two shared web projects shuffled** (`npm run test:web:shared-shuffled`, same
+  `--shard=N/4` flag, applied to the shared projects alone, so a file can sit on a different shard
+  number than in the main run). The seed is printed at the START of the run. To replay a failure:
+  `npx vitest run --config vitest.config.ts --project web-node-shared --project web-dom-shared --sequence.shuffle --sequence.seed=<seed> --maxWorkers=1`
+  (plus the same `--shard=N/4`). Use one worker: with `isolate: false` which files share a worker
+  depends on scheduling, so only a single worker reproduces the order. Shuffle also reorders the
+  tests inside a file; run that file alone with the same seed to tell an order-dependent test from a
+  leak between files.
 
 ### API / service unit (`tests/unit/<domain>/*.spec.ts`)
 

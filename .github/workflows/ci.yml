@@ -397,6 +397,16 @@ jobs:
           key: rr-typegen-${{ hashFiles('app/routes.ts', 'app/routes/**', 'react-router.config.ts', 'package-lock.json') }}
       - run: npx react-router typegen
       - run: npm run test:web -- --shard=${{ matrix.shard }}/4
+      # The specs listed in tests/web-isolation.json run with `isolate: false` in the step above (projects
+      # web-node-shared and web-dom-shared), in whatever order the shard hands them out. Run just those two
+      # projects again with files and tests shuffled: a spec that only passes because of what ran before it
+      # in the same worker, or that leaves a mount behind in the shared window, fails here instead of weeks
+      # later in an unrelated pull request. The seed is printed at the START of the run. Replay locally with:
+      # npx vitest run --config vitest.config.ts --project web-node-shared --project web-dom-shared
+      # --sequence.shuffle --sequence.seed=<seed> --maxWorkers=1 (plus the same --shard). The shard flag applies
+      # to the two shared projects alone, so a file may land on a different shard number than in the step above;
+      # the four shards together still cover every shared file exactly once.
+      - run: npm run test:web:shared-shuffled -- --shard=${{ matrix.shard }}/4
 
   # ── Build + bundle ceiling ───────────────────────────────────────────────
   build:
