@@ -265,7 +265,9 @@ export function BookingWizard({
             {m.common_back()}
           </button>
           {step < 3 ? (
-            <button
+            // No bookable service: Continue would be a dead end, and the step
+            // already says why, so the button is not rendered at all.
+            step === 1 && profile.services.length === 0 ? null : <button
               onClick={() => setStep(step + 1)}
               disabled={!canNext}
               className="h-9 px-5 rounded-md bg-ih-primary text-ih-primary-fg font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"

@@ -51,6 +51,7 @@
   "booking_step_property_address_placeholder": "123 Main St, City, State ZIP",
   "booking_step_services_heading": "Services",
   "booking_step_services_subtitle": "Choose one or more inspections for this visit.",
+  "booking_step_services_none": "{company} has no services open for online booking right now. Please contact them directly.",
   "booking_step_services_duration": "~{duration} min",
   "booking_unit_inspection_one": "inspection",
   "booking_unit_inspection_other": "inspections",

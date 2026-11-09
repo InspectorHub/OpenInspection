@@ -477,7 +477,7 @@
   "settings_services_template_label": "Plantilla del informe",
   "settings_services_template_none": "Sin plantilla",
   "settings_services_template_prefix": "Plantilla:",
-  "settings_services_no_template_warning": "Sin plantilla — las reservas en línea fallan cuando un cliente elige este servicio",
+  "settings_services_no_template_warning": "Sin plantilla — este servicio necesita una plantilla para aparecer en su página de reservas",
   "settings_mcw_provisioning_status": "Estado del aprovisionamiento",
   "settings_mcw_step_business_profile": "Perfil comercial (TCR)",
   "settings_mcw_step_brand": "Registro de marca (10DLC)",

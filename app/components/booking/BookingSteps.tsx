@@ -59,6 +59,11 @@ export function ServicesStep({
         <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">{m.booking_step_services_heading()}</h2>
         <p className="text-[13px] text-ih-fg-3">{m.booking_step_services_subtitle()}</p>
       </div>
+      {profile.services.length === 0 && (
+        <p role="status" className="px-4 py-3 rounded-md border border-ih-border bg-ih-bg-muted text-[13px] text-ih-fg-2 leading-relaxed">
+          {m.booking_step_services_none({ company: profile.company })}
+        </p>
+      )}
       <div className="space-y-2">
         {profile.services.map((svc) => {
           const selected = selectedServices.has(svc.id);
