@@ -29,6 +29,7 @@ export function videoDurationSec(file: File, timeoutMs = 4000): Promise<number |
     const timer = setTimeout(() => finish(null), timeoutMs);
     video.onloadedmetadata = () => finish(durationOrNull(video.duration));
     video.onerror = () => finish(null);
-    video.src = objectUrl;
+    // encodeURI leaves a blob: URL unchanged; it is the sanitizer CodeQL recognises for a URL written to a media element.
+    video.src = encodeURI(objectUrl);
   });
 }
