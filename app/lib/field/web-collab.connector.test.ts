@@ -81,4 +81,11 @@ describe("webCollabConnector", () => {
         live.destroy();
         expect(connection.destroy).toHaveBeenCalledTimes(1);
     });
+
+    it("reports the lineage hold live from the connection handle", () => {
+        const live = webCollabConnector.connect("insp-held", {});
+        expect(live.held?.()).toBe(false);
+        if (connection.handle) connection.handle.lineageHold = true;
+        expect(live.held?.()).toBe(true);
+    });
 });

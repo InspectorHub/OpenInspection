@@ -27,6 +27,7 @@ const b = env as unknown as TestBindings;
 
 const MSG_SYNC = 0;
 const MSG_ACK = 3;
+const MSG_GENERATION = 4;
 const KEY = '_default:sec1:item1';
 
 interface DOInternals {
@@ -297,9 +298,9 @@ describe('collab ack frame', () => {
             const withAck = await open(true);
             const without = await open(false);
             await new Promise((r) => setTimeout(r, 50));
-            // Both got the same first frame: sync step 1.
-            expect(withAck.frames.map((f) => f[0])).toEqual([MSG_SYNC]);
-            expect(without.frames.map((f) => f[0])).toEqual([MSG_SYNC]);
+            // Both got the same first frames: the lineage generation, then sync step 1.
+            expect(withAck.frames.map((f) => f[0])).toEqual([MSG_GENERATION, MSG_SYNC]);
+            expect(without.frames.map((f) => f[0])).toEqual([MSG_GENERATION, MSG_SYNC]);
 
             io.doc.transact(() => { applyItemPatch(io.doc, KEY, 'rating', 'NI'); });
             await io.persist();

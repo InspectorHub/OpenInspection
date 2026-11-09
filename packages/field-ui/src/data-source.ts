@@ -183,6 +183,7 @@ export interface ResultsDocHandle {
   doc: Y.Doc;
   persistenceSynced: Promise<void>;
   synced: () => boolean;
+  held?: () => boolean; // true while a stale offline copy could not be backed up: not syncing, retrying (lineage guard)
   locked?: () => boolean; // true once the server closed the socket because the report is published (no reconnect follows)
   destroy(): void;
 }

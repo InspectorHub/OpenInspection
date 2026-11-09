@@ -436,6 +436,9 @@ for a ticket and opens the socket with `?ticket=`.
   presence socket (`/api/inspections/{id}/collab/ws`,
   `/api/inspections/{id}/presence/ws`). It is not a credential for any other
   route.
+- The collab socket's first frame is `MSG_GENERATION` (4), the lineage id of the document; the restore frame (2) carries
+  the same id after its type byte. A client that does not use it ignores both the frame and the extra bytes. See
+  `docs/concepts/collab-editing.md`, "Lineage guard".
 - Redemption deletes the ticket before using it. When the ticket is presented,
   the member's current role is read again; a member who was removed or demoted
   since issue cannot open the socket.

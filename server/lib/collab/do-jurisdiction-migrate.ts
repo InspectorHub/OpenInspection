@@ -247,7 +247,7 @@ export async function migrateCollabDocs<Id>(
             }
             const res = await to.get(targetId).fetch('https://do.local/state-import', {
                 method: 'POST',
-                body: JSON.stringify({ ydoc: source.ydoc, identity, snapshots: source.snapshots, ...(replaceDerived ? { replaceDerived: true } : {}) }),
+                body: JSON.stringify({ ydoc: source.ydoc, identity, snapshots: source.snapshots, gen: source.gen ?? null, ...(replaceDerived ? { replaceDerived: true } : {}) }),
             });
             if (res.status === 409) {
                 const refusal = await res.json<RefusalBody>();

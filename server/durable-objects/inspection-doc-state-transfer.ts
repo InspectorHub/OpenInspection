@@ -17,6 +17,7 @@
  */
 
 import * as Y from 'yjs';
+import { isGeneration, newGeneration, storedGeneration } from './inspection-doc-generation';
 
 /** The only top-level type a results document has (see `getMap('results')` in the Durable Object). */
 const RESULTS_ROOT = 'results';
@@ -26,7 +27,7 @@ const MAX_SNAPSHOTS = 25;
 const MAX_SNAPSHOT_JSON_CHARS = 2_000_000;
 const SNAPSHOT_REASONS: readonly string[] = ['periodic', 'manual', 'connect', 'import', 'pre-rename'];
 
-export interface StateKeys { ydoc: string; identity: string; snapshots: string; derived: string; backup: string }
+export interface StateKeys { ydoc: string; identity: string; snapshots: string; derived: string; backup: string; gen: string }
 
 /** The document a replacement displaced, kept so the replacement can be undone (see `/state-restore-backup`). */
 export interface ReplacedBackup {
@@ -36,6 +37,8 @@ export interface ReplacedBackup {
     /** Digest of the replacement that displaced it: a restore is only honoured while the replacement is still exactly that. */
     newSha256: string;
     atMs:      number;
+    /** Generation (lineage id) of the displaced document; absent in a backup written before generations existed. */
+    gen?:      string;
 }
 
 export interface TransferIdentity { tenantId: string; inspectionId: string; reportId?: string | null }
@@ -56,6 +59,8 @@ export interface StateExport {
     snapshots:      ImportedSnapshot[];
     /** True while the document was built from the database and no client has changed it since. */
     derivedFromD1?: boolean;
+    /** The lineage id of the document (see `inspection-doc-generation.ts`); null from an object that stored none. It travels with the bytes. */
+    gen:            string | null;
 }
 
 /** A restore point as it arrives: any field may be missing or wrong, `parseStateImport` checks it. */
@@ -74,10 +79,12 @@ export interface StateImportBody {
     snapshots?:      RawSnapshot[];
     /** Ask to replace a target that is still only what the database produced. Honoured only under the rules in the header. */
     replaceDerived?: boolean;
+    /** The lineage id of the document, as exported. Absent or null (an older exporter) means a new one is minted. */
+    gen?:            string | null;
 }
 
 /** What the transfer reads and writes in storage. */
-export type StoredValue = Uint8Array | TransferIdentity | ImportedSnapshot[] | ReplacedBackup | boolean;
+export type StoredValue = Uint8Array | TransferIdentity | ImportedSnapshot[] | ReplacedBackup | boolean | string;
 
 /** The two storage verbs the transfer needs. `DurableObjectStorage` satisfies it, and so does a test double. */
 export interface TransferStorage {
@@ -90,6 +97,8 @@ export interface ParsedStateImport {
     identity:       TransferIdentity;
     snapshots:      ImportedSnapshot[];
     replaceDerived: boolean;
+    /** The lineage id the imported document keeps: the source's, or a freshly minted one when the body carried none. */
+    gen:            string;
 }
 
 export function bytesToBase64(b: Uint8Array): string {
@@ -119,14 +128,16 @@ function storedBackup(v: StoredValue | undefined): ReplacedBackup | null {
 }
 
 export async function exportStoredState(storage: TransferStorage, keys: StateKeys): Promise<StateExport> {
-    const stored = await storage.get([keys.ydoc, keys.identity, keys.snapshots, keys.derived]);
+    const stored = await storage.get([keys.ydoc, keys.identity, keys.snapshots, keys.derived, keys.gen]);
     const ydoc = stored.get(keys.ydoc);
+    const gen = stored.get(keys.gen);
     const snapshots = stored.get(keys.snapshots);
     return {
         ydoc:          ydoc instanceof Uint8Array ? bytesToBase64(ydoc) : null,
         identity:      storedIdentity(stored.get(keys.identity)),
         snapshots:     Array.isArray(snapshots) ? snapshots : [],
         derivedFromD1: stored.get(keys.derived) === true,
+        gen:           typeof gen === 'string' ? storedGeneration(gen) : null,
     };
 }
 
@@ -169,8 +180,9 @@ function validSnapshots(snapshots: RawSnapshot[] | undefined): ImportedSnapshot[
 /** Null when the body is not a usable export. Everything the write depends on is checked here, before any write. */
 export function parseStateImport(body: StateImportBody | null): ParsedStateImport | null {
     if (!body || typeof body !== 'object') return null;
-    const { ydoc, identity, snapshots, replaceDerived } = body;
+    const { ydoc, identity, snapshots, replaceDerived, gen } = body;
     if (typeof ydoc !== 'string' || !ydoc) return null;
+    if (gen !== undefined && gen !== null && !isGeneration(gen)) return null;
     if (!identity || typeof identity.tenantId !== 'string' || !identity.tenantId || typeof identity.inspectionId !== 'string' || !identity.inspectionId) return null;
     const checked = validSnapshots(snapshots);
     if (!checked) return null;
@@ -182,6 +194,7 @@ export function parseStateImport(body: StateImportBody | null): ParsedStateImpor
         identity: reportId === undefined ? { tenantId, inspectionId } : { tenantId, inspectionId, reportId },
         snapshots: checked,
         replaceDerived: replaceDerived === true,
+        gen: gen ?? newGeneration(),
     };
 }
 
@@ -213,7 +226,7 @@ const sameBytes = (a: Uint8Array, b: Uint8Array): boolean => a.length === b.leng
 export async function importState(storage: TransferStorage, keys: StateKeys, body: StateImportBody | null, live: () => boolean): Promise<ImportOutcome> {
     const parsed = parseStateImport(body);
     if (!parsed) return { status: 'invalid' };
-    const read = () => storage.get([keys.ydoc, keys.identity, keys.snapshots, keys.derived]);
+    const read = () => storage.get([keys.ydoc, keys.identity, keys.snapshots, keys.derived, keys.gen]);
     // Digests first (only a replacement needs them), from a provisional read.
     let digests: { previous: string; next: string; previousBytes: Uint8Array } | null = null;
     if (parsed.replaceDerived) {
@@ -230,7 +243,9 @@ export async function importState(storage: TransferStorage, keys: StateKeys, bod
     if (live()) return refuse('target-live');
     const hasState = [keys.ydoc, keys.identity, keys.snapshots].some((k) => held.has(k));
     let replaced: ReplacedTarget | null = null;
-    const entries: Record<string, StoredValue> = { [keys.ydoc]: parsed.bytes, [keys.identity]: parsed.identity };
+    // The lineage id goes in the same put as the bytes it names. A replacement keeps the SOURCE's: clients holding the source
+    // history stay valid, clients that synced with the displaced database-built target (another id) are discarded on connect.
+    const entries: Record<string, StoredValue> = { [keys.ydoc]: parsed.bytes, [keys.identity]: parsed.identity, [keys.gen]: parsed.gen };
     if (hasState) {
         if (!parsed.replaceDerived) return refuse('target-has-state');
         if (held.get(keys.derived) !== true) return refuse('target-edited');
@@ -242,7 +257,8 @@ export async function importState(storage: TransferStorage, keys: StateKeys, bod
         entries[keys.snapshots] = parsed.snapshots;
         // The marker is cleared in the SAME put: the document now holds the source's history, not what the database produced.
         entries[keys.derived] = false;
-        entries[keys.backup] = { ydoc: heldDoc, sha256: digests.previous, newSha256: digests.next, atMs: Date.now() };
+        const heldGen = storedGeneration(typeof held.get(keys.gen) === 'string' ? String(held.get(keys.gen)) : null);
+        entries[keys.backup] = { ydoc: heldDoc, sha256: digests.previous, newSha256: digests.next, atMs: Date.now(), ...(heldGen ? { gen: heldGen } : {}) };
     } else if (parsed.snapshots.length > 0) {
         entries[keys.snapshots] = parsed.snapshots;
     }
@@ -282,9 +298,11 @@ async function restoreBackup(host: TransferHost): Promise<Response> {
     if (!(heldDoc instanceof Uint8Array) || !(provisionalDoc instanceof Uint8Array) || !sameBytes(provisionalDoc, heldDoc) || currentSha !== heldBackup.newSha256) {
         return Response.json({ error: 'target-edited' }, { status: 409 });
     }
-    await storage.put({ [keys.ydoc]: heldBackup.ydoc, [keys.derived]: true, [keys.backup]: false });
+    // The displaced document's own lineage id goes back with it (a backup from before ids existed gets a new one).
+    const gen = heldBackup.gen ?? newGeneration();
+    await storage.put({ [keys.ydoc]: heldBackup.ydoc, [keys.derived]: true, [keys.backup]: false, [keys.gen]: gen });
     const identity = storedIdentity(held.get(keys.identity));
-    if (identity) host.adopt({ bytes: heldBackup.ydoc, identity, snapshots: [], replaceDerived: false }, true);
+    if (identity) host.adopt({ bytes: heldBackup.ydoc, identity, snapshots: [], replaceDerived: false, gen }, true);
     return Response.json({ ok: true, bytes: heldBackup.ydoc.length, sha256: heldBackup.sha256 });
 }
 

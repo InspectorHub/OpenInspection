@@ -15,6 +15,8 @@
   "editor_header_save_saving": "Guardando...",
   "editor_header_save_saved": "Guardado",
   "editor_header_save_error": "Error",
+  "editor_header_save_held": "Sin sincronizar",
+  "editor_header_save_held_detail": "Sin sincronizar: este dispositivo tiene una copia anterior de esta inspección que no se pudo respaldar, así que se conservó y no se envía nada. Libere almacenamiento o vuelva a abrir la inspección para reintentar.",
   "editor_header_search_placeholder": "Buscar en el informe...",
   "editor_header_version_history": "Historial de versiones",
   "editor_header_theme_label": "Tema: {scheme}",

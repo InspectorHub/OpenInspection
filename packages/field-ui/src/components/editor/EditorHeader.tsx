@@ -65,6 +65,8 @@ export interface EditorHeaderProps {
  onUpdateSourceTemplate: () => void;
  /** Whether the inspection has a source template (enables "Update source"). */
  canUpdateSourceTemplate: boolean;
+ /** The collab connection is held (a stale local copy could not be backed up): show "Not syncing". */
+ held?: boolean;
 }
 
 export function EditorHeader({
@@ -81,6 +83,7 @@ export function EditorHeader({
  onSaveAsNewTemplate,
  onUpdateSourceTemplate,
  canUpdateSourceTemplate,
+ held,
 }: EditorHeaderProps) {
  // The PDF preview and the theme switch are host UI (see `FieldHostSlots`); a host that
  // supplies none simply gets no such entry point.
@@ -159,7 +162,7 @@ export function EditorHeader({
  </div>
 
  {/* Save status indicator */}
- <WithHostStatus indicator={<SaveStatusIndicator status={state.saveStatus} />} renderStatus={renderStatus} />
+ <WithHostStatus indicator={<SaveStatusIndicator status={state.saveStatus} held={held === true} />} renderStatus={renderStatus} />
 
  {/* Status badge */}
  <span data-testid="header-status" className="hidden min-[1400px]:inline-flex shrink-0 whitespace-nowrap px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-ih-bg-muted text-ih-fg-2 ring-ih-border items-center">

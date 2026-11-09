@@ -9,7 +9,7 @@ import { applyItemPatch, seedResultsDoc } from '../../../packages/field-ui/src/s
 import { handleStateTransfer, type StateKeys, type StoredValue, type TransferIdentity } from '../../../server/durable-objects/inspection-doc-state-transfer';
 import type { DocNamespace } from '../../../server/lib/collab/do-jurisdiction-migrate';
 
-export const KEYS: StateKeys = { ydoc: 'ydoc', identity: 'identity', snapshots: 'snapshots', derived: 'derived-from-d1', backup: 'replaced-derived-backup' };
+export const KEYS: StateKeys = { ydoc: 'ydoc', identity: 'identity', snapshots: 'snapshots', derived: 'derived-from-d1', backup: 'replaced-derived-backup', gen: 'gen' };
 
 /** A real encoded results document with one finding carrying `rating`, as the editor would have built it. */
 export function ratedDocBytes(rating: string): Uint8Array {

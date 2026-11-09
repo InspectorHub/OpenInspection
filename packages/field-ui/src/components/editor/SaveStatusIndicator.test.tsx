@@ -26,6 +26,16 @@ describe("SaveStatusIndicator", () => {
     expect(el.getAttribute("aria-live")).toBe("polite");
   });
 
+  it.each(["idle", "saved", "saving", "error"] as const)("a held connection says it is not syncing, over a %s save state, in the error tone with the full reason on hover", (status) => {
+    render(<SaveStatusIndicator status={status} held />);
+    const el = screen.getByTestId("save-status");
+    expect(el.textContent).toBe(m.editor_header_save_held());
+    expect(el.getAttribute("data-status")).toBe("held");
+    expect(el.getAttribute("title")).toBe(m.editor_header_save_held_detail());
+    expect(el.className).toContain("text-ih-bad-fg");
+    expect(el.getAttribute("role")).toBe("status");
+  });
+
   it("idle shows nothing", () => {
     const { container } = render(<SaveStatusIndicator status="idle" />);
     expect(container.firstChild).toBeNull();

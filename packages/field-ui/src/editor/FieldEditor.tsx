@@ -464,7 +464,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
 
  // When the collab doc has synced, `readResultMap` already holds EVERY scope's
  // findings (the DO hydrated the full D1 blob), so a scope switch needs no fetch.
- const collabSynced = Boolean(collab?.synced);
+ const collabSynced = Boolean(collab?.synced) && collab?.lineageHold !== true; // a held connection (stale copy not backed up) is not syncing
 
  // Scope switch is fetch-if-missing, tracked in useScopeLoader (which owns the
  // merged/in-flight bookkeeping + the overlapping-load race). This wrapper
@@ -1895,7 +1895,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  // The per-unit scope switcher (commercial, per_unit mode only: the desktop header's `perUnitControls`), for the
  // phone's Items drawer and the tablet's list pane, and the save indicator both app bars carry.
  const scopeSwitcherEl = showUnitsSurface && isPerUnit ? <BreadcrumbDropdown units={units} activeUnitId={activeUnitId} onSelect={requestScope} /> : null;
- const saveStatusEl = <WithHostStatus indicator={<SaveStatusIndicator status={state.saveStatus} />} renderStatus={slots.renderStatus} />;
+ const saveStatusEl = <WithHostStatus indicator={<SaveStatusIndicator status={state.saveStatus} held={collab?.lineageHold === true} />} renderStatus={slots.renderStatus} />;
  const { pdf } = slots;
 
  // The bottom drawers of the touch layouts. The phone also has the Items drawer (the tablet shows the list in a pane).
@@ -2078,7 +2078,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  handlePublishClick={handlePublishClick}
  handleFinishFieldwork={handleFinishFieldwork}
  finishingFieldwork={publishFlow.finishing}
- collabEditing={fieldSession.collabEditing}
+ collabEditing={fieldSession.collabEditing} held={collab?.lineageHold === true}
  onOpenVersionHistory={() => setVersionHistoryOpen(true)}
  onChangeTemplate={() => state.setSettingsOpen(true)}
  onSaveAsNewTemplate={() => structure.openSaveTemplate("new")}
