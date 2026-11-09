@@ -1045,6 +1045,7 @@
     "tests/unit/templates/retired-templates.spec.ts",
     "tests/unit/templates/seed-coverage-applicability.spec.ts",
     "tests/unit/templates/seed-templates.spec.ts",
+    "tests/unit/templates/starter-content-readme-counts.spec.ts",
     "tests/unit/templates/statutory-letter-prefix-not-doubled.spec.ts",
     "tests/unit/templates/template-abbrev-schema.spec.ts",
     "tests/unit/templates/template-applicability-schema.spec.ts",

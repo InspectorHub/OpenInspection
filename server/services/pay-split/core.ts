@@ -136,8 +136,12 @@ export async function splitsForLines(
             inArray(inspectionServicePaySplits.inspectionServiceId, lineIds),
         ))
         .all();
-    // Deterministic order: the original before the corrections written against it.
-    return rows.sort((a, b) => Number(a.createdAt) - Number(b.createdAt) || a.id.localeCompare(b.id));
+    // Deterministic order: the original before the corrections written against it. Two rows written in the same
+    // millisecond tie on createdAt, and ids are random, so the tie must be broken by what the row IS (a correction
+    // points at its original) before the id is consulted; otherwise the original sorts second about half the time.
+    return rows.sort((a, b) => Number(a.createdAt) - Number(b.createdAt)
+        || Number(a.correctsSplitId !== null) - Number(b.correctsSplitId !== null)
+        || a.id.localeCompare(b.id));
 }
 
 export async function requireSplit(db: Db, tenantId: string, splitId: string): Promise<InspectionServicePaySplit> {

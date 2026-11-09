@@ -15,7 +15,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import * as schema from '../../../server/lib/db/schema';
 import {
     tenants, users, services, inspections, inspectionServices,
-    serviceInspectors, servicePayRules,
+    serviceInspectors, servicePayRules, inspectionServicePaySplits,
 } from '../../../server/lib/db/schema';
 import { syncInspectionAssignments } from '../../../server/lib/db/assignment-links';
 import {
@@ -246,6 +246,28 @@ describe('pay-split population', () => {
             expect(rows[0].lockedAt).not.toBeNull();
             expect(rows[0].amountCents).toBe(30000);                    // untouched
             expect(rows[1].correctsSplitId).toBe(id);
+        });
+    });
+
+    describe('ordering', () => {
+        it('puts the original before its correction when both share a created_at and the original id sorts later', async () => {
+            // Same-millisecond writes tie on created_at and ids are random, so the tie-break must use what the
+            // row is (a correction points at its original), not the id. Force the worst case deterministically.
+            const at = new Date(1_700_000_000_000);
+            await db.insert(inspectionServicePaySplits).values([
+                {
+                    id: 'zzz-original', tenantId: T, inspectionServiceId: LINE, userId: 'u1', amountCents: 30000,
+                    source: 'rule', lockedAt: at, correctsSplitId: null, createdAt: at, updatedAt: at,
+                },
+                {
+                    id: 'aaa-correction', tenantId: T, inspectionServiceId: LINE, userId: 'u1', amountCents: -2000,
+                    source: 'manual', lockedAt: null, correctsSplitId: 'zzz-original', reason: 'overpaid',
+                    createdAt: at, updatedAt: at,
+                },
+            ]).run();
+
+            const rows = await splits();
+            expect(rows.map(r => r.id)).toEqual(['zzz-original', 'aaa-correction']);
         });
     });
 
