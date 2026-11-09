@@ -189,10 +189,8 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
     private derivedFromD1: boolean = false;
     /** Lineage id of the history this document holds (see inspection-doc-generation.ts); minted in hydrate() when none is stored. */
     private gen = '';
-    /**
-     * Memoizes the one-time D1 hydration so concurrent first connects await the
-     * same load (one D1 read per DO lifetime). Lazily created in hydrateFromD1Once.
-     */
+    private readonly refusedSockets = new WeakSet<WebSocket>(); // upgrades answered with the generation frame only (inspection-doc-generation.ts)
+    /** Memoizes the one-time D1 hydration so concurrent first connects await the same load (one D1 read per DO lifetime). Lazily created in hydrateFromD1Once. */
     private d1HydrationPromise: Promise<void> | null = null;
 
     constructor(ctx: DurableObjectState, env: AppEnv) {
@@ -285,7 +283,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             // memoized promise guarantees a single D1 load; concurrent connects
             // await the same promise.
             await this.hydrateFromD1Once();
-            if (isStaleClaim(req.headers.get(GEN_HEADER), this.gen)) return staleLineageResponse(this.ctx, this.gen); // another history: refused, see inspection-doc-generation.ts
+            if (isStaleClaim(req.headers.get(GEN_HEADER), this.gen)) return staleLineageResponse(this.ctx, this.gen, this.refusedSockets); // another history: refused, see inspection-doc-generation.ts
             // PR-H pre-merge boundary snapshot (#181): capture the CURRENT doc
             // state attributed to the connecting user BEFORE accepting the socket
             // and BEFORE this client's buffered offline edits arrive (those come
@@ -461,7 +459,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
     async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
         // Only binary frames carry y-protocols messages.
-        if (typeof raw === 'string' || isStaleSocket(this.ctx, ws)) return; // a refused-lineage socket takes no writes
+        if (typeof raw === 'string' || isStaleSocket(this.refusedSockets, this.ctx, ws)) return; // a refused-lineage socket takes no writes
         // A socket that was open when the report was published: its update is not applied, and the close code says why.
         if (await isDocLocked(this.ctx)) { ws.close(CLOSE_REPORT_PUBLISHED, CLOSE_REASON); return; }
 
@@ -493,12 +491,12 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
     async webSocketClose(ws: WebSocket): Promise<void> {
         try { ws.close(); } catch { /* already closed */ }
-        if (!isStaleSocket(this.ctx, ws)) await this.flushOnLastDisconnect(); // a refused socket never held the document: no write
+        if (!isStaleSocket(this.refusedSockets, this.ctx, ws)) await this.flushOnLastDisconnect(); // a refused socket never held the document: no write
     }
 
     async webSocketError(ws: WebSocket): Promise<void> {
         try { ws.close(1011, 'error'); } catch { /* already closed */ }
-        if (!isStaleSocket(this.ctx, ws)) await this.flushOnLastDisconnect(); // a refused socket never held the document: no write
+        if (!isStaleSocket(this.refusedSockets, this.ctx, ws)) await this.flushOnLastDisconnect(); // a refused socket never held the document: no write
     }
 
     /**

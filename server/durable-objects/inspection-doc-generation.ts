@@ -82,25 +82,22 @@ export function isStaleClaim(claimed: string | null, current: string): boolean {
     return claimed !== null && claimed !== current;
 }
 
-/** Sockets refused by `staleLineageResponse`, remembered in memory so the close path never depends on reading tags. */
-const refusedSockets = new WeakSet<WebSocket>();
-
 /**
  * True for a socket accepted by `staleLineageResponse`. Total: it never throws, because it runs inside the close and message
- * handlers of every socket (a test double, or a socket whose tags cannot be read, is simply not a refused one). The in-memory
- * marker answers while the object is awake; the hibernation tag answers after an eviction.
+ * handlers of every socket (a test double, or a socket whose tags cannot be read, is simply not a refused one). `refused` is the
+ * object's own in-memory record (answers while it is awake); the hibernation tag answers after an eviction.
  */
-export function isStaleSocket(ctx: DurableObjectState, ws: WebSocket): boolean {
-    if (refusedSockets.has(ws)) return true;
+export function isStaleSocket(refused: WeakSet<WebSocket>, ctx: DurableObjectState, ws: WebSocket): boolean {
+    if (refused.has(ws)) return true;
     try { return ctx.getTags(ws).includes(STALE_TAG); } catch { return false; }
 }
 
-/** The upgrade answer for a client holding another history: the generation frame, then close. See the header comment. */
-export function staleLineageResponse(ctx: DurableObjectState, current: string): Response {
+/** The upgrade answer for a client holding another history: the generation frame, then close. See the header comment. The socket is recorded in `refused`. */
+export function staleLineageResponse(ctx: DurableObjectState, current: string, refused: WeakSet<WebSocket>): Response {
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
     ctx.acceptWebSocket(server, [STALE_TAG]);
-    refusedSockets.add(server);
+    refused.add(server);
     server.send(generationFrame(MSG_GENERATION, current));
     server.close(CLOSE_STALE_LINEAGE, 'LINEAGE');
     return new Response(null, { status: 101, webSocket: client });
