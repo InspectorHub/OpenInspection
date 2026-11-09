@@ -11,7 +11,7 @@
  *   - replay window: a validly-signed but stale header (> ±300s) is rejected
  *   - malformed input is rejected (never throws)
  *
- * This file (`m2m-auth.ts`) is kept byte-for-byte identical in apps/portal, so
+ * This file (`m2m-auth.ts`) is kept byte-for-byte identical in the hosted control plane, so
  * the same properties hold for the portal side of the handshake.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';

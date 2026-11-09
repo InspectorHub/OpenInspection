@@ -10,8 +10,7 @@
  * never crosses that edge, so the receiver sees no such header. The previous
  * "auth is implicit via the cf-worker header" assumption therefore failed
  * closed (403) on every binding call once SaaS went live. See the integration
- * routes in apps/core (`requireServiceBinding`) and apps/portal
- * (`/api/integration/from-core`).
+ * routes in this repository (`requireServiceBinding`) and the hosted control plane.
  *
  * HOW IT WORKS
  * ------------
@@ -48,7 +47,7 @@
  * call across this seam has no acting person (provisioning, seat reconciliation,
  * a queue consumer), and all of them must cross that window untouched.
  *
- * Keep this file byte-for-byte identical in apps/portal and apps/core.
+ * Keep this file byte-for-byte identical with the hosted control plane's copy.
  */
 
 export const M2M_HEADER = 'x-portal-m2m';

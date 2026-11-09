@@ -191,8 +191,8 @@ app.all("/api/*", toApi);
 // production over 24h, `GET /status` averaged 46.8ms of CPU with a max of 108ms,
 // which is module evaluation on a cold isolate, not request work.
 //
-// It is polled by uptime monitoring and by the superproject's
-// check-deploy-lag.mjs, so it is exactly the request most likely to ARRIVE at a
+// It is polled by uptime monitoring and by the project's deploy-lag
+// report, so it is exactly the request most likely to ARRIVE at a
 // cold isolate and warm the whole API for nothing.
 //
 // `generated/version.ts` is a tiny standalone module — five string constants and

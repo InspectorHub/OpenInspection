@@ -28,7 +28,7 @@
  * ── Why this gate exists at all ─────────────────────────────────────────────
  * Every other class of leak into this repository already has a gate: Chinese
  * has one, hosted-service routes have one, mode disguises have one. This class
- * had none, and the superproject's own notes said so in as many words. It was
+ * had none, and the project's own audit notes said so in as many words. It was
  * the only category on that list whose entry read "nothing." Three hundred and
  * thirty-three lines had accumulated by the time anyone counted.
  *
@@ -75,6 +75,15 @@ const RULES = [
         skipIf: (line) => /marketplace|Scheme \d|reinspection/i.test(line),
         why: 'Drop the citation. The requirement stands on its own; the round it '
             + 'came from is a private tracker a reader here cannot open.',
+    },
+    {
+        id: 'private-ops-path',
+        // The private repository's other trees (hosted-service runbooks, competitor research) and the words that name
+        // that repository's structure. This repository's OWN docs/ folders (operate, compliance, ...) are fine; these
+        // names are not among them, so every mention is a dangling link and a pointer at the private repo.
+        re: /docs\/(?:saas-ops|competitors)[^\s)'"`,\]]*|\bsuper-?(?:project|repo)\b/gi,
+        why: 'That document or repository is not part of this one. Inline what '
+            + 'it said, point at a public doc in this repository, or say "the hosted control plane".',
     },
     {
         id: 'private-planning-path',

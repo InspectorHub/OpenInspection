@@ -61,9 +61,9 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // ---------------------------------------------------------------------------
 // Pure helpers, exported for tests/unit/tooling/migration-lag-gate.spec.ts.
-// This is the CANONICAL copy. apps/portal and apps/cms carry logic-identical
-// duplicates (separate submodules, no shared package) that differ only in their
-// header prose and the "how to apply" hint — fix bugs in all three.
+// This is the CANONICAL copy. The project's other repositories carry logic-identical
+// duplicates (separate repositories, no shared package) that differ only in their
+// header prose and the "how to apply" hint — fix bugs in all of them.
 // ---------------------------------------------------------------------------
 
 /** True when the error text says the migrations table itself is absent. */

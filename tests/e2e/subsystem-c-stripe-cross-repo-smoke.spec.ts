@@ -6,7 +6,7 @@
  *
  * TODO(cross-repo-harness): BLOCKER — this needs a run environment nothing in
  * this repo provides, NOT a data fixture. Three things must be up at once:
- *   1. the PORTAL worker on 127.0.0.1:8787 (a different repo, apps/portal),
+ *   1. the PORTAL worker on 127.0.0.1:8787 (a different repo: the hosted control plane),
  *   2. this core worker on 127.0.0.1:8789 (playwright.config.ts webServer),
  *   3. `stripe listen --forward-to 127.0.0.1:8787/api/billing/webhook`,
  *      because the assertion chain depends on a REAL signed Stripe event
@@ -19,10 +19,9 @@
  * run on it. Do not go looking for that gap; it was closed. What is missing is
  * the dual-server + Stripe-CLI orchestration above.
  *
- * Unit coverage of the underlying logic already lives across the two
- * repos:
- *   apps/portal/tests/unit/stripe-webhook.spec.ts   (6 tests)
- *   apps/core/tests/unit/billing-summary.spec.ts    (4 tests)
+ * Unit coverage of the underlying logic already lives in the two
+ * repositories (the control plane's Stripe webhook specs, and this repository's
+ * billing-summary spec).
  */
 import { test, expect } from '@playwright/test';
 

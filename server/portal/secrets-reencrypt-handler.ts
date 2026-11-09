@@ -11,7 +11,7 @@ import { SigningKeyService } from '../services/signing-key.service';
 
 /**
  * POST /api/platform/secrets/reencrypt — JWT_SECRET rotation: the tenants' stored secrets AND their e-sign signing keys. SaaS-only (the
- * seam is unmounted in standalone). Idempotent; SOP: docs/saas-ops/jwt-secret-rotation-sop.md.
+ * seam is unmounted in standalone). Idempotent; the rotation procedure belongs to the operator of the hosted deployment.
  *
  * Both parts are bounded for a Free-plan invocation (50 subrequests), so the operator runs it again until it says it is finished:
  *   - `signingKeys` is done first, so it cannot be starved: at most 25 keys written per call, `remaining` = active keys still not under
