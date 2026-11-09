@@ -100,6 +100,28 @@ describe("SMS consent block", () => {
     expect(c.getByText(/Stop texts/i)).toBeTruthy();
   });
 
+  // Seen on an agent who never gave a number: "Texts are ON." with a Stop button.
+  // Reachable-under-the-relationship needs a number to reach; without one nothing
+  // can be sent, so ON is false and Stop has nothing to stop.
+  it("says OFF, not ON, and offers no Stop, when there is no phone number on file", () => {
+    const c = setup({ state: "implied", phone: null, at: null, capturedVia: null, mode: "implied" });
+    expect(c.getByText(/no phone number/i)).toBeTruthy();
+    expect(c.queryByText(/Texts are ON/i)).toBeNull();
+    expect(c.queryByText(/Stop texts/i)).toBeNull();
+    expect(c.queryByText(/already doing together/i)).toBeNull();
+  });
+
+  it("offers no resume without a number either", () => {
+    const c = setup({ state: "revoked", phone: null, mode: "implied", disclosure: null });
+    expect(c.queryByRole("button", { name: /turn.*on|resume/i })).toBeNull();
+  });
+
+  it("still says ON with Stop where a number is on file (the control)", () => {
+    const c = setup({ state: "implied", at: null, capturedVia: null, mode: "implied" });
+    expect(c.getByText(/are ON/i)).toBeTruthy();
+    expect(c.getByText(/Stop texts/i)).toBeTruthy();
+  });
+
   it("distinguishes “you stopped” from “you never asked”", () => {
     // Both are OFF, but only one is a decision the reader made. Collapsing them
     // would tell someone they opted out of something they never saw.

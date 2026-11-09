@@ -42,12 +42,12 @@ const UNARCHIVED: AcceptanceRow = {
   body: null,
 };
 
-function renderPage(acceptances: AcceptanceRow[], loadFailed = false) {
+function renderPage(acceptances: AcceptanceRow[], loadFailed = false, termsPublished: boolean | null = false) {
   const Stub = createRoutesStub([
     {
       path: "/agent-settings/legal",
       Component: AgentSettingsLegalPage,
-      loader: () => ({ acceptances, loadFailed }),
+      loader: () => ({ acceptances, loadFailed, termsPublished }),
     },
   ]);
   return render(<Stub initialEntries={["/agent-settings/legal"]} />);
@@ -117,6 +117,27 @@ describe("AgentSettingsLegalPage", () => {
     renderPage([]);
     expect(await screen.findByText(/has not published/i)).toBeTruthy();
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+  });
+
+  // The reverse case, seen in a real session: terms ARE published and the agent
+  // signed up under them, yet the page said "has not published any agent terms".
+  // An empty record under a published document must say the record is empty, not
+  // that there is no document.
+  it("does not claim nothing is published when a version is in force", async () => {
+    renderPage([], false, true);
+    expect(await screen.findByText(/no acceptance is recorded/i)).toBeTruthy();
+    expect(screen.queryByText(/has not published/i)).toBeNull();
+  });
+
+  it("does not claim nothing is published when it could not be determined", async () => {
+    renderPage([], false, null);
+    expect(await screen.findByText(/no acceptance is recorded/i)).toBeTruthy();
+    expect(screen.queryByText(/has not published/i)).toBeNull();
+  });
+
+  it("tells an account older than the record that its earlier acceptance is not listed", async () => {
+    renderPage([], false, true);
+    expect(await screen.findByText(/before this record existed/i)).toBeTruthy();
   });
 
   // An empty list and a failed read are different facts, and only one of them

@@ -5,7 +5,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Banner, Select } from "@core/shared-ui";
 import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
-import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
+import { useInspectionDateTimeFormat, useUiLocale } from "~/hooks/useSessionContext";
 import { propertyGroupKey, inspectionDateValue } from "~/lib/property-groups";
 import { agentMayReadRepairList, type AgentRepairAccess } from "~/lib/agent-repair-access";
 import { useAgentTimeZoneOverride } from "~/routes/agent-layout";
@@ -94,7 +94,7 @@ export default function AgentDashboardPage() {
  // #270 — an agent spans many tenants, so the SHAPE cannot come from one of
  // them the way the inspector hub's does; the agent's own preference governs
  // their list, and each row still names its zone.
- const fmt = useInspectionDateTimeFormat();
+ const fmt = { ...useInspectionDateTimeFormat(), locale: useUiLocale() };
 
  // Task 4c: the referral matching a conversion-flow ?welcome=<id>, if it has
  // shown up in this agent's referrals yet (server-side auto-link can lag a

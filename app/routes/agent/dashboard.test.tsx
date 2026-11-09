@@ -12,7 +12,8 @@
  * app/routes/agent/settings-profile.test.tsx) so useState/dismiss behavior
  * exercises through real React, not just loader/action plumbing.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { overwriteGetLocale } from "~/paraglide/runtime";
 import { render, fireEvent } from "@testing-library/react";
 import { createRoutesStub, Outlet } from "react-router";
 
@@ -295,5 +296,26 @@ describe("AgentDashboardPage respects the company's agent repair policy (IA-35)"
     });
     const row = await findByTestId("referral-row-i1");
     expect(row.textContent).toContain("Build repair request");
+  });
+});
+
+// The referral date is a string the page builds itself, and it rendered "Nov 8 · 4:06 PM UTC"
+// under an es-419 UI because the locale came from the account, not from the UI language.
+describe("AgentDashboardPage referral dates follow the UI language", () => {
+  afterEach(() => overwriteGetLocale(() => "en"));
+  const WHEN = { ...REFERRAL_I1, date: "2026-11-08T16:06:00.000Z" };
+
+  it("uses Spanish month words under es-419", async () => {
+    overwriteGetLocale(() => "es-419");
+    const { findByTestId } = renderDashboard({ referrals: [WHEN] });
+    const text = (await findByTestId("referral-row-i1")).textContent ?? "";
+    expect(text).toMatch(/\bnov 8/);
+    expect(text).not.toMatch(/Nov 8/);
+  });
+
+  it("keeps English month words under en (the control)", async () => {
+    overwriteGetLocale(() => "en");
+    const { findByTestId } = renderDashboard({ referrals: [WHEN] });
+    expect((await findByTestId("referral-row-i1")).textContent).toMatch(/Nov 8/);
   });
 });

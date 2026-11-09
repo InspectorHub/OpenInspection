@@ -4,7 +4,7 @@ import type { ApiOf } from '../lib/api-schema';
 import { setCookie } from 'hono/cookie';
 import { Errors } from '../lib/errors';
 import { checkRateLimit } from '../lib/rate-limit';
-import { verifyTurnstile, resolveTurnstile, TURNSTILE_TEST_KEY_WARNING } from '../lib/middleware/bot-protection';
+import { verifyTurnstile, resolveTurnstile, resolveTurnstileSiteKey, TURNSTILE_TEST_KEY_WARNING } from '../lib/middleware/bot-protection';
 import { signJwt } from '../lib/jwt-keyring';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -52,6 +52,7 @@ const AgentTermsResponseSchema = z.object({
         version: z.string().describe('The version in force, YYYY-MM-DD.'),
         contentHash: z.string().describe('SHA-256 hex of the body below. Echo it back on submit so a stale page is refused.'),
         body: z.string().describe('The agent-terms text to display. The signer must be shown this, not a link to it.'),
+        turnstileSiteKey: z.string().nullable().describe('The public Turnstile site key the signup page renders its bot challenge with, matched to the secret the server verifies against. Null where the deployment does not challenge signups.'),
     }),
 }).openapi('AgentTermsResponse');
 
@@ -130,6 +131,7 @@ app.openapi(agentTermsRoute, async (c) => {
             version: inForce.version,
             contentHash: inForce.contentHash,
             body: inForce.bodySnapshot, // projection-allow: the agent terms text in force, a string the signup page shows to a visitor before any account exists, by design
+            turnstileSiteKey: resolveTurnstileSiteKey(c.env), // projection-allow: the public widget site key the signup page needs to render its bot check
         },
     }, 200);
 });

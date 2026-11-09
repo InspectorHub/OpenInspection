@@ -55,6 +55,18 @@ It says so, every time: `booking.turnstile.test_key` /
 `agent.signup.turnstile.test_key` are logged with the reason, so a deployment
 running open is visible in the logs rather than only in someone's memory.
 
+The `/agent-signup` page renders the widget with the site key that `GET /api/agent-signup/terms` returns
+as `turnstileSiteKey` (resolved by the same function as the booking page, so the key and the verifying secret
+cannot drift; `null` where the deployment does not challenge signups). The solved token is posted as
+`cf-turnstile-response`, an expired or failed challenge is reported on the form, and each answered submit asks
+for a fresh token because a token is good for one request.
+
+Signup also writes the acceptance ledger: the `agent_terms_acceptances` row (version, content hash, time, and
+IP and country where the request carried them) is inserted in the same `db.batch()` as the new account, so an
+account never exists without its record. Accounts created before this change have no ledger row and are not
+backfilled; they keep passing the agent-terms gate through the acceptance stored on the account and are asked
+again only when the terms change.
+
 **Standalone leaves it to the operator.** You run your own deployment on your
 own domain. A single-company install behind a private URL has a legitimate
 reason not to challenge anyone, and we are not in a position to overrule it. If
