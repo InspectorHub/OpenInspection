@@ -24,7 +24,7 @@ import { resolveVideoBackend } from '../../services/video/resolve';
 import { verifiedPosterRef } from '../../services/video/r2-backend';
 import { drizzle } from 'drizzle-orm/d1';
 import { inspectionMediaPool, tenantConfigs } from '../../lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { registerR2VideoRoutes } from './media-video-r2';
 import { getDrizzle } from '../../lib/route-helpers';
@@ -381,7 +381,8 @@ mediaStudioRoutes.openapi(videoFinalizeRoute, async (c) => {
     const tenantId = c.get('tenantId');
     await c.var.services.inspection.getInspection(id, tenantId);
 
-    const { backend } = await resolveVideoBackend(c, id);
+    // The upload was minted under one backend; finalize it there even if the plan changed since.
+    const { backend } = await resolveVideoBackend(c, id, ref.provider);
     const posterRef = verifiedPosterRef(ref, tenantId, id);
 
     const { poolId } = await backend.finalize(ref, posterRef);
@@ -428,8 +429,19 @@ mediaStudioRoutes.openapi(videoDeleteRoute, async (c) => {
     const tenantId = c.get('tenantId');
     await c.var.services.inspection.getInspection(id, tenantId);
 
-    const { backend, provider } = await resolveVideoBackend(c, id);
     const db = getDrizzle(c);
+    // The stored row says where the video lives. The tenant's CURRENT plan only decides where a NEW upload goes,
+    // so a video uploaded under another plan is still found and managed here.
+    const row = await db
+        .select({ provider: inspectionMediaPool.provider, r2Key: inspectionMediaPool.r2Key, streamUid: inspectionMediaPool.streamUid })
+        .from(inspectionMediaPool)
+        .where(and(
+            or(eq(inspectionMediaPool.id, videoRef), eq(inspectionMediaPool.streamUid, videoRef)),
+            eq(inspectionMediaPool.inspectionId, id),
+            eq(inspectionMediaPool.tenantId, tenantId),
+        ))
+        .get();
+    const { backend, provider } = await resolveVideoBackend(c, id, row?.provider);
     // A video a published version shows is part of that frozen report and stays stored.
     const frozen = await loadFrozenFileKeys(db, tenantId, id);
     const refuseFrozen = (...refs: string[]) => {
@@ -437,22 +449,13 @@ mediaStudioRoutes.openapi(videoDeleteRoute, async (c) => {
     };
 
     if (provider === 'stream') {
-        refuseFrozen(videoRef);
-        await backend.delete({ provider: 'stream', streamUid: videoRef });
+        // videoRef may be the pool row id or the Stream uid; Stream is addressed by the uid.
+        const streamUid = row?.streamUid ?? videoRef;
+        refuseFrozen(videoRef, streamUid);
+        await backend.delete({ provider: 'stream', streamUid });
     } else {
-        // R2: videoRef is the mediaId. Look up the pool row to get r2Key for
-        // the delete call (the backend needs the full ref to locate the object).
-        const row = await db
-            .select({ r2Key: inspectionMediaPool.r2Key })
-            .from(inspectionMediaPool)
-            .where(and(
-                eq(inspectionMediaPool.id, videoRef),
-                eq(inspectionMediaPool.inspectionId, id),
-                eq(inspectionMediaPool.tenantId, tenantId),
-                eq(inspectionMediaPool.provider, 'r2'),
-            ))
-            .get();
-        if (!row) throw Errors.NotFound('Video not found');
+        // R2: videoRef is the mediaId; the row gives the r2Key the backend needs to locate the object.
+        if (!row || row.provider !== 'r2') throw Errors.NotFound('Video not found');
         refuseFrozen(videoRef, row.r2Key);
         await backend.delete({ provider: 'r2', mediaId: videoRef, r2Key: row.r2Key });
     }
