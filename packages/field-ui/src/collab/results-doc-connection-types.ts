@@ -40,8 +40,11 @@ type ResultsDocPersistenceFactory = (name: string, doc: Y.Doc) => ResultsDocPers
 export interface ConnectOptions {
     /** Host persistence factory (IndexedDB on the web). Required. */
     persistence: ResultsDocPersistenceFactory;
-    /** Host WebSocket URL builder for an inspection id. Required. */
-    wsUrl: (inspectionId: string) => string;
+    /**
+     * Host WebSocket URL builder for an inspection id. Required. `gen` is the generation the in-memory document belongs to (null:
+     * none recorded); the host puts it on the upgrade as `?gen=<id>` so the server can refuse a socket holding another history.
+     */
+    wsUrl: (inspectionId: string, gen?: string | null) => string;
     /**
      * Subscribe to the host's "network is back" signal; returns an unsubscribe.
      * When it fires the backoff resets and the socket reopens immediately.

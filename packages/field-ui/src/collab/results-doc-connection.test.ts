@@ -116,7 +116,7 @@ describe('connectResultsDoc host contract', () => {
         await tick();
         expect(host.stores[0]?.name).toBe('results-insp/odd id');
         expect(resultsDocName('x')).toBe('results-x');
-        expect(host.wsUrl).toHaveBeenCalledWith('insp/odd id');
+        expect(host.wsUrl).toHaveBeenCalledWith('insp/odd id', null);
         expect(FakeSocket.instances[0]?.url).toBe('wss://host.test/collab/insp/odd id');
         destroy();
     });

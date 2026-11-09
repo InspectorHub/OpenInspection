@@ -58,7 +58,7 @@ import { loadTemplateSnapshot, renameLegacyKeysResponse } from './inspection-doc
 import { asSnapshotArray, type ResultsSnapshot, type ResultsSnapshotMeta, type SnapshotReason } from './inspection-doc-snapshots';
 import { matchSnapshotBySeqPath } from './inspection-doc-snapshot-path';
 import { ACK_TAG, AckTracker, ackTags, logPersistFailure } from './inspection-doc-ack';
-import { GEN_KEY, MSG_GENERATION, generationFrame, newGeneration, storedGeneration } from './inspection-doc-generation';
+import { GEN_HEADER, GEN_KEY, MSG_GENERATION, generationFrame, isStaleClaim, isStaleSocket, newGeneration, staleLineageResponse, storedGeneration } from './inspection-doc-generation';
 import { handleStateTransfer, type ParsedStateImport, type TransferHost } from './inspection-doc-state-transfer';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             // memoized promise guarantees a single D1 load; concurrent connects
             // await the same promise.
             await this.hydrateFromD1Once();
-
+            if (isStaleClaim(req.headers.get(GEN_HEADER), this.gen)) return staleLineageResponse(this.ctx, this.gen); // another history: refused, see inspection-doc-generation.ts
             // PR-H pre-merge boundary snapshot (#181): capture the CURRENT doc
             // state attributed to the connecting user BEFORE accepting the socket
             // and BEFORE this client's buffered offline edits arrive (those come
@@ -461,7 +461,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
     async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
         // Only binary frames carry y-protocols messages.
-        if (typeof raw === 'string') return;
+        if (typeof raw === 'string' || isStaleSocket(this.ctx, ws)) return; // a refused-lineage socket takes no writes
         // A socket that was open when the report was published: its update is not applied, and the close code says why.
         if (await isDocLocked(this.ctx)) { ws.close(CLOSE_REPORT_PUBLISHED, CLOSE_REASON); return; }
 
@@ -493,12 +493,12 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
     async webSocketClose(ws: WebSocket): Promise<void> {
         try { ws.close(); } catch { /* already closed */ }
-        await this.flushOnLastDisconnect();
+        if (!isStaleSocket(this.ctx, ws)) await this.flushOnLastDisconnect(); // a refused socket never held the document: no write
     }
 
     async webSocketError(ws: WebSocket): Promise<void> {
         try { ws.close(1011, 'error'); } catch { /* already closed */ }
-        await this.flushOnLastDisconnect();
+        if (!isStaleSocket(this.ctx, ws)) await this.flushOnLastDisconnect(); // a refused socket never held the document: no write
     }
 
     /**

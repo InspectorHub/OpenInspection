@@ -334,7 +334,21 @@ a document built from the database (see `docs/operate/durable-object-jurisdictio
 - **A backup that cannot be written** (storage full or blocked) abandons the discard: the store is kept, no new id is
   recorded, nothing is sent (the handle reports `lineageHold`), and the socket is reopened with the usual backoff to retry.
   The offline copy is never cleared without its backup.
-- The recorded id is re-read at every socket open, so a second tab's change is seen. If that read fails, the id is treated as not recorded: the server's is adopted and the store is trusted once (fail-open).
+- **The server checks too.** A client that holds a recorded id reports it on the socket upgrade (`?gen=<id>`). If it is not the
+  id the object holds, the object sends the generation frame only (no step 1), then closes the socket with code 4410, and any
+  frame still arriving on it is dropped, so that socket can never write. A client that follows the protocol treats the frame as a
+  mismatch (backup, discard, record the new id) and reconnects reporting the new id, which is accepted. A malformed value counts as
+  a mismatch. A client that sends no `gen` is served as before: see the residual window below.
+- **A connection reports the history of its in-memory document, not the shared record.** The first read of the record names the
+  history the loaded document belongs to; later socket opens in the same tab keep using that, even if another tab has since discarded
+  and recorded a newer id. A tab still holding the old history therefore reports (and is judged by) the old id and discards it with
+  a backup instead of handing it to the new history. A document that belongs to no recorded history while the record now holds one
+  is discarded too, not trusted.
+  With two tabs open the single backup slot can be overwritten by the second tab's discard; both copies are the same old history, the second possibly a superset.
+- **Residual window.** A client that sends no `gen` cannot be told apart from a current one that has nothing recorded, and refusing
+  it would lock out every legitimate older client. That covers a cached bundle that predates the parameter, including bundles that
+  predate the guard and ignore the generation frame, and the native client. For those, the generation frame is the only protection
+  and a bundle that ignores it can still merge its old history until the cached bundle is replaced (a reload fetches the new one).
 - While a discard is held, the editor's save indicator reads "Not syncing" (with the full reason on hover), the connection reports itself as not synced, and the unsaved-changes warning stays armed.
 - **Rolling back the engine** to a build without the guard leaves everything done during the rollback invisible to it: a version
   restore or a state import in that window creates a new history but no new id. Browsers that synced before the rollback keep

@@ -10,10 +10,12 @@ import { env, runInDurableObject } from 'cloudflare:test';
 import { INSPECTION_RESULTS_TEST_DDL } from '../helpers/inline-ddl';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import * as decoding from 'lib0/decoding';
+import * as encoding from 'lib0/encoding';
+import * as syncProtocol from 'y-protocols/sync';
 import { projectResults, seedResultsDoc } from '@core/field-ui/shared/results-doc';
 import * as Y from 'yjs';
 import type { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
-import { isGeneration } from '../../server/durable-objects/inspection-doc-generation';
+import { CLOSE_STALE_LINEAGE, GEN_HEADER, isGeneration } from '../../server/durable-objects/inspection-doc-generation';
 import type { StateExport } from '../../server/durable-objects/inspection-doc-state-transfer';
 
 interface TestBindings {
@@ -57,8 +59,10 @@ async function seedDatabase(): Promise<void> {
 }
 
 /** Open a socket the way the authorized route does and collect every frame the object sends. */
-async function openSocket(name: string): Promise<{ frames: Uint8Array[]; close: () => void }> {
-    const res = await stub(name).fetch('https://do.test/collab/ws', { headers: { ...HEADERS, Upgrade: 'websocket' } });
+async function openSocket(name: string, claimedGen?: string): Promise<{ frames: Uint8Array[]; close: () => void; send: (data: Uint8Array) => void; closeCode: () => number | null }> {
+    const headers: Record<string, string> = { ...HEADERS, Upgrade: 'websocket' };
+    if (claimedGen !== undefined) headers[GEN_HEADER] = claimedGen;
+    const res = await stub(name).fetch('https://do.test/collab/ws', { headers });
     expect(res.status).toBe(101);
     const ws = res.webSocket;
     if (!ws) throw new Error('no websocket on the upgrade response');
@@ -66,8 +70,10 @@ async function openSocket(name: string): Promise<{ frames: Uint8Array[]; close: 
     ws.binaryType = 'arraybuffer';
     ws.accept();
     ws.addEventListener('message', (ev) => { frames.push(new Uint8Array(ev.data as ArrayBuffer)); });
+    let code: number | null = null;
+    ws.addEventListener('close', (ev) => { code = ev.code; });
     await new Promise<void>((r) => setTimeout(r, 50));
-    return { frames, close: () => ws.close() };
+    return { frames, close: () => ws.close(), send: (data) => ws.send(data), closeCode: () => code };
 }
 
 function frameType(frame: Uint8Array): number {
@@ -119,6 +125,115 @@ describe('generation: the first frame of a socket', () => {
         expect(frameGeneration(a.frames[0] ?? new Uint8Array())).not.toBe(frameGeneration(c.frames[0] ?? new Uint8Array()));
         a.close();
         c.close();
+    });
+});
+
+/** A sync update that sets one key in a scratch map of the object's document: the probe for "was this client's write applied". */
+function probeUpdate(value: string): Uint8Array {
+    const client = new Y.Doc();
+    let update: Uint8Array = new Uint8Array();
+    client.on('update', (u: Uint8Array) => { update = u; });
+    client.getMap('probe').set('x', value);
+    const enc = encoding.createEncoder();
+    encoding.writeVarUint(enc, MSG_SYNC);
+    syncProtocol.writeUpdate(enc, update);
+    return encoding.toUint8Array(enc);
+}
+async function probeValue(name: string): Promise<unknown> {
+    return runInDurableObject(stub(name), async (instance) => (instance as unknown as DOInternals).doc.getMap('probe').get('x'));
+}
+
+describe('generation: the object checks the generation the client reports', () => {
+    async function currentGen(name: string): Promise<string> {
+        const first = await openSocket(name);
+        const gen = frameGeneration(first.frames[0] ?? new Uint8Array());
+        first.close();
+        return gen;
+    }
+
+    it('a client reporting the current generation is served normally and its writes are applied', async () => {
+        const name = freshName();
+        const gen = await currentGen(name);
+        const sock = await openSocket(name, gen);
+        expect(sock.frames.map(frameType).slice(0, 2)).toEqual([MSG_GENERATION, MSG_SYNC]);
+        sock.send(probeUpdate('current'));
+        await new Promise<void>((r) => setTimeout(r, 50));
+        expect(await probeValue(name)).toBe('current');
+        expect(sock.closeCode()).toBeNull();
+        sock.close();
+    });
+
+    it('a client that reports NO generation keeps the previous behaviour: served and writing (the documented residual window)', async () => {
+        const name = freshName();
+        await currentGen(name);
+        const sock = await openSocket(name);
+        sock.send(probeUpdate('legacy'));
+        await new Promise<void>((r) => setTimeout(r, 50));
+        expect(await probeValue(name)).toBe('legacy');
+        expect(sock.closeCode()).toBeNull();
+        sock.close();
+    });
+
+    it('a client reporting another generation gets the generation frame only, is closed with the stale-lineage code and writes nothing', async () => {
+        const name = freshName();
+        const gen = await currentGen(name);
+        const sock = await openSocket(name, 'gen-stale-0001');
+        expect(sock.frames.map(frameType)).toEqual([MSG_GENERATION]); // no step 1: nothing invites a reply
+        expect(frameGeneration(sock.frames[0] ?? new Uint8Array())).toBe(gen);
+        expect(sock.closeCode()).toBe(CLOSE_STALE_LINEAGE);
+        try { sock.send(probeUpdate('stale')); } catch { /* a closed socket refuses, which is the point */ }
+        await new Promise<void>((r) => setTimeout(r, 50));
+        expect(await probeValue(name)).toBeUndefined();
+    });
+
+    it('a refused socket that was the only one does not make the object write its storage or the database', async () => {
+        const name = freshName();
+        const gen = await currentGen(name);
+        await new Promise<void>((r) => setTimeout(r, 50));
+        let writes = 0;
+        await runInDurableObject(stub(name), async (instance) => {
+            const io = instance as unknown as DOInternals;
+            const original = io.persist.bind(io);
+            io.persist = async () => { writes += 1; await original(); };
+        });
+        const before = writes;
+        const sock = await openSocket(name, 'gen-stale-0001');
+        expect(sock.closeCode()).toBe(CLOSE_STALE_LINEAGE);
+        await new Promise<void>((r) => setTimeout(r, 100));
+        expect(writes).toBe(before);
+        // Control: an ordinary last disconnect still persists.
+        const ok = await openSocket(name, gen);
+        ok.close();
+        await new Promise<void>((r) => setTimeout(r, 100));
+        expect(writes).toBeGreaterThan(before);
+    });
+
+    it('a malformed report is a mismatch, and the same client succeeds once it reports the new generation', async () => {
+        const name = freshName();
+        const gen = await currentGen(name);
+        const bad = await openSocket(name, 'invalid');
+        expect(bad.closeCode()).toBe(CLOSE_STALE_LINEAGE);
+        const again = await openSocket(name, gen);
+        expect(again.closeCode()).toBeNull();
+        again.send(probeUpdate('after'));
+        await new Promise<void>((r) => setTimeout(r, 50));
+        expect(await probeValue(name)).toBe('after');
+        again.close();
+    });
+
+    it('after a version restore a client still reporting the previous generation is refused, one reporting the new one is not', async () => {
+        const name = freshName();
+        const before = await currentGen(name);
+        const snap = await stub(name).fetch('https://do.test/snapshots', { method: 'POST', headers: HEADERS });
+        const { seq } = await snap.json<{ seq: number }>();
+        expect((await stub(name).fetch('https://do.test/restore', { method: 'POST', headers: HEADERS, body: JSON.stringify({ seq }) })).status).toBe(200);
+        const after = await exportedGen(name);
+        const old = await openSocket(name, before);
+        expect(old.closeCode()).toBe(CLOSE_STALE_LINEAGE);
+        expect(frameGeneration(old.frames[0] ?? new Uint8Array())).toBe(after);
+        const fresh = await openSocket(name, after ?? '');
+        expect(fresh.closeCode()).toBeNull();
+        fresh.close();
     });
 });
 
