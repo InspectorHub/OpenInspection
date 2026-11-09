@@ -355,7 +355,6 @@
     "tests/unit/inspections/inspection-people-card.spec.ts",
     "tests/unit/inspections/inspection-photo-ops.spec.ts",
     "tests/unit/inspections/inspection-prefs-pinned-tags.spec.ts",
-    "tests/unit/inspections/inspection-prefs-schema.spec.ts",
     "tests/unit/inspections/inspection-quota.spec.ts",
     "tests/unit/inspections/inspection-recipients.spec.ts",
     "tests/unit/inspections/inspection-request-people.spec.ts",
