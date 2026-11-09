@@ -157,6 +157,16 @@ pass.
 Until `conflicts`, `skipped` and `failed` are empty or resolved, the old objects are the only copy of those documents'
 history, so leave them be. Deletes keep reaching them through the old namespace either way.
 
+### Local development cannot pin a jurisdiction
+
+Jurisdiction pinning only works on a real Cloudflare deployment. The local runtime that `wrangler dev` starts (workerd) does not implement it: with `DO_JURISDICTION` set to a jurisdiction such as `us`, every request that reaches a pinned Durable Object fails with a 500 and the message "Jurisdiction restrictions are not implemented in workerd". With the variable unset, the migration route answers 409 because there is nothing to pin to.
+
+Consequences for an operator:
+
+- Leave `DO_JURISDICTION` unset in local development and in `.dev.vars`. Setting it locally breaks the app rather than simulating the pin.
+- A migration dry run cannot be rehearsed locally. Run it against a real deployment (a staging Worker or a preview deployment on your own Cloudflare account) and confirm the result there before touching production.
+- Tests that need the pinned behavior must stub the namespace; they cannot rely on the local runtime to enforce it.
+
 ## What to check in production
 
 Only your deployment can show these; the test suite cannot, because the local runtime does not implement jurisdictions.
