@@ -4,7 +4,7 @@
 
 <h1 align="center">OpenInspection</h1>
 
-<p align="center"><strong>Open source home inspection software.</strong> Self-host the full SaaS-grade inspection stack on Cloudflare for ~$0/month.</p>
+<p align="center"><strong>Open source home inspection software.</strong> AGPL-3.0, self-hostable on a single Cloudflare Worker, and your data exports cleanly.</p>
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/InspectorHub/OpenInspection)
 [![GitHub Discussions](https://img.shields.io/github/discussions/InspectorHub/OpenInspection)](https://github.com/InspectorHub/OpenInspection/discussions)
@@ -13,13 +13,13 @@
 > 🧪 **Try it in 60 seconds — no install, no credit card.**
 > [**Start free on inspectorhub.io →**](https://inspectorhub.io/register)
 >
-> Activation-link signup, and your first 5 inspections are free — no card, no clock. Your workspace ships pre-loaded with starter templates + canned comments so you can click through a real inspection immediately. Decide to self-host later? Your data exports cleanly — same codebase, same schema.
+> Activation-link signup; the hosted Free Plan includes up to 5 new inspections and 50 built-in emails each calendar month, with no card. Your workspace ships pre-loaded with starter templates + canned comments so you can click through a real inspection immediately. Decide to self-host later? Your data exports cleanly — same codebase, same schema.
 
 ---
 
 ## What it is
 
-OpenInspection is [open source home inspection software](https://inspectorhub.io/open-source) — a complete inspection stack: inspector dashboard, public booking widget, a field-ready inspection editor, professional HTML reports with e-signatures, AI assistance, and PWA offline support, all running on Cloudflare's edge and self-hosted on a single Worker.
+OpenInspection is [open source home inspection software](https://inspectorhub.io/open-source) — an inspection stack with an inspector dashboard, public booking widget, a field-ready inspection editor, professional HTML reports with e-signatures, AI assistance, and PWA offline support, all running on Cloudflare's edge and self-hosted on a single Worker.
 
 ### Architecture
 
@@ -53,8 +53,9 @@ OpenInspection is [open source home inspection software](https://inspectorhub.io
 
 ## Why OpenInspection
 
+- **Open**: the whole stack is AGPL-3.0 source you can read, fork and run yourself, and your data exports from the hosted service in the same schema the self-hosted version uses.
 - **Cheap to run**: a solo inspector's whole year fits in Cloudflare's smallest paid Workers plan, plus a domain (~$10/yr). The free plan is enough to try it and enough to deploy it, but ⚠️ **not enough to run it**: its CPU ceiling is in the low milliseconds and this application's p95 request is ~49ms (measured over seven days of live traffic, 2026-09-05). A statutory-form render alone is ~470ms.
-- **Yours**: fork it, change templates, add integrations. No vendor lock-in.
+- **Yours**: fork it, change templates, add integrations.
 - **Fast**: edge-deployed, < 100 ms response times globally
 - **Compliant**: PBKDF2-SHA256 password hashing, hash-chained Ed25519 audit log on e-signatures (ESIGN Act + UETA), server-rendered PDF + Certificate of Completion via Browser Run, offline-verifiable evidence pack, tenant-scoped data isolation
 - **Modern**: React Router v8 + React 19 + Hono API + Drizzle + Tailwind v4 — small surface, easy to read
