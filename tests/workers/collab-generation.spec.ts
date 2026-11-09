@@ -208,6 +208,22 @@ describe('generation: the object checks the generation the client reports', () =
         expect(writes).toBeGreaterThan(before);
     });
 
+    it('closing or erroring a socket whose tags cannot be read does not throw, and still flushes', async () => {
+        const name = freshName();
+        await currentGen(name);
+        let writes = 0;
+        await runInDurableObject(stub(name), async (instance) => {
+            const io = instance as unknown as DOInternals;
+            const original = io.persist.bind(io);
+            io.persist = async () => { writes += 1; await original(); };
+            const handlers = instance as unknown as { webSocketClose(ws: WebSocket): Promise<void>; webSocketError(ws: WebSocket): Promise<void> };
+            const fake = { close: () => undefined } as unknown as WebSocket; // never accepted: getTags throws for it
+            await handlers.webSocketClose(fake);
+            await handlers.webSocketError(fake);
+        });
+        expect(writes).toBe(2);
+    });
+
     it('a malformed report is a mismatch, and the same client succeeds once it reports the new generation', async () => {
         const name = freshName();
         const gen = await currentGen(name);

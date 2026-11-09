@@ -164,7 +164,6 @@
       "packages/field-ui/src/collab/results-binding.append-pending.test.ts",
       "packages/field-ui/src/collab/results-binding.photo-attach.test.ts",
       "packages/field-ui/src/collab/results-doc-connection.test.ts",
-      "packages/field-ui/src/collab/results-doc-lineage.test.ts",
       "packages/field-ui/src/collab/results-merge.video.test.ts",
       "packages/field-ui/src/components/editor-shared/canned-comment-row.test.ts",
       "packages/field-ui/src/components/editor-shared/defect-category-chip.test.ts",
