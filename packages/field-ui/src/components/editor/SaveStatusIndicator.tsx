@@ -6,7 +6,16 @@ export type SaveStatus = "idle" | "saving" | "saved" | "error";
  * The save indicator: Saving, Saved, or Save failed (nothing while idle). The desktop header and the phone and
  * tablet app bars show the same one, so a failed save is never visible in only some layouts.
  */
-export function SaveStatusIndicator({ status }: { status: SaveStatus }) {
+export function SaveStatusIndicator({ status, held = false }: { status: SaveStatus; held?: boolean }) {
+ // The collab connection kept a stale offline copy it could not back up and is not syncing (lineage guard): said before any save state.
+ if (held) {
+  return (
+   <span data-testid="save-status" data-status="held" role="status" aria-live="polite" title={m.editor_header_save_held_detail()} className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 text-[11px] font-bold text-ih-bad-fg">
+    <span className="w-1.5 h-1.5 rounded-full bg-ih-bad" />
+    {m.editor_header_save_held()}
+   </span>
+  );
+ }
  if (status === "idle") return null;
  return (
   <span

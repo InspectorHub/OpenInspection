@@ -137,6 +137,18 @@ was written (`target-edited` once any client edit has persisted, so a restore ca
 not be live. It answers 404 when there is no backup. On success the backup goes back, marked database-built again, and the
 stored backup is spent.
 
+**Clients and the lineage guard.** A document built from the database and the old document are two independent histories. A
+browser that connected to the pinned target before `replaceDerived` holds the target's history, and merging it into the
+old one would not combine them (per finding, one history wins by client id). Each object therefore carries a generation id
+(`docs/concepts/collab-editing.md`, "Lineage guard"): the replacement keeps the SOURCE's id, so browsers holding the old
+document stay valid, and a browser that synced with the displaced target holds a different id and discards its local copy
+on its next connect (keeping one backup of it on that device). A backup restore puts the displaced document's id back.
+Limits: a browser whose store was written before the guard shipped recorded no id and is trusted once, so after the first
+deploy ask anyone who may have opened these reports on the pinned target to reopen them online, or confirm nobody did,
+before running `replaceDerived`. An export from an older object carries no id and gets a new one on import. If you roll the
+engine back to a build without the guard, a `replaceDerived`, backup restore or version restore done in that window is
+invisible to it (no new id is minted), so browsers holding the displaced history are not discarded after you roll forward.
+
 **Timing.** An old object whose save alarm was armed before the deploy still runs it, and that save writes the old document's
 projection to the database. This is harmless to the check, because the two then agree; but an alarm that fires between the
 check's database read and the import would leave the copy one save behind. Wait a minute after deploying before the real

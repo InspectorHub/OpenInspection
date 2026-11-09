@@ -23,7 +23,7 @@ const state = {
   setSettingsOpen: vi.fn(),
 };
 
-function mount(slots?: FieldHostSlots, extra: { tenantSlug?: string | null; urls?: Partial<FieldUrls>; without?: readonly ('restartSession' | 'openUrl')[] } = {}) {
+function mount(slots?: FieldHostSlots, extra: { held?: boolean; tenantSlug?: string | null; urls?: Partial<FieldUrls>; without?: readonly ('restartSession' | 'openUrl')[] } = {}) {
   const fake = createFakeDataSource({
     data: createEmptyEditorData(),
     urls: { reportPreview: (slug, id) => `/report-view/${slug}/${id}`, ...extra.urls },
@@ -42,6 +42,7 @@ function mount(slots?: FieldHostSlots, extra: { tenantSlug?: string | null; urls
         onSaveAsNewTemplate={vi.fn()}
         onUpdateSourceTemplate={vi.fn()}
         canUpdateSourceTemplate={false}
+        {...(extra.held ? { held: true } : {})}
       />
     </FieldDataSourceProvider>
   );
@@ -170,5 +171,15 @@ describe('EditorHeader back control', () => {
     expect(screen.queryByRole('link', { name: /back/i })).toBeNull();
     act(() => { screen.getByRole('button', { name: /back/i }).click(); });
     expect(fake.exitCount).toBe(1);
+  });
+});
+
+describe('EditorHeader held state', () => {
+  it('shows Not syncing in the desktop header while the collab connection is held, and not otherwise', () => {
+    mount(undefined, { held: true });
+    expect(screen.getByTestId('save-status').getAttribute('data-status')).toBe('held');
+    cleanup();
+    mount();
+    expect(screen.queryByTestId('save-status')).toBeNull(); // idle shows no indicator
   });
 });

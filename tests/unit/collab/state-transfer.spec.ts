@@ -8,7 +8,7 @@ import {
     appendPhoto, applyItemPatch, loadResultsProjection, projectResults, removeFindingKeys, seedResultsDoc,
 } from '../../../packages/field-ui/src/shared/results-doc';
 
-const KEYS: StateKeys = { ydoc: 'ydoc', identity: 'identity', snapshots: 'snapshots', derived: 'derived-from-d1', backup: 'replaced-derived-backup' };
+const KEYS: StateKeys = { ydoc: 'ydoc', identity: 'identity', snapshots: 'snapshots', derived: 'derived-from-d1', backup: 'replaced-derived-backup', gen: 'gen' };
 const IDENTITY = { tenantId: 't-1', inspectionId: 'i-1', reportId: 'r-1' };
 const SNAP: ImportedSnapshot = { seq: 1, atMs: 1700000000000, byUserId: 'u-1', reason: 'manual', projection: { marker: 'x' } };
 
@@ -128,12 +128,12 @@ describe('parseStateImport: documents the real editor builds', () => {
 });
 
 describe('importState', () => {
-    it('writes content, identity and restore points in ONE storage put, so a crash cannot leave part of an import', async () => {
+    it('writes content, identity, lineage id and restore points in ONE storage put, so a crash cannot leave part of an import', async () => {
         const s = fakeStorage();
         const out = await importState(s, KEYS, body({ snapshots: [SNAP] }), () => false);
         expect(out.status).toBe('imported');
         expect(s.putCalls).toHaveLength(1);
-        expect(Object.keys(s.putCalls[0] ?? {}).sort()).toEqual(['identity', 'snapshots', 'ydoc']);
+        expect(Object.keys(s.putCalls[0] ?? {}).sort()).toEqual(['gen', 'identity', 'snapshots', 'ydoc']);
     });
 
     it('writes nothing for an invalid document', async () => {

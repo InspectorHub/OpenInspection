@@ -300,6 +300,45 @@ on-demand JSON-projection snapshots in DO storage (capped at 25, `{seq, atMs, by
   converges all live clients (a plain additive update could not revert deletions).
 - UI: the **Version history** panel in the editor (`packages/field-ui/src/components/collab/VersionHistoryPanel.tsx`).
 
+## Lineage guard (generation id)
+
+A Yjs document is a history, and two histories of the same inspection that were built independently do not merge: for each
+finding the whole item of ONE history wins, chosen by client id, not by time. A browser that kept an old history in its
+offline store could therefore resurrect deleted photos and drop newer ones. A new history begins whenever the server
+document is rebuilt rather than carried forward: a version restore (for a browser that was closed or offline during it), a
+document rebuilt from the database after its storage was emptied, and a copy between Durable Object namespaces that replaced
+a document built from the database (see `docs/operate/durable-object-jurisdiction.md`).
+
+- The object keeps a random **generation id** in its storage (`gen`). It is created with the document, kept through
+  hibernation, minted again on a version restore and when the document is rebuilt, and unchanged by a restructure. A state
+  transfer carries it with the document bytes. An object whose storage predates the id mints one on its next start.
+- **Wire protocol.** The server sends `MSG_GENERATION` (4) followed by the id as a varstring as the **first frame of every
+  socket**, before its sync step 1. The restore frame (`MSG_RESTORE`, 2) carries the same varstring after its type byte.
+  Clients that do not know the frame ignore it: the browser editor of an earlier build and the native client both drop
+  frame types they do not handle, and both read only the type byte of a restore frame.
+- **Client.** The web host records the id per inspection in its own small IndexedDB database (`results-gen-<id>`). Until
+  the first frame is judged the connection neither forwards local edits nor sends its own step 1 nor answers the server's. Same id: carry on.
+  Different id: the local copy is discarded (as on a restore) and re-pulled, and nothing from it is sent. No id recorded
+  (a store written before the guard existed): the server's id is adopted and the store is trusted once, so **the first
+  deploy cannot protect stores that already exist**. A server that sends no generation frame (an older deploy) is
+  recognised by its first frame being a sync frame, and the connection behaves as it did before.
+- **Offline edits on a discarded store.** They live in the same IndexedDB store and are dropped with it. The connection first
+  saves the full Yjs state of what it discards into ONE backup slot (`results-discarded-<id>`: the update, both ids, the
+  time), overwritten by the next discard, never read automatically, and removed with the inspection's other offline data.
+  Support can recover edits by applying that update to a scratch document. Photos waiting in the offline media queue are
+  separate and are not touched.
+- **A backup that cannot be written** (storage full or blocked) abandons the discard: the store is kept, no new id is
+  recorded, nothing is sent (the handle reports `lineageHold`), and the socket is reopened with the usual backoff to retry.
+  The offline copy is never cleared without its backup.
+- The recorded id is re-read at every socket open, so a second tab's change is seen. If that read fails, the id is treated as not recorded: the server's is adopted and the store is trusted once (fail-open).
+- While a discard is held, the editor's save indicator reads "Not syncing" (with the full reason on hover), the connection reports itself as not synced, and the unsaved-changes warning stays armed.
+- **Rolling back the engine** to a build without the guard leaves everything done during the rollback invisible to it: a version
+  restore or a state import in that window creates a new history but no new id. Browsers that synced before the rollback keep
+  their old id and match again after the roll-forward, so a stale store can slip through exactly as it did before the guard.
+  After a rollback, treat restores and imports made meanwhile as unprotected and ask users with offline copies to reopen
+  the inspection online.
+- The native client keeps its own connector and does not act on the frame yet, so it is not protected by this guard.
+
 ## Configuration
 
 The Durable Object must be bound in every deploy target.

@@ -18,6 +18,7 @@ import type { OfflinePurgeHost } from "@core/field-ui/collab/offline-purge";
 import type { CollabConnector } from "@core/field-ui/data-source";
 import type { ResultsDocHost } from "@core/field-ui/collab/use-results-doc";
 import { webMediaStore } from "./web-media-store";
+import { discardedDbName, lineageDbName, webLineageStore } from "./web-lineage-store";
 
 /**
  * Delete an IndexedDB database by name, resolving once the delete settles.
@@ -84,16 +85,18 @@ export function webSubscribeOnline(onOnline: () => void): () => void {
     return () => window.removeEventListener("online", onOnline);
 }
 
-/** The three host pieces `useResultsDoc` needs, as one stable reference. */
+/** The host pieces `useResultsDoc` needs (persistence, socket URL, online signal, lineage store), as one stable reference. */
 export const webCollabHost: ResultsDocHost = {
     persistence: webPersistence,
     wsUrl: webCollabWsUrl,
     subscribeOnline: webSubscribeOnline,
+    lineage: webLineageStore,
 };
 
 /** Erase one inspection's persisted results doc from this browser profile. */
-export function webClearResultsData(inspectionId: string): Promise<void> {
-    return deleteDatabase(resultsDocName(inspectionId));
+export async function webClearResultsData(inspectionId: string): Promise<void> {
+    // The lineage record and the discarded-store backup belong to the same inspection: they go with it.
+    await Promise.all([resultsDocName(inspectionId), lineageDbName(inspectionId), discardedDbName(inspectionId)].map(deleteDatabase));
 }
 
 /** What `purgeInspectionOfflineData` needs from the web host. */
@@ -131,6 +134,7 @@ export const webCollabConnector: CollabConnector = {
             persistenceSynced,
             synced: () => handle.synced,
             locked: () => handle.locked === true,
+            held: () => handle.lineageHold === true,
             destroy,
         };
     },

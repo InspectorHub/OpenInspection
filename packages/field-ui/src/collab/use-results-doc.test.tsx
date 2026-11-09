@@ -12,10 +12,11 @@ afterEach(cleanup);
 
 /** A connector the test drives by hand: it records connects and hands back the callbacks. */
 function manualConnector() {
-  const connects: Array<{ id: string; onChange?: () => void; onSynced?: () => void; live: LiveHandle; destroyed: boolean; setSynced(v: boolean): void; resolvePersisted(): void }> = [];
+  const connects: Array<{ id: string; onChange?: () => void; onSynced?: () => void; live: LiveHandle; destroyed: boolean; setSynced(v: boolean): void; setHeld(v: boolean): void; resolvePersisted(): void }> = [];
   const connector: CollabConnector = {
     connect(id, opts) {
       let synced = false;
+      let held = false;
       let resolvePersisted: () => void = () => undefined;
       const persistenceSynced = new Promise<void>((r) => {
         resolvePersisted = r;
@@ -28,6 +29,9 @@ function manualConnector() {
         setSynced: (v: boolean) => {
           synced = v;
         },
+        setHeld: (v: boolean) => {
+          held = v;
+        },
         resolvePersisted,
         live: undefined as unknown as LiveHandle,
       };
@@ -35,6 +39,7 @@ function manualConnector() {
         doc: new Y.Doc(),
         persistenceSynced,
         synced: () => synced,
+        held: () => held,
         destroy: () => {
           rec.destroyed = true;
         },
@@ -60,6 +65,18 @@ function sourceWith(connector: CollabConnector): FieldDataSource {
 }
 
 describe('useResultsDoc', () => {
+  it('republishes the lineage hold so the editor can say it is not syncing', () => {
+    const { connector, connects } = manualConnector();
+    mount(sourceWith(connector), <Harness id="insp-1" />);
+    expect(seen?.lineageHold).toBe(false);
+    connects[0].setHeld(true);
+    act(() => connects[0].onChange?.());
+    expect(seen?.lineageHold).toBe(true);
+    connects[0].setHeld(false);
+    act(() => connects[0].onChange?.());
+    expect(seen?.lineageHold).toBe(false);
+  });
+
   it('connects through the data source and exposes the initial handle at once', () => {
     const { connector, connects } = manualConnector();
     mount(sourceWith(connector), <Harness id="insp-1" />);

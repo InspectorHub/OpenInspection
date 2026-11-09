@@ -93,7 +93,9 @@ describe('InspectionDocDO state transfer', () => {
 
     it('exporting an object with no state returns nulls rather than failing', async () => {
         const res = await stub('src-empty').fetch(url('state-export'));
-        expect(await res.json()).toEqual({ ydoc: null, identity: null, snapshots: [], derivedFromD1: false });
+        const out = await res.json<{ gen: string }>();
+        expect(out).toEqual({ ydoc: null, identity: null, snapshots: [], derivedFromD1: false, gen: out.gen });
+        expect(out.gen).toMatch(/^[A-Za-z0-9_-]{8,64}$/); // every object names its history, even an empty one
     });
 
     it('rejects bytes that are not a Yjs document BEFORE writing anything, so the object stays importable', async () => {
@@ -102,7 +104,7 @@ describe('InspectionDocDO state transfer', () => {
         const res = await target.fetch(url('state-import'), { method: 'POST', body: JSON.stringify(bad) });
         expect(res.status).toBe(400);
         const stored = await runInDurableObject(target, (_i, state) => state.storage.list());
-        expect([...stored.keys()]).toEqual([]);
+        expect([...stored.keys()]).toEqual(['gen']); // only the lineage id every object mints when it first wakes
 
         await seedSource('src-good');
         const good = await (await stub('src-good').fetch(url('state-export'))).text();
