@@ -44,7 +44,7 @@ export const MSG_GENERATION = 4;
 export const GEN_HEADER = 'x-collab-gen';
 
 /** Hibernation tag of a socket that reported another history; such a socket takes no writes. */
-export const STALE_TAG = 'stale-lineage';
+const STALE_TAG = 'stale-lineage';
 
 /** Close code of a refused socket (4409 is "published"). Not special to the client: it reconnects with the usual backoff. */
 export const CLOSE_STALE_LINEAGE = 4410;
@@ -82,9 +82,17 @@ export function isStaleClaim(claimed: string | null, current: string): boolean {
     return claimed !== null && claimed !== current;
 }
 
-/** True for a socket accepted by `staleLineageResponse`. */
+/** Sockets refused by `staleLineageResponse`, remembered in memory so the close path never depends on reading tags. */
+const refusedSockets = new WeakSet<WebSocket>();
+
+/**
+ * True for a socket accepted by `staleLineageResponse`. Total: it never throws, because it runs inside the close and message
+ * handlers of every socket (a test double, or a socket whose tags cannot be read, is simply not a refused one). The in-memory
+ * marker answers while the object is awake; the hibernation tag answers after an eviction.
+ */
 export function isStaleSocket(ctx: DurableObjectState, ws: WebSocket): boolean {
-    return ctx.getTags(ws).includes(STALE_TAG);
+    if (refusedSockets.has(ws)) return true;
+    try { return ctx.getTags(ws).includes(STALE_TAG); } catch { return false; }
 }
 
 /** The upgrade answer for a client holding another history: the generation frame, then close. See the header comment. */
@@ -92,6 +100,7 @@ export function staleLineageResponse(ctx: DurableObjectState, current: string): 
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
     ctx.acceptWebSocket(server, [STALE_TAG]);
+    refusedSockets.add(server);
     server.send(generationFrame(MSG_GENERATION, current));
     server.close(CLOSE_STALE_LINEAGE, 'LINEAGE');
     return new Response(null, { status: 101, webSocket: client });
