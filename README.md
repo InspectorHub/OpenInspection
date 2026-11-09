@@ -4,7 +4,7 @@
 
 <h1 align="center">OpenInspection</h1>
 
-<p align="center"><strong>Open source home inspection software.</strong> AGPL-3.0, self-hostable on a single Cloudflare Worker, and your data exports cleanly.</p>
+<p align="center"><strong>Open source home inspection software.</strong> AGPL-3.0, self-hostable on a single Cloudflare Worker, with a JSON data export.</p>
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/InspectorHub/OpenInspection)
 [![GitHub Discussions](https://img.shields.io/github/discussions/InspectorHub/OpenInspection)](https://github.com/InspectorHub/OpenInspection/discussions)
@@ -13,7 +13,7 @@
 > 🧪 **Try it in 60 seconds — no install, no credit card.**
 > [**Start free on inspectorhub.io →**](https://inspectorhub.io/register)
 >
-> Activation-link signup; the hosted Free Plan includes up to 5 new inspections and 50 built-in emails each calendar month, with no card. Your workspace ships pre-loaded with starter templates + canned comments so you can click through a real inspection immediately. Decide to self-host later? Your data exports cleanly — same codebase, same schema.
+> Activation-link signup; the hosted Free Plan includes up to 5 new inspections and 50 built-in emails each calendar month, with no card. Your workspace ships pre-loaded with starter templates + canned comments so you can click through a real inspection immediately. Decide to self-host later? It is the same open-source codebase, and the engine exports your inspections, results, templates and agreements as JSON.
 
 ---
 
@@ -35,7 +35,7 @@ OpenInspection is [open source home inspection software](https://inspectorhub.io
 - Simultaneous editing — inspection results are a Yjs CRDT in a Durable Object
 - Installable PWA; field data is offline-capable (the results document buffers in IndexedDB and merges on reconnect). Photo and video *binary* upload needs a connection and says so rather than queueing
 - Migrate from Spectora through the import wizard, which shows what the conversion produced before anything is written
-- Native client: [OpenInspection-App](https://github.com/InspectorHub/OpenInspection-App) is the offline-first app for Android and iOS (Capacitor) with a Windows pilot (Electron), in its own AGPL-3.0 repository; it talks to this engine through the generated API contract
+- Native client: [OpenInspection-App](https://github.com/InspectorHub/OpenInspection-App) is the offline-first native client, built with Capacitor, in its own AGPL-3.0 repository; it talks to this engine through the generated API contract. Android builds are published as signed APKs on its Releases page; iOS and a Windows client (Electron) are in development and not yet publicly available
 
 ### Customer experience
 - Company-level public booking widget (`/book/<slug>`) with auto-assignment, optional inspector choice, and Turnstile bot protection
@@ -54,7 +54,7 @@ OpenInspection is [open source home inspection software](https://inspectorhub.io
 
 ## Why OpenInspection
 
-- **Open**: the whole stack is AGPL-3.0 source you can read, fork and run yourself, and your data exports from the hosted service in the same schema the self-hosted version uses.
+- **Open**: the whole stack is AGPL-3.0 source you can read, fork and run yourself, and the engine exports a company's inspections, results, templates and agreements as JSON (`GET /api/admin/export`, see the API reference).
 - **Cheap to run**: a solo inspector's whole year fits in Cloudflare's smallest paid Workers plan, plus a domain (~$10/yr). The free plan is enough to try it and enough to deploy it, but ⚠️ **not enough to run it**: its CPU ceiling is in the low milliseconds and this application's p95 request is ~49ms (measured over seven days of live traffic, 2026-09-05). A statutory-form render alone is ~470ms.
 - **Yours**: fork it, change templates, add integrations.
 - **Fast**: edge-deployed, < 100 ms response times globally
