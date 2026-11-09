@@ -29,7 +29,7 @@ To produce a portal-free build: delete this directory, the
 `StandaloneProvider` + leave `outbox` undefined), and the `/api/platform/*`
 guard in `workers/app.ts`.
 
-Detailed integration docs live in the super-project `docs/saas-ops/`.
+The integration exists only in the hosted (multi-tenant) mode: a standalone deployment never mounts this seam, and nothing under `server/portal/` is needed to run one.
 
 | File | Purpose |
 |---|---|

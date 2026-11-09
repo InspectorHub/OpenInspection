@@ -106,7 +106,7 @@ worker upload: 17977 KiB raw / 2775 KiB gzip (90.3% of the 3 MiB Workers Free li
   Flagging for Task 2+ implementers and for the pre-push bundle WARNING. (The
   dead-code side of this is closed: the knip baseline converged from 602 to 5
   in #256, and `npm run lint:deadcode` is the live check. This used to cite a
-  planning file in the private superproject, which no reader of this repository
+  planning file that no reader of this repository
   could open and which no longer exists.)
 - `docx`'s own dependencies (`jszip`, `nanoid`, `xml`, `xml-js`, `hash.js` —
   npm package names, each its own `node_modules/<name>/` entry, not tracked

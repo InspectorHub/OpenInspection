@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
  * POST /setup always returns 200 (fresh workspace) and every test
  * that requires a real token runs instead of being skipped.
  *
- * Requires the dev server to be running (`npm run dev` in apps/core).
+ * Requires the dev server to be running (`npm run dev`).
  * The setup wizard no longer uses a module-level cache, so the cleared
  * DB is reflected immediately without restarting the dev server.
  */

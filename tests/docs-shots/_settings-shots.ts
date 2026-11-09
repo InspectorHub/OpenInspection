@@ -52,8 +52,8 @@ export function resetSettingsGuides(entries: readonly SettingsShot[]): void {
  *
  * What blocks it is the join, not the capture: the publisher matches `<id>.png`
  * to `<!-- shot: <id> -->` by exact set equality, so turning `settings-
- * communication` into four pictures means the guide in
- * `apps/portal/docs/user-guide/` loses that marker and gains four. Emitting the
+ * communication` into four pictures means the published guide
+ * loses that marker and gains four. Emitting the
  * extra PNGs first would fail the docs build with "capture with no marker",
  * which is the check working. Convert a page here and its prose in the same
  * change, never one without the other.

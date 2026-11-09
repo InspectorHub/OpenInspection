@@ -8,8 +8,7 @@ import type { Api } from "./api-client.server";
  * whole content of a file rather than a third of a longer one.
  */
 /**
- * Module mount paths. Verified against `apps/core/server/index.ts` route()
- * calls. Some modules share a mount (e.g. inspections + inspectionSync +
+ * Module mount paths. Verified against the route() calls in `server/index.ts`. Some modules share a mount (e.g. inspections + inspectionSync +
  * inspectionTag all under `/api/inspections`); each client only sees ITS OWN
  * routes typed in its `*Api`, so collisions on the path prefix are fine.
  */
