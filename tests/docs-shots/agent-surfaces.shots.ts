@@ -49,6 +49,10 @@ test('the dashboard, grouped by property', async ({ page }) => {
     if (await name.count()) await name.fill('Dana Okafor');
     const accept = page.locator('input[type=checkbox]').first();
     if (await accept.count()) await accept.check();
+    // Wait for the challenge's token before submitting: a click before it only shows "verify" and sends nothing. The
+    // widget adds an input of its own inside its host; the form's is the direct child.
+    await expect(page.getByTestId('agent-signup-turnstile')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('agent-signup-turnstile').locator(':scope > input[name="cf-turnstile-response"]')).not.toHaveValue('', { timeout: 20_000 });
     await page.getByRole('button', { name: /Sign up|Create/i }).first().click();
 
     await page.waitForURL('**/agent-dashboard', { timeout: 30_000 });

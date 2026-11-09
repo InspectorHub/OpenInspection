@@ -351,6 +351,18 @@ branch). The helpers are `tests/unit/helpers/response-shape.ts` (the walker), `r
   corrupt. Before this, ten projects shared one inspection and it worked only
   because nothing ran at the same time: SpeedMode's overlay opens while unrated
   items remain, and a concurrent spec rating those items left it with none.
+- **Wide specs are split into projects, by title.** `editor-responsive` is one project per viewport
+  (`editor-responsive-375x812`, …), each selected by a `grep` on the viewport in the test titles and each with its own
+  seeded inspection, so the working paths run side by side instead of in one serial chain. Splitting a spec this way means
+  adding every new project name to `EXCLUSIVE_SEED_PROJECTS` (an unlisted one silently shares the `shared` entry).
+  Do not add `dependencies` to a project as a scheduling hint: a project that depends on another waits for all of it.
+- **A control that can be missing must fail fast.** Give a `boundingBox()`, `textContent()` or similar locator call an
+  explicit short `timeout`: without one it waits for the whole test timeout and the report says only "Test timeout".
+  A signup form carries a bot challenge; wait for its token (the widget answers by itself on Cloudflare's public test
+  key) before clicking submit. The gate is never bypassed.
+- **`globalSetup` is a handful of wrangler spawns, not one per row.** It migrates, lists the tables, wipes them and
+  publishes the agent terms in one SQL file, lists the KV keys and clears them with one `kv bulk delete`. Keep it that
+  way: each spawn costs seconds on Windows.
 - **Gate on hydration, not on markup.** The app is server-rendered, so `<main>`
   and a full item list are on screen before React attaches any handler — waiting
   for them proves the SSR shell arrived and nothing more. Use

@@ -97,14 +97,11 @@ for (const vp of [...VIEWPORTS, ...DESKTOP_WIDTHS]) {
 }
 
 /**
- * The rating the previous viewport stored on the shared Roof item. All five viewports edit the same item (one
- * seeded inspection per project), so a viewport that picked the level already stored, or wrote the note already
- * there, would pass without changing anything. Each viewport therefore picks its own level and writes its own note,
- * and reads the change back from the API. The tests run in file order in one worker, which is what makes this
- * chain meaningful; it is not read when it is unset (a retry in a fresh worker).
+ * Each viewport is its own Playwright project (`editor-responsive-<width>x<height>`, selected by the `grep` on the
+ * viewport in the test title) with its own seeded inspection, so no viewport can pass by finding the rating or the
+ * note a neighbour stored. The note is unique to the viewport and is read back from the API, which is what proves
+ * this viewport wrote it.
  */
-let previousStoredRating: string | null = null;
-
 for (const [viewportIndex, vp] of VIEWPORTS.entries()) {
     const expected: EditorLayout = layoutForWidth(vp.width);
 
@@ -137,18 +134,14 @@ for (const [viewportIndex, vp] of VIEWPORTS.entries()) {
             await expect(notes).toHaveValue(text);
 
             // Read it back from what the server stored, not from what the field echoes: the finding that carries
-            // this viewport's note must exist, carry a rating, and not be the level the previous viewport stored.
-            let storedRating: string | null = null;
+            // this viewport's note must exist and carry a rating.
             await expect
                 .poll(async () => {
                     const results = await readStoredResults(page, seededInspectionId());
                     const entry = Object.values(results).find((r) => r.notes === text);
-                    storedRating = typeof entry?.rating === 'string' ? entry.rating : null;
-                    return storedRating;
+                    return typeof entry?.rating === 'string' ? entry.rating : null;
                 }, { timeout: 30_000, message: `the stored results hold "${text}" with a rating` })
                 .not.toBeNull();
-            if (previousStoredRating !== null) expect(storedRating, 'this viewport stored a different level than the last').not.toBe(previousStoredRating);
-            previousStoredRating = storedRating;
 
             // And a reload shows the same thing (the editor reads it back from the server too).
             await page.reload();
@@ -173,13 +166,20 @@ for (const [viewportIndex, vp] of VIEWPORTS.entries()) {
             await expect(annotate).toBeVisible();
             // Every toolbar target is a real touch target on a narrow screen.
             if (vp.width <= 480) {
-                for (const name of ['Annotate', 'Rotate', 'Set cover', 'Caption', 'Delete']) {
-                    const box = await page.locator('.yarl__toolbar').getByRole('button', { name, exact: true }).first().boundingBox();
-                    expect(box, `${name} is on screen`).not.toBeNull();
-                    expect(box!.height, `${name} height`).toBeGreaterThanOrEqual(43.5);
-                    expect(box!.width, `${name} width`).toBeGreaterThanOrEqual(43.5);
+                // The editor offers Crop, Annotate, the cover action (Set cover, or Adjust cover on the cover photo) and
+                // Delete for a stored photo; Rotate and Caption have no handler there and are not offered.
+                const targets: Array<string | RegExp> = ['Crop', 'Annotate', /^(Set|Adjust) cover$/, 'Delete'];
+                for (const name of targets) {
+                    const button = page.locator('.yarl__toolbar').getByRole('button', { name, exact: typeof name === 'string' }).first();
+                    const box = await button.boundingBox({ timeout: 5_000 });
+                    expect(box, `${String(name)} is on screen`).not.toBeNull();
+                    expect(box!.height, `${String(name)} height`).toBeGreaterThanOrEqual(43.5);
+                    expect(box!.width, `${String(name)} width`).toBeGreaterThanOrEqual(43.5);
                 }
             }
+            // Rotate and Caption are deliberately not offered here (they have no handler): pin that decision so a
+            // regression that shows dead buttons again is caught.
+            await expect(page.locator('.yarl__toolbar').getByRole('button', { name: /^(Rotate|Caption)$/ })).toHaveCount(0);
             await expectNoHorizontalScroll(page);
 
             // Annotate: draw one shape on the canvas, then save. The annotator closes on save.

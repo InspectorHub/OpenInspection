@@ -366,6 +366,8 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
     page,
     request,
   }) => {
+    // Report page, signup form, the bot challenge answering, then the dashboard: more than the 30 s default.
+    test.setTimeout(75_000);
     const sendRes = await apiPost(request, `/api/inspections/${inspectionBId}/send-report-pdf`, adminToken, {
       recipients: [{ contactId: unregisteredAgentContactId, roleKey: 'buyer_agent' }],
     });
@@ -403,6 +405,13 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
       // acceptance recorded a presentation that had not happened.
       await expect(freshPage.locator('#agent-terms-body')).toBeVisible();
       await freshPage.getByRole('checkbox', { name: /accept the Agent Terms/i }).check();
+
+      // The signup carries a bot challenge. Without a configured key the server resolves Cloudflare's public TEST
+      // key, whose widget answers by itself; the gate is never bypassed, so wait for its token before submitting
+      // (a click before it only shows "verify" and sends nothing). The widget adds an input of its own inside its host;
+      // the form's is the direct child.
+      await expect(freshPage.getByTestId('agent-signup-turnstile')).toBeVisible({ timeout: 10000 });
+      await expect(freshPage.getByTestId('agent-signup-turnstile').locator(':scope > input[name="cf-turnstile-response"]')).not.toHaveValue('', { timeout: 20000 });
 
       await freshPage.getByRole('button', { name: 'Create account' }).click();
 
