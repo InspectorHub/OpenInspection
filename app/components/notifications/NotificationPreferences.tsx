@@ -1,5 +1,6 @@
 import { Checkbox } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { notificationClassLabel } from "~/lib/notification-class-label";
 
 /**
  * The notifications screen (spec §4), rendered by all three audiences.
@@ -152,7 +153,7 @@ function ChannelCell({
                 bare
                 checked={row.channels[channel] === "on"}
                 disabled={busy || !!lockedReason}
-                aria-label={`${row.label} — ${channelLabel}`}
+                aria-label={`${notificationClassLabel(row.id, row.label)} — ${channelLabel}`}
                 {...(lockedReason ? { title: lockedReason } : {})}
                 onChange={(e) => onChange(row.id, channel, e.currentTarget.checked)}
             />
@@ -193,7 +194,7 @@ export function NotificationPreferences({
                         <ul className="mt-3 divide-y divide-ih-border">
                             {alwaysSent.map((item) => (
                                 <li key={item.id} className="py-2 flex items-baseline justify-between gap-4">
-                                    <span className="text-[13px] text-ih-fg-1">{item.label}</span>
+                                    <span className="text-[13px] text-ih-fg-1">{notificationClassLabel(item.id, item.label)}</span>
                                     <span className="text-[12px] text-ih-fg-3 shrink-0">
                                         {item.channels
                                             .map((c) => CHANNELS.find((x) => x.id === c)?.label() ?? c)
@@ -278,12 +279,12 @@ export function NotificationPreferences({
                                         {bulk && bulkStateOf(youChoose, { classId: row.id }) && (
                                             <BulkBox
                                                 state={bulkStateOf(youChoose, { classId: row.id })!}
-                                                label={m.notif_prefs_bulk_row({ notification: row.label })}
+                                                label={m.notif_prefs_bulk_row({ notification: notificationClassLabel(row.id, row.label) })}
                                                 disabled={busy}
                                                 onToggle={(enabled) => bulk(enabled, { classId: row.id })}
                                             />
                                         )}
-                                        {row.label}
+                                        {notificationClassLabel(row.id, row.label)}
                                     </span>
                                     {CHANNELS.map((c) => (
                                         <ChannelCell

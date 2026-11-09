@@ -1,6 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, isNull } from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
 import { users } from '../../lib/db/schema/tenant';
+import { agentTermsLedgerStatement } from './terms-acceptance';
+
 import { contacts } from '../../lib/db/schema/contact';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
@@ -65,16 +68,42 @@ export async function signup(
 
     const id = crypto.randomUUID();
     const passwordHash = await hashPassword(input.password);
-    await db.insert(users).values({
-        id,
-        tenantId: null,
-        email,
-        passwordHash,
-        name: input.name,
-        role: 'agent',
-        createdAt: new Date(),
-        termsAccepted: input.termsAccepted,
-    });
+    // The acceptance is written TWICE on purpose and in ONE batch: the ledger row
+    // (`agent_terms_acceptances`, the evidence of record, the same shape the later
+    // accept flow writes) and the `users.terms_accepted` projection the request-path
+    // gate reads. D1's `batch()` is atomic, so a failed ledger write leaves no
+    // account, and there is no instant at which an accepted user has no record.
+    //
+    // ONE clock read for both, so the row and its projection agree on the instant.
+    //
+    // HISTORICAL accounts are deliberately NOT touched. Agents who signed up before
+    // this ledger write existed hold the projection and no ledger row; nothing here
+    // or anywhere backfills one, because an acceptance record is never created or
+    // rebuilt after the fact. They keep passing the gate through the projection (the
+    // hash still matches) and their history reads empty until the terms change and
+    // they accept again, which then writes a row.
+    const acceptedAt = new Date(input.termsAccepted.at);
+    const statements: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
+        db.insert(users).values({
+            id,
+            tenantId: null,
+            email,
+            passwordHash,
+            name: input.name,
+            role: 'agent',
+            createdAt: new Date(),
+            termsAccepted: input.termsAccepted,
+        }),
+        agentTermsLedgerStatement(db, {
+            userId: id,
+            version: input.termsAccepted.version,
+            contentHash: input.termsAccepted.contentHash,
+            acceptedAt,
+            ip: input.termsAccepted.ip,
+            country: input.termsAccepted.country,
+        }),
+    ];
+    await db.batch(statements);
 
     await autoLinkSameEmail(rawDb, id, email);
     return { userId: id, email };

@@ -9,7 +9,7 @@ import { BrowserTimezoneHint } from "~/components/settings/BrowserTimezoneHint";
 import { NotificationSettings } from "~/components/notifications/NotificationSettings";
 import type { AlwaysSentItem, ChannelId, ChoiceRow } from "~/components/notifications/NotificationPreferences";
 import type { SmsConsent } from "~/components/notifications/SmsConsentBlock";
-import { useDisplayLocale } from "~/hooks/useSessionContext";
+import { useUiLocale } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { useTimezoneOptions } from "~/hooks/useTimezoneOptions";
@@ -162,7 +162,7 @@ export default function AgentSettingsProfilePage() {
 
   const [applyAll, setApplyAll] = useState(false);
   const navigate = useNavigate();
-  const locale = useDisplayLocale();
+  const locale = useUiLocale();
 
   const { fetcher: tzFetcher, submit: submitTz, busy: tzSaving } =
     useGuardedSubmit<typeof action>();

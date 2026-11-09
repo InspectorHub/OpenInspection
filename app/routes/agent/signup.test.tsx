@@ -20,7 +20,7 @@
  *     into the agent's referrals.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
+import { render, act, fireEvent, waitFor } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
 const agentSignupPost = vi.fn();
@@ -210,13 +210,13 @@ describe("the agent terms tick is required", () => {
  */
 const TERMS = { version: "2026-09-01", contentHash: "a".repeat(64), body: "Agent terms text." };
 
-function renderSignup(terms: typeof TERMS | null) {
+function renderSignup(terms: typeof TERMS | null, turnstileSiteKey: string | null = null, onAction: () => object = () => ({})) {
   const Stub = createRoutesStub([
     {
       path: "/agent-signup",
       Component: AgentSignupPage,
-      loader: () => ({ email: "", returnTo: "", terms }),
-      action: async () => ({}),
+      loader: () => ({ email: "", returnTo: "", terms, turnstileSiteKey }),
+      action: async () => onAction(),
     },
   ]);
   return render(<Stub initialEntries={["/agent-signup"]} />);
@@ -301,5 +301,142 @@ describe("agent signup page — copy aimed at an external agent (F73)", () => {
     // Rendered as two hyphens, not an em dash — the only place on the page that
     // punctuation appeared.
     expect(text).not.toMatch(/instead --/);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  The bot challenge                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The server enforces a Turnstile challenge on signup wherever the deployment
+ * mandates one (SaaS always), but this page rendered no widget, so the form could
+ * never carry a token and every submit answered "Bot challenge required". The
+ * gate is not bypassed or skipped: the page renders the challenge with the site
+ * key the server resolved and posts the token it yields.
+ */
+describe("agent signup page — the bot challenge", () => {
+  type RenderOpts = {
+    sitekey: string;
+    callback: (token: string) => void;
+    "expired-callback"?: () => void;
+    "error-callback"?: () => void;
+  };
+  const renderWidget = vi.fn((_el: HTMLElement, _opts: RenderOpts) => "widget-1");
+
+  beforeEach(() => {
+    renderWidget.mockClear();
+    window.turnstile = { render: renderWidget, remove: vi.fn() };
+  });
+
+  const lastOpts = () => renderWidget.mock.calls.at(-1)![1];
+  const tokenInput = (c: HTMLElement) => c.querySelector<HTMLInputElement>('input[name="cf-turnstile-response"]');
+
+  it("renders the widget with the site key the server resolved", async () => {
+    const { findByText, container } = renderSignup(TERMS, "1x00000000000000000000AA");
+    await findByText("Create account");
+    await waitFor(() => expect(renderWidget).toHaveBeenCalledTimes(1));
+    expect(lastOpts().sitekey).toBe("1x00000000000000000000AA");
+    expect(container.querySelector("[data-testid='agent-signup-turnstile']")).toBeTruthy();
+  });
+
+  it("puts the solved token in the cf-turnstile-response field the action reads", async () => {
+    const { findByText, container } = renderSignup(TERMS, "site-key");
+    await findByText("Create account");
+    await waitFor(() => expect(renderWidget).toHaveBeenCalled());
+    act(() => lastOpts().callback("tok-123"));
+    expect(tokenInput(container)?.value).toBe("tok-123");
+  });
+
+  it("renders no widget and no token field where the deployment challenges nobody", async () => {
+    const { findByText, container } = renderSignup(TERMS, null);
+    await findByText("Create account");
+    expect(renderWidget).not.toHaveBeenCalled();
+    expect(container.querySelector("[data-testid='agent-signup-turnstile']")).toBeNull();
+    expect(tokenInput(container)).toBeNull();
+  });
+
+  it("does not submit before a token exists, and says why", async () => {
+    const action = vi.fn(() => ({}));
+    const { findByText, findByRole, container } = renderSignup(TERMS, "site-key", action);
+    await findByText("Create account");
+    fireEvent.submit(container.querySelector("form")!);
+    expect((await findByRole("alert")).textContent).toMatch(/complete the verification/i);
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("drops an expired token and asks again", async () => {
+    const { findByText, findByRole, container } = renderSignup(TERMS, "site-key");
+    await findByText("Create account");
+    await waitFor(() => expect(renderWidget).toHaveBeenCalled());
+    act(() => lastOpts().callback("tok-1"));
+    act(() => lastOpts()["expired-callback"]!());
+    expect(tokenInput(container)?.value).toBe("");
+    expect((await findByRole("alert")).textContent).toMatch(/complete the verification/i);
+  });
+
+  it("says so when the challenge cannot load or errors", async () => {
+    const { findByText, findByRole } = renderSignup(TERMS, "site-key");
+    await findByText("Create account");
+    await waitFor(() => expect(renderWidget).toHaveBeenCalled());
+    act(() => lastOpts()["error-callback"]!());
+    expect((await findByRole("alert")).textContent).toMatch(/could not load/i);
+  });
+
+  async function submitWith(result: () => object) {
+    const view = renderSignup(TERMS, "site-key", result);
+    await view.findByText("Create account");
+    await waitFor(() => expect(renderWidget).toHaveBeenCalledTimes(1));
+    act(() => lastOpts().callback("tok-1"));
+    const form = view.container.querySelector("form")!;
+    for (const [name, value] of [["name", "Alice Agent"], ["email", "a@x.com"], ["password", "SuperSecret123!"]]) {
+      fireEvent.change(form.querySelector(`[name="${name}"]`)!, { target: { value } });
+    }
+    fireEvent.click(form.querySelector('input[type="checkbox"]')!);
+    fireEvent.submit(form);
+    return view;
+  }
+
+  it("asks for a fresh challenge after the API refused, because the token was spent", async () => {
+    const { container } = await submitWith(() => ({
+      status: "error", error: { "": ["Bot challenge failed"] }, tokenSpent: true,
+    }));
+    await waitFor(() => expect(renderWidget).toHaveBeenCalledTimes(2));
+    expect(tokenInput(container)?.value).toBe("");
+  });
+
+  it("keeps the token when the server refused before calling the API (validation error)", async () => {
+    const answered = vi.fn(() => ({ status: "error", error: { "": ["Server-side validation"] } }));
+    const { container } = await submitWith(answered);
+    await waitFor(() => expect(answered).toHaveBeenCalled());
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    expect(renderWidget).toHaveBeenCalledTimes(1);
+    expect(tokenInput(container)?.value).toBe("tok-1");
+  });
+});
+
+type SentBody = { turnstileToken?: string };
+describe("agent signup action carries the challenge token", () => {
+  it("forwards cf-turnstile-response as turnstileToken", async () => {
+    await action(actionArgs({ ...VALID_SIGNUP, "cf-turnstile-response": "tok-abc" }));
+    const body = agentSignupPost.mock.calls[0]![0]!.json as SentBody;
+    expect(body.turnstileToken).toBe("tok-abc");
+  });
+
+  it("sends no turnstileToken when the form carried none, leaving the server to refuse", async () => {
+    await action(actionArgs(VALID_SIGNUP));
+    const body = agentSignupPost.mock.calls[0]![0]!.json as SentBody;
+    expect(Object.keys(body)).not.toContain("turnstileToken");
+  });
+});
+
+describe("agent signup loader exposes the challenge key", () => {
+  it("returns the key from the terms read, and null when terms are unavailable", async () => {
+    const { createApi } = await import("~/lib/api-client.server");
+    vi.mocked(createApi).mockReturnValueOnce({
+      agentSignup: { terms: { $get: async () => jsonRes({ data: { ...TERMS, turnstileSiteKey: "k1" } }) } },
+    } as never);
+    expect((await loader(loaderArgs("http://app.example.com/agent-signup"))).turnstileSiteKey).toBe("k1");
+    expect((await loader(loaderArgs("http://app.example.com/agent-signup"))).turnstileSiteKey).toBeNull();
   });
 });

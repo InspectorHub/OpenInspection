@@ -42,6 +42,7 @@ import * as schema from '../../../server/lib/db/schema';
 import { users, deploymentLegalVersions } from '../../../server/lib/db/schema';
 import { DeploymentLegalService } from '../../../server/services/deployment-legal.service';
 import { signup } from '../../../server/services/agent/signup';
+import { withBatch } from '../helpers/d1-binding';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 vi.mock('../../../server/services/agent/auto-link', () => ({
@@ -128,7 +129,8 @@ describe('agent signup is fail-closed on acceptance', () => {
         db = fix.db;
         await setupSchema(fix.sqlite);
         const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        // Signup writes the user and its ledger row in one `db.batch()`.
+        vi.mocked(drizzle).mockReturnValue(withBatch(db, fix.sqlite) as never);
     });
 
     const args = {
