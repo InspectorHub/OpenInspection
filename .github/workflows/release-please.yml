@@ -19,6 +19,9 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    # The token lives in this environment, which only the main branch may use, so a workflow on any other
+    # branch cannot read it.
+    environment: release
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -28,14 +31,15 @@ jobs:
           # A Release PR opened by the default GITHUB_TOKEN does not re-trigger
           # other workflows (e.g. CI), so its checks stay empty. To run CI on the
           # Release PR, provide a PAT or GitHub App token as RELEASE_PLEASE_TOKEN
-          # and uncomment the line below; otherwise the Release PR carries no CI.
-          # token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          # and set it as the secret RELEASE_PLEASE_TOKEN of the `release` environment (restricted to main).
+          # Without it the step below falls back to the default token.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
 
-      # Releases and tags created with GITHUB_TOKEN do not trigger other
-      # workflows, so publish-field-ui.yml cannot listen for the tag. A
-      # workflow_dispatch started with GITHUB_TOKEN is exempt from that rule, and
-      # it runs publish-field-ui.yml itself, which keeps the filename that npm
-      # trusted publishing is bound to. The ref is the tag release-please made.
+      # Publishing is started only by this dispatch, which keeps the workflow filename that npm trusted
+      # publishing is bound to and a single entry point. Do not make publish-field-ui.yml listen for the
+      # tag: with RELEASE_PLEASE_TOKEN set, release-please's tags and releases do trigger workflows, so a
+      # tag listener would publish twice. A workflow_dispatch started with GITHUB_TOKEN is exempt from the
+      # rule that GITHUB_TOKEN events trigger nothing. The ref is the tag release-please made.
       - name: Publish @inspectorhub/field-ui
         if: >-
           github.repository == 'InspectorHub/OpenInspection' &&
