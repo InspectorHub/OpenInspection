@@ -15,6 +15,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import type { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
+import { GEN_KEY } from '../../server/durable-objects/inspection-doc-generation';
 import type { TenantPresenceDO } from '../../server/durable-objects/tenant-presence';
 
 const b = env as unknown as {
@@ -43,6 +44,18 @@ function post(path: string): Request {
     return new Request(`https://do.local${path}`, { method: 'POST' });
 }
 
+/** The two keys the Inspection DO block seeds. */
+const SEEDED_KEYS = ['ydoc:update:1', 'snapshot:0'];
+
+/**
+ * Both seeded keys are still there, and the only other thing the object may hold is its lineage generation (GEN_KEY), which it
+ * mints when it wakes, so whether it is present depends on which request woke it. Anything else would be an unexpected write.
+ */
+function expectSeededIntact(keys: string[]): void {
+    for (const k of SEEDED_KEYS) expect(keys).toContain(k);
+    expect(keys.filter((k) => !SEEDED_KEYS.includes(k)).every((k) => k === GEN_KEY)).toBe(true);
+}
+
 describe('InspectionDocDO purge', () => {
     let stub: DurableObjectStub;
     beforeEach(async () => {
@@ -52,25 +65,26 @@ describe('InspectionDocDO purge', () => {
     });
 
     it('empties its storage and says so', async () => {
-        expect(await storedKeys(stub)).toHaveLength(2);
+        expectSeededIntact(await storedKeys(stub));
 
         const res = await stub.fetch(post('/purge'));
         expect(res.status).toBe(200);
         expect(await res.json()).toEqual({ purged: true });
 
-        expect(await storedKeys(stub)).toHaveLength(0);
+        // Exactly empty: the seeded keys AND the lineage generation are gone.
+        expect(await storedKeys(stub)).toEqual([]);
     });
 
     it('does not purge on a path that only resembles the verb', async () => {
         const res = await stub.fetch(post('/purged'));
         expect(res.status).toBe(404);
-        expect(await storedKeys(stub)).toHaveLength(2);
+        expectSeededIntact(await storedKeys(stub));
     });
 
     it('does not purge on a GET', async () => {
         const res = await stub.fetch(new Request('https://do.local/purge'));
         expect(res.status).toBe(404);
-        expect(await storedKeys(stub)).toHaveLength(2);
+        expectSeededIntact(await storedKeys(stub));
     });
 });
 

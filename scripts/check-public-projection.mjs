@@ -106,6 +106,7 @@ export const OUT_OF_SCOPE = {
     'server/features/setup-wizard/index.ts': 'answers a fixed text; the wizard is a page, not an API',
     'server/portal/integration.routes.ts': 'the portal signs the call (service-binding HMAC); no anonymous caller',
     'server/portal/statutory-admin.routes.ts': 'the portal signs the call (service-binding HMAC); no anonymous caller',
+    'server/portal/collab-admin.routes.ts': 'every route is behind requireServiceBinding (the portal signs the call with the x-portal-m2m MAC); no anonymous caller',
 };
 
 /** A route module that answers with what another scanned module builds from the request context; the delegate must be in the set. */

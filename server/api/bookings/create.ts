@@ -82,6 +82,7 @@ app.openapi(createBookingRoute, async (c) => {
         // The company's own monthly allowance is spent. The visitor is not the one who set it up and has nothing
         // to act on, so they get a neutral answer that names no plan; the owner is told once per month through
         // the existing threshold notice (deduped there per month).
+        // projection-allow: the helper returns `never` and builds no response; it throws a fixed neutral refusal (no row, no plan name) or rethrows the error as it is
         return refuseVisitorOnSpentAllowance(c, tenantId, err);
     }
 });

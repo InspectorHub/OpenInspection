@@ -88,7 +88,7 @@ describe("call sites still build the same fragments", () => {
     const sites: Array<[string, string[]]> = [
         ["packages/field-ui/src/components/editor/ItemEditor.tsx", ["urls.photo(inspectionId ?? \"\", k, \"thumb\")"]],
         ["packages/field-ui/src/components/editor/SideRail.tsx", ["urls.photo(inspectionId ?? \"\", key, \"thumb\")", "urls.photo(inspectionId ?? \"\", key, \"original\")"]],
-        ["packages/field-ui/src/hooks/usePhotoOps.ts", ["urls.photo(state.inspection.id, baseKey)", "urls.photo(state.inspection.id, dk)", "urls.photo(state.inspection.id, annotateBaseKey, \"original\")", "urls.photo(state.inspection.id, originalKey, \"original\")"]],
+        ["packages/field-ui/src/hooks/usePhotoOps.ts", ["urls.photo(state.inspection.id, baseKey)", "urls.photo(state.inspection.id, dk)", "(id, key, size) => urls.photo(id, key, size), photo.originalKey)", "urls.photo(state.inspection.id, originalKey, \"original\")"]],
         ["packages/field-ui/src/components/editor/EditorHeader.tsx", ["urls.reportPreview(tenantSlug, String(state.inspection.id))"]],
         ["packages/field-ui/src/components/media-studio/VideoPlayer.tsx", ["urls.videoObject(inspectionId, mediaId)"]],
         [
@@ -97,7 +97,9 @@ describe("call sites still build the same fragments", () => {
         ],
         ["packages/field-ui/src/components/editor/InspectionOverview.tsx", ["urls.statutoryPreviewPdf(String(bag.id))"]],
         ["packages/field-ui/src/hooks/useHostActions.ts", ["dataSource.urls.reportPreview(tenantSlug, inspectionId)"]],
-        ["packages/field-ui/src/editor/FieldEditor.tsx", ["dataSource.urls.photo(String(state.inspection.id), photos[0], \"original\")"]],
+        ["packages/field-ui/src/editor/FieldEditor.tsx", ["(id, key, size) => dataSource.urls.photo(id, key, size))"]],
+        // The studio helper both of those call is where the size variant is chosen: the annotate base is always the original.
+        ["packages/field-ui/src/components/media-studio/photo-studio-target.ts", ["photoUrl(inspectionId, keys.baseKey, 'original')"]],
         ["packages/field-ui/src/components/editor/PublishModal.tsx", ["urls.editorPath(inspectionId)"]],
     ];
     for (const [file, fragments] of sites) {

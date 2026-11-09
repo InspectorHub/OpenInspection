@@ -91,7 +91,7 @@ export const DEFAULT_BATCH = 5;
 /** One stored document as the database knows it. `reportId` is null only for a row from before reports existed. */
 export interface CollabDocRef { rowId: string; tenantId: string; inspectionId: string; reportId: string | null }
 
-export interface MigrationConflict {
+interface MigrationConflict {
     /** The `inspection_results` row id: what the cursor and `restoreBackupFor` use. */
     rowId:        string;
     name:         string;
@@ -105,13 +105,13 @@ export interface MigrationConflict {
     reason:       ImportRefusal | 'source-differs-from-database' | 'source-unreadable' | 'database-row-unreadable' | 'unknown';
 }
 
-export type SkipReason = 'no-report-id' | 'identity-mismatch';
-export interface MigrationSkip { rowId: string; name: string; reason: SkipReason }
+type SkipReason = 'no-report-id' | 'identity-mismatch';
+interface MigrationSkip { rowId: string; name: string; reason: SkipReason }
 
-export type RowOutcome = 'copied' | 'replaced' | 'alreadyThere' | 'empty' | 'conflict' | 'skipped' | 'failed' | 'wouldCopy';
+type RowOutcome = 'copied' | 'replaced' | 'alreadyThere' | 'empty' | 'conflict' | 'skipped' | 'failed' | 'wouldCopy';
 
 /** One line per row handled in the batch: which row it was and what happened, so every outcome can be traced to a row id. */
-export interface MigrationRow { rowId: string; name: string; outcome: RowOutcome }
+interface MigrationRow { rowId: string; name: string; outcome: RowOutcome }
 
 export interface MigrationReport {
     total:        number;

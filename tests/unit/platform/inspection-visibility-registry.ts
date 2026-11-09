@@ -115,7 +115,7 @@ export const SET_READS: Record<string, Entry> = {
     'GET /api/admin/agreements/requests': E('admin-only', 'requireRole(owner, manager)'),
     'GET /api/admin/agreements/requests/:id': E('admin-only', 'requireRole(owner, manager)'),
     'POST /api/team/payroll-export': E('admin-only', 'requireRole(owner, manager) and companyFinance'),
-    'GET /api/usage/summary': E('company-open-staff', 'lifetime capacity figures; no inspection rows'),
+    'GET /api/usage/summary': E('company-open-staff', 'capacity figures (lifetime counters, plus the inspection count of the current month for a capped plan, read in server/features/plan-quota/month-usage.ts); a company-wide count, no inspection rows'),
     'GET /api/billing/summary': E('admin-only', 'requireRole(owner, manager)'),
     'GET /api/agent/leaderboard': E('admin-only', 'requireRole(owner, manager)'),
 };
@@ -153,7 +153,6 @@ export const API_FILE_CLASSIFICATION: Record<string, Entry> = {
     'server/api/calendar-items.ts': E('scoped-service', 'the feed is cut to the visible set; another person needs scheduleOthers; the dispatch board is capability-gated'),
     'server/api/invoices.ts': E('scoped-service', 'the list is cut to visible inspections; mutations are owner/manager'),
     'server/api/metrics.ts': E('scoped-service', 'a restricted caller gets the own-row view'),
-    'server/api/usage.ts': E('company-open-staff', 'lifetime capacity counters'),
     'server/api/ics.ts': E('self-only', 'a token resolves to one user and that user own roster'),
     'server/api/sms.ts': E('handler-assert', 'public opt-in and webhooks are token-driven; GET /sms/consent asserts visibility; the rest is owner/manager'),
     'server/api/agent/photo.ts': E('self-only', 'agent report photos: published and released reports only, and only the repair items the agent is entitled to see'),

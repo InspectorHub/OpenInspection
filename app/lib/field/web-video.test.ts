@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { VideoUploadTicket } from "@core/field-ui/data-source-types";
+import { MAX_FORM_VIDEO_BYTES } from "../../../server/lib/media/video-types";
 import { apiErrorReason, createWebVideo, posterRoute, uploadWithProgressBody, VIDEO_UPLOAD_TIMEOUT_MS, WEB_R2_VIDEO_MAX_BYTES } from "./web-video";
 
 const ok = (body: unknown = { success: true }) =>
@@ -260,8 +261,7 @@ describe("createWebVideo.remove", () => {
 });
 
 describe("createWebVideo.maxUploadBytes", () => {
-    it("holds an r2 clip to the single-request limit the engine enforces, and leaves Stream (direct upload) at the default", async () => {
-        const { MAX_FORM_VIDEO_BYTES } = await import("../../../server/lib/media/video-types");
+    it("holds an r2 clip to the single-request limit the engine enforces, and leaves Stream (direct upload) at the default", () => {
         const limit = createWebVideo().maxUploadBytes;
         expect(limit?.r2).toBe(MAX_FORM_VIDEO_BYTES);
         expect(WEB_R2_VIDEO_MAX_BYTES).toBe(MAX_FORM_VIDEO_BYTES);

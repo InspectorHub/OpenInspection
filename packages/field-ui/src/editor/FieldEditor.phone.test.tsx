@@ -10,7 +10,7 @@ import type { EditorData } from "../data-source";
 import { m } from "../i18n";
 import type { FakeCommentsLibrary } from "../testing/fake-data-source";
 import { createEmptyEditorData } from "../testing/fake-data-source";
-import { DATA, VIDEO_DATA, mount, resizeViewport, stubCamera } from "./FieldEditor.capabilities.fixtures";
+import { DATA, VIDEO_DATA, VIEWER_CONTROL_ACTION, mount, resizeViewport, stubCamera } from "./FieldEditor.capabilities.fixtures";
 
 afterEach(() => {
   cleanup();
@@ -169,7 +169,7 @@ describe("phone user paths into the shared overlays", () => {
     fireEvent.click((await screen.findAllByText("Flashing condition"))[0]);
     fireEvent.click(await screen.findByTestId("thumb-0"));
     // The viewer's own toolbar is on screen, and it is the only one.
-    expect(await screen.findAllByRole("button", { name: m.media_viewer_cover() })).toHaveLength(1);
+    expect(await screen.findAllByRole("button", { name: VIEWER_CONTROL_ACTION() })).toHaveLength(1);
   });
 
   async function openSections() {

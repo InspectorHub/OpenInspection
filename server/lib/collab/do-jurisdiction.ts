@@ -15,14 +15,6 @@ export type DoJurisdiction = (typeof JURISDICTIONS)[number];
 /** The namespaces that hold personal data and so must follow the jurisdiction. */
 const PINNED_BINDINGS = ['INSPECTION_DOC', 'INSPECTION_PRESENCE', 'TENANT_PRESENCE', 'INSPECTOR_MCP'] as const;
 
-/**
- * The namespaces that store personal data as they were before pinning. Kept so objects created without a jurisdiction can be
- * read once and copied (collab) and so deletion can still reach them (collab and tenant presence): a pinned namespace mints
- * different ids, so it cannot name an object that was created before pinning.
- */
-export const UNPINNED_COLLAB_BINDING = 'INSPECTION_DOC_UNPINNED';
-export const UNPINNED_TENANT_PRESENCE_BINDING = 'TENANT_PRESENCE_UNPINNED';
-
 export function readDoJurisdiction(env: Pick<JurisdictionEnv, 'DO_JURISDICTION'>): DoJurisdiction | null {
     const raw = env.DO_JURISDICTION?.trim().toLowerCase();
     if (!raw) return null;

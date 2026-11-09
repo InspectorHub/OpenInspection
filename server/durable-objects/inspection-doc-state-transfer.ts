@@ -30,7 +30,7 @@ const SNAPSHOT_REASONS: readonly string[] = ['periodic', 'manual', 'connect', 'i
 export interface StateKeys { ydoc: string; identity: string; snapshots: string; derived: string; backup: string; gen: string }
 
 /** The document a replacement displaced, kept so the replacement can be undone (see `/state-restore-backup`). */
-export interface ReplacedBackup {
+interface ReplacedBackup {
     ydoc:      Uint8Array;
     /** Digest of the displaced document. */
     sha256:    string;
@@ -64,7 +64,7 @@ export interface StateExport {
 }
 
 /** A restore point as it arrives: any field may be missing or wrong, `parseStateImport` checks it. */
-export interface RawSnapshot {
+interface RawSnapshot {
     seq?:        number;
     atMs?:       number;
     byUserId?:   string | null;
@@ -114,7 +114,7 @@ export function base64ToBytes(s: string): Uint8Array {
     return out;
 }
 
-export async function sha256Hex(bytes: Uint8Array): Promise<string> {
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
     return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
 }

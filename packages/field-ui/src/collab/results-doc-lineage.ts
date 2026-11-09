@@ -61,7 +61,7 @@ export function readFrameGeneration(decoder: decoding.Decoder): string | null {
 }
 
 /** True when the document holds any finding: an empty store has nothing worth a backup. */
-export function holdsResults(doc: Y.Doc): boolean {
+function holdsResults(doc: Y.Doc): boolean {
     return doc.getMap('results').size > 0;
 }
 

@@ -33,6 +33,7 @@ vi.mock("~/lib/api-client.server", () => ({
   })),
 }));
 
+import { createApi } from "~/lib/api-client.server";
 import { loader, action } from "~/routes/agent/signup";
 import AgentSignupPage from "~/routes/agent/signup";
 
@@ -432,7 +433,6 @@ describe("agent signup action carries the challenge token", () => {
 
 describe("agent signup loader exposes the challenge key", () => {
   it("returns the key from the terms read, and null when terms are unavailable", async () => {
-    const { createApi } = await import("~/lib/api-client.server");
     vi.mocked(createApi).mockReturnValueOnce({
       agentSignup: { terms: { $get: async () => jsonRes({ data: { ...TERMS, turnstileSiteKey: "k1" } }) } },
     } as never);

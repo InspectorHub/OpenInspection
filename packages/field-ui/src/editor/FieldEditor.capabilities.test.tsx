@@ -13,7 +13,7 @@ import { cleanup, screen, waitFor, fireEvent, within } from "@testing-library/re
 import type { EditorData } from "../data-source";
 import { m } from "../i18n";
 import type { FakeCommentsLibrary } from "../testing/fake-data-source";
-import { ALL_OMITS, EMPTY_TEMPLATE_DATA, VIDEO_DATA, mount, stubViewport, type Absent } from "./FieldEditor.capabilities.fixtures";
+import { ALL_OMITS, EMPTY_TEMPLATE_DATA, VIDEO_DATA, VIEWER_CONTROL_ACTION, mount, stubViewport, type Absent } from "./FieldEditor.capabilities.fixtures";
 
 beforeEach(() => stubViewport(false));
 afterEach(() => {
@@ -289,7 +289,7 @@ const ENTRIES: Entry[] = [
       await openItem(phone);
       fireEvent.click(await screen.findByTestId("thumb-0"));
       // The other toolbar actions are the control: the viewer itself opened.
-      await screen.findByRole("button", { name: m.media_viewer_cover() });
+      await screen.findByRole("button", { name: VIEWER_CONTROL_ACTION() });
       return has(m.media_viewer_poster());
     },
   },

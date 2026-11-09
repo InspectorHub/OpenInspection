@@ -63,7 +63,7 @@ export type VideoUploaded =
 type Phase = "pick" | "uploading" | "finalizing";
 
 /** The size limit that applies to a backend: the host's, else the default. */
-export function maxVideoBytes(provider: "stream" | "r2", host?: { r2?: number; stream?: number }): number {
+function maxVideoBytes(provider: "stream" | "r2", host?: { r2?: number; stream?: number }): number {
   return host?.[provider] ?? MAX_VIDEO_BYTES;
 }
 

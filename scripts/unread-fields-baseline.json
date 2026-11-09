@@ -1,15 +1,71 @@
 {
-  "app/components/portal/sections/report/types.ts#StyleProfileClient.schemaVersion": {
-    "kind": "wire-shape",
-    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
+  "packages/field-ui/src/collab/results-doc-lineage.ts#DiscardedStoreInfo.serverGen": {
+    "kind": "deferred",
+    "reason": "Stored with the discarded-store backup slot (web-lineage-store.ts spreads the whole info object into IndexedDB, so no `.serverGen` read exists) as a diagnostic of which server generation replaced the store; nothing in the product reads the slot back yet, only tests do."
   },
-  "app/components/template/types.ts#TemplateSchema.schemaVersion": {
-    "kind": "wire-shape",
-    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
+  "packages/field-ui/src/decode-image.ts#DecodeImageOptions.keepOriginal": {
+    "kind": "invisible-read",
+    "reason": "The byte budget field-ui hands to the host's image decoder when the keep-original setting is on. It is filled here and read only by the decoder a host supplies through `media.decodeImage`, which lives in the native client repository, so no consumer exists in this tree. Dropping it would leave the host unable to learn the limit."
   },
-  "packages/field-ui/src/shared/structure-ops.ts#Snapshot.schemaVersion": {
-    "kind": "wire-shape",
-    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
+  "packages/field-ui/src/shared/template-schema.ts#TemplateSection.sharedComments": {
+    "kind": "invisible-read",
+    "reason": "Read by NAME as a string: `app/lib/editor/structure-ops.ts` lists `'sharedComments'` among the section keys it carries across a structure edit. A string in a list is a read no name-based scan can follow."
+  },
+  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.commands": {
+    "kind": "record",
+    "reason": "The ordered list of commands the editor issued on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.reloadCount": {
+    "kind": "record",
+    "reason": "How many times the editor asked the host to reload on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.restartCount": {
+    "kind": "record",
+    "reason": "How many times the editor asked the host to restart the session on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.openedUrls": {
+    "kind": "record",
+    "reason": "The addresses the editor asked the host to open on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.exitCount": {
+    "kind": "record",
+    "reason": "How many times the editor asked the host to leave on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.posters": {
+    "kind": "record",
+    "reason": "The poster images the editor asked for on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.createUploads": {
+    "kind": "record",
+    "reason": "The video upload sessions the editor created on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.uploadedFiles": {
+    "kind": "record",
+    "reason": "The video files the editor uploaded on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.posterUploads": {
+    "kind": "record",
+    "reason": "The poster images the editor uploaded on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.finalizes": {
+    "kind": "record",
+    "reason": "The video uploads the editor finalised on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVersionHistory.restores": {
+    "kind": "record",
+    "reason": "The versions the editor restored on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVersionHistory.gets": {
+    "kind": "record",
+    "reason": "The versions the editor opened on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeSettingsSheet.loads": {
+    "kind": "record",
+    "reason": "The times the editor loaded the settings sheet on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-resources.ts#FakeTemplateSearch.searches": {
+    "kind": "record",
+    "reason": "The ordered list of template searches the editor issued on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
   },
   "server/cron/types.ts#CronJob.maxBatch": {
     "kind": "invisible-read",
@@ -26,6 +82,10 @@
   "server/lib/billing-summary.ts#BillingSummary.guests": {
     "kind": "wire-shape",
     "reason": "Returned whole: `GET /api/billing/summary` does `{ ...summary, portalUrl }` (or returns `summary` unchanged) and ships it. The spread reads every field. Whether the seat page RENDERS the guest count is a different question from whether the field is read."
+  },
+  "server/lib/collab/do-jurisdiction.ts#JurisdictionEnv.INSPECTOR_MCP": {
+    "kind": "deferred",
+    "reason": "Typing for the INSPECTOR_MCP binding pinned by name: PINNED_BINDINGS in the same file lists it and reads it by key (env[name]), so no `.INSPECTOR_MCP` property read exists; the field keeps the binding in the declared env shape."
   },
   "server/lib/compliance/erasure-coverage.ts#ErasureCoverageDisclosure.manifestRuleCount": {
     "kind": "wire-shape",
@@ -75,10 +135,6 @@
     "kind": "invisible-read",
     "reason": "Names the tenant_configs column carrying a per-tenant override in YEARS, where 0 means indefinite. retention-report-pdfs.ts reads exactly that column, resolving one window per distinct tenant. Not a property read for the same reason as its sibling - the executor hardcodes it - and now pinned by tests/unit/privacy/retention-logs.spec.ts: an override shorter than the default must delete, a longer one must keep, 0 must keep forever, and a missing config row must fall back to the disclosed default rather than to indefinite. CORRECTION: this entry used to say \"no manifest-driven sweep exists - the only runtime sweep in the tree is the hand-written e-sign one\". Both halves were false."
   },
-  "server/lib/compliance/retention-sweep.ts#RetentionSweepSummary.purgedArtefacts": {
-    "kind": "invisible-read",
-    "reason": "Logged whole: `cron/jobs/agreements.ts` calls `logger.info('[cron] retention sweep purged signatures', summary)`, so every count in the summary reaches the structured log. The object is the argument; no field is named."
-  },
   "server/lib/google-calendar.ts#GoogleTokenResponse.token_type": {
     "kind": "wire-shape",
     "reason": "The OAuth token response as the provider sends it — Google here, Intuit in `qbo.schema.ts`. Declared so the shape is honest about what arrives; nothing needs to branch on a value that is always \"Bearer\"."
@@ -115,10 +171,6 @@
     "kind": "invisible-read",
     "reason": "Read by the qrcode package's svg-tag renderer, which this module deep-imports and hands the whole options object to. Measured rather than assumed: margin 0 gives a 21-module viewBox and margin 8 gives 37. Pinned by tests/unit/platform/qr-options.spec.ts so the pass-through cannot break silently on an upgrade."
   },
-  "server/lib/report-style/profiles.ts#StyleProfile.schemaVersion": {
-    "kind": "wire-shape",
-    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
-  },
   "server/lib/sms/messaging-rules.ts#MessagingRule.identification": {
     "kind": "invisible-read",
     "reason": "Read as a STRING key by `scripts/check-messaging-rules.mjs`, which lists it in REQUIREMENT_KEYS and validates its allowed values. `send-gate.ts` says outright that it does not enforce it and does not pretend to — it never sees the composed body and does not own the inbound path — and points at the register for where enforcement lives."
@@ -130,10 +182,6 @@
   "server/lib/sms/sender-identity.ts#SmsSenderIdentity.tenantOnWhoseBehalf": {
     "kind": "wire-shape",
     "reason": "Stored in the `sender_identity` JSON column beside `platformSender` — the tenant a message was sent FOR. The pair is the record of who transmitted on whose behalf; nothing branches on it and nothing should."
-  },
-  "server/lib/version-diff.ts#Snapshot.schemaVersion": {
-    "kind": "wire-shape",
-    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
   "server/portal/outbox.service.ts#OutboxRow.lastTriedAt": {
     "kind": "wire-shape",
@@ -162,10 +210,6 @@
   "server/services/inspection/inspection-analytics.service.ts#RepairListEntry.recommendationLabel": {
     "kind": "wire-shape",
     "reason": "Part of the published response contract — `report-delivery.ts` declares it on the schema and the analytics service fills it from the slug map. It leaves the process; our own client does not render it, which is a separate question from whether the field is dead."
-  },
-  "server/services/inspection/report-schema-types.ts#SchemaData.schemaVersion": {
-    "kind": "wire-shape",
-    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
   "server/services/integrations.service.ts#IntegrationRow.lastSync": {
     "kind": "wire-shape",
@@ -242,73 +286,5 @@
   "server/types/hono.ts#AppEnv.JWT_PUBLIC_KEY_V3": {
     "kind": "invisible-read",
     "reason": "Read as `env[`JWT_PUBLIC_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts). The next rotation slot; provisioning it is a verify-only window before JWT_CURRENT_KID flips."
-  },
-  "packages/field-ui/src/shared/template-schema.ts#TemplateSection.sharedComments": {
-    "kind": "invisible-read",
-    "reason": "Read by NAME as a string: `app/lib/editor/structure-ops.ts` lists `'sharedComments'` among the section keys it carries across a structure edit. A string in a list is a read no name-based scan can follow."
-  },
-  "packages/field-ui/src/shared/template-schema.ts#TemplateSchemaV2.schemaVersion": {
-    "kind": "wire-shape",
-    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
-  },
-  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.commands": {
-    "kind": "record",
-    "reason": "The ordered list of commands the editor issued on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.reloadCount": {
-    "kind": "record",
-    "reason": "How many times the editor asked the host to reload on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.exitCount": {
-    "kind": "record",
-    "reason": "How many times the editor asked the host to leave on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-resources.ts#FakeTemplateSearch.searches": {
-    "kind": "record",
-    "reason": "The ordered list of template searches the editor issued on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.restartCount": {
-    "kind": "record",
-    "reason": "How many times the editor asked the host to restart the session on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.openedUrls": {
-    "kind": "record",
-    "reason": "The addresses the editor asked the host to open on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.posters": {
-    "kind": "record",
-    "reason": "The poster images the editor asked for on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.createUploads": {
-    "kind": "record",
-    "reason": "The video upload sessions the editor created on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.uploadedFiles": {
-    "kind": "record",
-    "reason": "The video files the editor uploaded on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.posterUploads": {
-    "kind": "record",
-    "reason": "The poster images the editor uploaded on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.finalizes": {
-    "kind": "record",
-    "reason": "The video uploads the editor finalised on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVersionHistory.restores": {
-    "kind": "record",
-    "reason": "The versions the editor restored on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVersionHistory.gets": {
-    "kind": "record",
-    "reason": "The versions the editor opened on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeSettingsSheet.loads": {
-    "kind": "record",
-    "reason": "The times the editor loaded the settings sheet on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "packages/field-ui/src/decode-image.ts#DecodeImageOptions.keepOriginal": {
-    "kind": "invisible-read",
-    "reason": "The byte budget field-ui hands to the host's image decoder when the keep-original setting is on. It is filled here and read only by the decoder a host supplies through `media.decodeImage`, which lives in the native client repository, so no consumer exists in this tree. Dropping it would leave the host unable to learn the limit."
   }
 }
