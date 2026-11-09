@@ -170,7 +170,12 @@ export default defineConfig({
     // instead of vitest's transform pipeline, which throws "Invalid or unexpected
     // token" on these standalone build scripts. Tests import their exported pure
     // functions through a runtime `import(fileURL)`.
-    server: { deps: { external: [/scripts[\\/].+\.mjs$/] } },
+    //
+    // The generated message catalogues are loaded the same way: server/lib/i18n/messages.ts re-exports
+    // app/paraglide, ~3.7 MB of generated source that Vite would otherwise transform again in every
+    // isolated file (the web suite's config has the measurements). No unit spec mocks either path, and
+    // the runtime stays one instance because messages and runtime are both loaded by Node from the same URLs.
+    server: { deps: { external: [/scripts[\\/].+\.mjs$/, /[\\/]app[\\/]paraglide[\\/]/, /[\\/]i18n[\\/]generated[\\/]/] } },
     // Per-file environment overrides: add `// @vitest-environment happy-dom`
     // docblock to client-side test files (db, sync-engine, photo-resize, etc.)
     // that need a DOM environment. This is the vitest v4 equivalent of the

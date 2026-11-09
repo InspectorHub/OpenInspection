@@ -12,7 +12,10 @@ import { createEmptyEditorData, createFakeDataSource } from '../testing/fake-dat
 import type { FakeDataSource } from '../testing/fake-data-source';
 import { useAddStatutoryInstance } from './useAddStatutoryInstance';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 function setup() {
   const fake = createFakeDataSource({ data: createEmptyEditorData() });

@@ -114,6 +114,33 @@ const WEB_MODULE_PATTERNS = [
     ['module-level DOM access', /^(export\s+)?const\s+\w+\s*=\s*(typeof\s+window[^?]*\?\s*)?(window|document)\./m],
 ];
 
+/**
+ * Hazards that are accepted in a shared spec because tests/setup-web.ts undoes them after every test, for every
+ * project. Each entry names the hazard rule it lifts and the line of the setup file that carries the guarantee;
+ * `setupResetProblems` fails when that line goes, so an exemption cannot outlive the reset it depends on.
+ */
+export const SETUP_RESETS = {
+    'fake timers': { setup: 'tests/setup-web.ts', needle: /vi\.useRealTimers\(\)/, call: 'vi.useRealTimers()' },
+    'localStorage write': { setup: 'tests/setup-web.ts', needle: /localStorage\.clear\(\)/, call: 'localStorage.clear()' },
+};
+
+/** One string per exempted hazard whose reset is missing from its setup file (empty = every exemption is backed). */
+export function setupResetProblems(root) {
+    const problems = [];
+    for (const [hazard, { setup, needle, call }] of Object.entries(SETUP_RESETS)) {
+        let text = '';
+        try {
+            text = stripComments(readFileSync(join(root, setup), 'utf8'));
+        } catch {
+            /* a missing setup file backs nothing */
+        }
+        if (!/afterEach\(/.test(text) || !needle.test(text)) {
+            problems.push(`${setup} no longer calls ${call} in an afterEach, so specs with "${hazard}" can no longer share a worker (scripts/lib/web-isolation.mjs SETUP_RESETS)`);
+        }
+    }
+    return problems;
+}
+
 const GENERATED_I18N = /^(app\/paraglide\/|packages\/field-ui\/src\/i18n\/generated\/)/;
 
 /** The environment a spec asks for in its docblock; `node` when it names none (the project default). */
@@ -127,8 +154,12 @@ export function webSpecHazards(source) {
     const src = stripComments(source);
     const hits = [];
     for (const [name, re] of WEB_SPEC_HAZARDS) {
+        if (SETUP_RESETS[name]) continue;
         if (re.test(src) && !hits.includes(name)) hits.push(name);
     }
+    // Fake timers are accepted because tests/setup-web.ts puts the real ones back after every TEST; a clock
+    // installed once for the whole file (beforeAll / afterAll) would be torn down after its first test.
+    if (/\b(beforeAll|afterAll)\(\s*(\(\)\s*=>\s*)?\{?\s*vi\.(useFakeTimers|setSystemTime)\b/.test(src)) hits.push('fake timers in a file-level hook');
     const env = webSpecEnvironment(source);
     if (env !== 'node' && env !== 'happy-dom') hits.push(`environment ${env}`);
     // A global written through an alias: `const g = globalThis; g.x = 1`.

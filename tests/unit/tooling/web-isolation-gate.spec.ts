@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url';
 type Manifest = { shared?: { node?: string[]; dom?: string[] }; forcedIsolated?: Record<string, string> };
 type Check = (root: string, manifest: Manifest, specs: string[]) => { errors: string[]; shared: number; total: number };
 let checkManifest: Check;
+let setupResetProblems: (root: string) => string[];
 let root: string;
 
 function put(rel: string, body: string) {
@@ -33,6 +34,7 @@ beforeAll(async () => {
     const url = pathToFileURL(path.join(process.cwd(), 'scripts/check-web-isolation.mjs')).href;
     // @vite-ignore: native load, the script is plain ESM outside the vitest transform.
     ({ checkManifest } = await import(/* @vite-ignore */ url));
+    ({ setupResetProblems } = await import(/* @vite-ignore */ pathToFileURL(path.join(process.cwd(), 'scripts/lib/web-isolation.mjs')).href));
     root = mkdtempSync(path.join(tmpdir(), 'web-isolation-'));
     put('app/other.test.ts', "it('x', () => {});\n");
     put('app/other.test.tsx', "// @vitest-environment happy-dom\nit('x', () => {});\n");
@@ -53,12 +55,11 @@ describe('web-isolation gate: spec-level hazards', () => {
     it.each([
         ['a module mock', "vi.mock('~/lib/pure', () => ({}));", 'module mock'],
         ['a global stub', "vi.stubGlobal('fetch', () => 1);", 'global stub'],
-        ['fake timers', 'vi.useFakeTimers();', 'fake timers'],
+        ['fake timers installed for the whole file', 'beforeAll(() => vi.useFakeTimers());', 'fake timers in a file-level hook'],
         ['a global write', 'globalThis.flag = 1;', 'global write'],
         ['a browser API replacement', 'window.matchMedia = () => null;', 'browser API replacement'],
         ['a prototype write on any element class', 'HTMLImageElement.prototype.decode = () => null;', 'browser API replacement'],
         ['a spy on any element prototype', "vi.spyOn(HTMLImageElement.prototype, 'complete', 'get');", 'spy on a browser object'],
-        ['a localStorage write', "localStorage.setItem('k', 'v');", 'localStorage write'],
         ['a sessionStorage use', "sessionStorage.getItem('k');", 'browser storage write'],
         ['a location write', "window.location = 'http://x';", 'navigator/location/history write'],
         ['a body mutation', "document.body.appendChild(document.createElement('div'));", 'document head/body mutation'],
@@ -72,6 +73,19 @@ describe('web-isolation gate: spec-level hazards', () => {
     it('rejects an environment other than node or happy-dom', () => {
         const errors = verdict('dom', 'app/components/Jsdom.test.tsx', "// @vitest-environment jsdom\nit('x', () => {});\n");
         expect(errors.join('\n')).toContain('environment jsdom');
+    });
+
+    it.each([
+        ['fake timers', 'vi.useFakeTimers();'],
+        ['a pinned clock', 'vi.setSystemTime(0);'],
+        ['a localStorage write', "localStorage.setItem('k', 'v');"],
+    ])('accepts %s, which tests/setup-web.ts undoes after every test', (_label, line) => {
+        expect(verdict('dom', 'app/components/Reset.test.tsx', `${DOM}${line}\nit('x', () => {});\n`)).toEqual([]);
+    });
+
+    it('still rejects a sessionStorage write, which setup-web.ts does not clear for the node project', () => {
+        const errors = verdict('dom', 'app/components/Session.test.tsx', `${DOM}sessionStorage.setItem('k', 'v');\nit('x', () => {});\n`);
+        expect(errors.join('\n')).toContain('browser storage write');
     });
 
     it('does not trip on a comment that merely mentions a hazard', () => {
@@ -160,6 +174,27 @@ describe('web-isolation gate: state in imported modules', () => {
             'app/lib/thing.fixtures.ts': "export const arm = () => vi.stubGlobal('fetch', () => 1);\n",
         });
         expect(errors.join('\n')).toContain('helper app/lib/thing.fixtures.ts: global stub');
+    });
+});
+
+describe('web-isolation gate: the exemptions rest on tests/setup-web.ts', () => {
+    const SETUP_OK = "afterEach(() => { vi.useRealTimers(); });\nafterEach(() => { if (typeof localStorage !== 'undefined') localStorage.clear(); });\n";
+
+    it('accepts a setup file that resets timers and localStorage after each test', () => {
+        put('tests/setup-web.ts', SETUP_OK);
+        expect(setupResetProblems(root)).toEqual([]);
+    });
+
+    it('rejects a setup file that stopped restoring real timers', () => {
+        put('tests/setup-web.ts', SETUP_OK.replace('vi.useRealTimers()', 'void 0'));
+        expect(setupResetProblems(root).join('\n')).toContain('vi.useRealTimers()');
+    });
+
+    it('rejects a setup file that stopped clearing localStorage, and one that only mentions the calls in a comment', () => {
+        put('tests/setup-web.ts', SETUP_OK.replace('localStorage.clear()', 'void 0'));
+        expect(setupResetProblems(root).join('\n')).toContain('localStorage.clear()');
+        put('tests/setup-web.ts', '// afterEach(() => { vi.useRealTimers(); localStorage.clear(); });\n');
+        expect(setupResetProblems(root)).toHaveLength(2);
     });
 });
 

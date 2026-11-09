@@ -15,11 +15,14 @@
  * A failing spec is fixed by removing it from `shared` and recording it under `forcedIsolated` with
  * the reason (or by running `node scripts/gen-web-isolation.mjs`, which re-derives the lists from the
  * rules).
+ *
+ * A few hazards (fake timers, localStorage writes) are accepted in a shared spec because tests/setup-web.ts undoes
+ * them after every test; this gate also fails when that reset is removed (SETUP_RESETS in scripts/lib/web-isolation.mjs).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { listWebSpecs, webSharedProblems } from './lib/web-isolation.mjs';
+import { listWebSpecs, setupResetProblems, webSharedProblems } from './lib/web-isolation.mjs';
 
 /** The environment each shared list runs in. */
 const LIST_ENV = { node: 'node', dom: 'happy-dom' };
@@ -71,6 +74,7 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href) {
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     const specs = listWebSpecs(root);
     const { errors, shared, total } = checkManifest(root, manifest, specs);
+    errors.push(...setupResetProblems(root));
     if (!cfg.includes('web-isolation.json')) errors.push('vitest.config.ts does not read tests/web-isolation.json, so the lists decide nothing');
     if (errors.length) {
         console.error(`Web-isolation violations (${errors.length}):\n  ${errors.join('\n  ')}`);

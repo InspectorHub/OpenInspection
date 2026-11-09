@@ -22,7 +22,10 @@ import type { FakeDataSource } from "../../testing/fake-data-source";
 
 import { PcaNarrativePanel } from "./PcaNarrativePanel";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const narrative: PcaNarrativeData = {
   transmittalLetter: "TL", summaryGeneralDescription: "GD", summaryPhysicalCondition: "PC",

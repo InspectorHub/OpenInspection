@@ -71,6 +71,21 @@ export default defineConfig({
     // No maxWorkers cap and no pool override — see vitest.api.config.ts for the
     // measurements behind both. Capping cost 13% of wall-clock for memory that
     // was never scarce, and the threads pool segfaults on better-sqlite3.
+    // Re-measured here with the catalogues external (below): pool 'threads' for web-isolated took 345 s
+    // against 348 s for forks, which is noise, and it breaks any spec that sets process.env.TZ
+    // (useSchedulingTimeZone, PaymentsModal): a worker thread has its own env copy and the ICU zone does not
+    // move. Not adopted; do not add it without a gate that keeps those specs on forks.
+    // The two generated message catalogues are the heaviest modules in the whole web graph: app/paraglide
+    // (the engine's) and packages/field-ui/src/i18n/generated (the field client's). Between them they were
+    // about half of all import self-time, and the isolated project paid for them again in every file.
+    // Externalising them lets Node load each catalogue ONCE per worker process through its own module cache
+    // instead of Vite re-transforming it per file; a full `npm run test:web` went from 405 s to 348 s when measured back to back (-14%).
+    // Mocking one of them is still safe: `vi.mock` intercepts the import by resolved id, before the
+    // externalisation decision (repair-builder-action-tag-seam stubs ~/paraglide/messages and passes).
+    // The paraglide runtime stays a single instance: messages and runtime are both loaded by Node from the
+    // same file URLs, so setLocale in a spec still changes what the messages render.
+    // The option is inherited by all three projects through `extends: true`.
+    server: { deps: { external: [/[\\/]app[\\/]paraglide[\\/]/, /[\\/]i18n[\\/]generated[\\/]/] } },
     setupFiles: ['tests/setup-web.ts'],
     // Three projects over one include set, split by the manifest above:
     //   web-node-shared  isolate:false, environment node. The specs the rules in

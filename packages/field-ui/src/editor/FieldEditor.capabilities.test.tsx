@@ -299,24 +299,50 @@ const ENTRIES: Entry[] = [
   { name: "pdf: Preview menu", cap: "pdf", trees: ["desktop"], present: async () => screen.queryAllByRole("button", { name: m.editor_header_preview() }).some((b) => b.getAttribute("aria-haspopup") === "menu") },
 ];
 
-describe("FieldEditor optional capabilities", () => {
-  // One case per (tree, entry, omitted capability), so a failure names all three and no case mounts more than once.
-  const cases = (["desktop", "phone"] as const).flatMap((tree) =>
-    ENTRIES.filter((e) => e.trees.includes(tree)).flatMap((entry) =>
-      [null, ...ALL_OMITS].map((omit) => ({ tree, entry, omit, title: `${tree}: ${entry.name} | ${omit === null ? "everything provided" : `without ${omit}`}` })),
-    ),
-  );
+/** Closes whatever the last entry left open (a menu, a sheet, a chooser) so the next one starts from the editor itself. */
+async function dismissOverlays() {
+  for (let i = 0; i < 4 && (screen.queryAllByRole("dialog").length > 0 || screen.queryAllByRole("menu").length > 0); i++) {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  (document.activeElement as HTMLElement | null)?.blur();
+}
 
-  it.each(cases.map((c) => [c.title, c] as const))("%s", async (_title, { tree, entry, omit }) => {
-    const phone = tree === "phone";
-    mount(omit, phone, entry.data);
-    // Let the editor finish mounting before a person would reach for anything.
-    await screen.findByRole("button", { name: phone ? endsWith(m.editor_mobile_drawer_items()) : m.editor_header_publish() });
-    const shown = await entry.present(phone);
-    // Shown unless the capability that serves it is the one left out; controls (cap null) are always shown.
-    const expected = entry.cap === null || entry.cap !== omit;
-    expect(shown, `${entry.name} should be ${expected ? "shown" : "hidden"} ${omit === null ? "when every capability is provided" : `without ${omit}`}`).toBe(expected);
+describe("FieldEditor optional capabilities", () => {
+  // The matrix is (tree, entry, omitted capability). Mounting the whole editor is the expensive part, so each
+  // (tree, inspection, omitted capability) is mounted ONCE and every entry that shares it is asserted against that
+  // mount, one after the other, with the overlays the previous entry opened closed in between. Every triple is still
+  // asserted on its own with the same message (it names the tree, the entry and the omitted capability), and a
+  // soft expectation lets one mount report every triple that failed rather than stopping at the first.
+  const groups = (["desktop", "phone"] as const).flatMap((tree) => {
+    const entries = ENTRIES.filter((e) => e.trees.includes(tree));
+    const datas = [...new Set(entries.map((e) => e.data))];
+    return datas.map((data) => ({ tree, data, entries: entries.filter((e) => e.data === data) }));
   });
+  const omits = [null, ...ALL_OMITS];
+
+  it.each(groups.flatMap((g) => omits.map((omit) => [`${g.tree}${g.data ? ` (${g.entries.map((e) => e.name).join(", ")})` : ""} | ${omit === null ? "everything provided" : `without ${omit}`}`, g, omit] as const)))(
+    "%s",
+    async (_title, { tree, data, entries }, omit) => {
+      const phone = tree === "phone";
+      mount(omit, phone, data);
+      // Let the editor finish mounting before a person would reach for anything.
+      await screen.findByRole("button", { name: phone ? endsWith(m.editor_mobile_drawer_items()) : m.editor_header_publish() });
+      const checked: string[] = [];
+      for (const entry of entries) {
+        await dismissOverlays();
+        const shown = await entry.present(phone);
+        // Shown unless the capability that serves it is the one left out; controls (cap null) are always shown.
+        const expected = entry.cap === null || entry.cap !== omit;
+        const title = `${tree}: ${entry.name} | ${omit === null ? "everything provided" : `without ${omit}`}`;
+        expect.soft(shown, `${title}: the entry should be ${expected ? "shown" : "hidden"} ${omit === null ? "when every capability is provided" : `without ${omit}`}`).toBe(expected);
+        checked.push(title);
+      }
+      // Every entry of the group was asserted, once.
+      expect(checked).toHaveLength(entries.length);
+      expect(new Set(checked).size).toBe(entries.length);
+    },
+  );
 
   it("opens the cost items drawer from its entry when the host provides the cost lines", async () => {
     mount(null, false);

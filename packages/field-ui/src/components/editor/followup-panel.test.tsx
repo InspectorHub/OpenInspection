@@ -29,7 +29,10 @@ import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-
 import type { FakeDataSource } from "../../testing/fake-data-source";
 import { FollowupPanel } from "./FollowupPanel";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const CARRIED = {
     original: { rating: "Defect", notes: "Cracked crown", photos: [{ key: "a" }, { key: "b" }] },

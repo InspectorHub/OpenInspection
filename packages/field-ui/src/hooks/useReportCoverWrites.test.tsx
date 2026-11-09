@@ -11,7 +11,10 @@ import type { FakeDataSource } from '../testing/fake-data-source';
 import { useReportCoverWrites } from './useReportCoverWrites';
 import type { ReportCoverWrites } from './useReportCoverWrites';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 

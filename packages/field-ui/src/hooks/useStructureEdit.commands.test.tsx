@@ -13,7 +13,10 @@ import { createEmptyEditorData, createFakeDataSource } from '../testing/fake-dat
 import type { FakeDataSource } from '../testing/fake-data-source';
 import { useStructureEdit } from './useStructureEdit';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const raw = {
   schemaVersion: 2 as const,

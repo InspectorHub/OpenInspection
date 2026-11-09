@@ -125,13 +125,37 @@ tests/
   the import and environment cost) and `web-isolated` is the historical one-fresh-graph-per-file
   behaviour (node by default; a `@vitest-environment happy-dom` docblock still selects the DOM per
   file). A spec is shareable only if it has no module mock, registry reset, global stub or write,
-  fake timers, storage, location or `document` structure write, hand-made React root or
+  session storage, location or `document` structure write (fake timers and `localStorage` writes are
+  the two exceptions below), hand-made React root or
   wall-clock bound, and reaches no module that keeps state (type-only imports are not followed).
   The manifest splits the shareable specs by the environment their docblock declares, and the
   gate fails when a spec sits in the wrong list. `npm run lint:web-isolation` fails when a listed
   spec breaks those rules; `npm run gen:web-isolation` regenerates the lists (a spec that passes
   the rules but fails or flakes when shared goes under `forcedIsolated` with a reason, and stays
   there). A new spec is isolated until the generator lists it, so nothing breaks by default.
+- **Two hazards are accepted because the shared setup undoes them.** `tests/setup-web.ts` calls
+  `vi.useRealTimers()` and `localStorage.clear()` in an `afterEach` for every project, so a shared
+  spec may use fake timers (installed per test, not once in `beforeAll`) and write `localStorage`
+  without leaving anything for the next file. `SETUP_RESETS` in `scripts/lib/web-isolation.mjs`
+  names each exemption and `npm run lint:web-isolation` fails if the setup file stops making the
+  call. `sessionStorage`, `indexedDB`, spies on browser objects and timers installed in
+  `beforeAll` are still rejected. A spy on an object the spec builds itself (a fake data source)
+  still needs `vi.restoreAllMocks()` in an `afterEach` for the rule to pass.
+- **The generated message catalogues are loaded by Node, not transformed per file.**
+  `vitest.config.ts` lists `app/paraglide/` and `packages/field-ui/src/i18n/generated/` under
+  `test.server.deps.external` (inherited by all three projects). Those two were about half of all
+  import self-time; a full `npm run test:web` went from 405 s to 348 s with this alone. The paraglide
+  runtime is still a single instance, so `setLocale` in a spec works, and `vi.mock('~/paraglide/messages')`
+  still intercepts (repair-builder-action-tag-seam relies on it).
+- **The worker-thread pool was measured and not adopted.** `pool: 'threads'` for `web-isolated`
+  gave 345 s against 348 s, and a worker thread cannot move the ICU zone with `process.env.TZ`
+  (useSchedulingTimeZone, PaymentsModal do). Do not retry it without a gate that keeps such specs on forks.
+- **`FieldEditor.capabilities.test.tsx` mounts once per (tree, inspection, omitted capability),**
+  not once per entry. Every entry that shares a mount is asserted in turn against it, closing any
+  menu or sheet the previous entry opened, and the soft expectation message still names the tree,
+  the entry and the omitted capability. The 533 matrix triples are unchanged; the file went from
+  96 s to 48 s. A new entry needs no change beyond its row in `ENTRIES`; if it leaves state the
+  next entry would trip over, close it in `dismissOverlays`.
 - **Module state that is allowed is listed by name, with one reason each**
   (`WEB_BENIGN_MODULE_STATE` in `scripts/lib/web-isolation.mjs`): the overlay layer stack, the
   toast listener list, a counter of mounted navs. Each is state that is only touched inside
@@ -189,6 +213,11 @@ tests/
   `lint:unit-isolation` until someone reads it and updates the number. A spec that imports the worker entry
   (`workers/app`) or installs a fake API app loader is never shared. Both isolation gates also print, without
   failing, any spec the rules accept but the manifest does not list, so a manifest that fell behind is visible.
+- **The generated message catalogue is loaded by Node, not transformed per file.** `vitest.api.config.ts`
+  lists `app/paraglide/` and `packages/field-ui/src/i18n/generated/` under `test.server.deps.external`
+  (next to `scripts/*.mjs`), because `server/lib/i18n/messages.ts` pulls ~3.7 MB of generated source into
+  most of the graph. Measured on the full unit suite: 421 s to 336 s. No unit spec mocks either path; a
+  `vi.mock` of one would be the thing to re-check before adding it.
 - **Do not mock `drizzle-orm/d1` to inject the test database.** A module mock keeps the spec in
   `api-isolated`. Give the code under test a real binding instead: `tests/unit/helpers/d1-binding.ts`
   has `d1For(db)` (a `D1Database` over the database `createTestDb()` returned), `lazyD1()` (a binding
