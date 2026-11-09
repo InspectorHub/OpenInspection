@@ -35,6 +35,7 @@ OpenInspection is [open source home inspection software](https://inspectorhub.io
 - Simultaneous editing — inspection results are a Yjs CRDT in a Durable Object
 - Installable PWA; field data is offline-capable (the results document buffers in IndexedDB and merges on reconnect). Photo and video *binary* upload needs a connection and says so rather than queueing
 - Migrate from Spectora through the import wizard, which shows what the conversion produced before anything is written
+- Native client: [OpenInspection-App](https://github.com/InspectorHub/OpenInspection-App) is the offline-first app for Android and iOS (Capacitor) with a Windows pilot (Electron), in its own AGPL-3.0 repository; it talks to this engine through the generated API contract
 
 ### Customer experience
 - Company-level public booking widget (`/book/<slug>`) with auto-assignment, optional inspector choice, and Turnstile bot protection
