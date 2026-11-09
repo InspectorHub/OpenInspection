@@ -87,16 +87,18 @@ export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSu
   // The slide ON SCREEN. `index` only says where the viewer was opened; the lightbox then moves on its own (Next/Prev,
   // arrow keys, swipe), so the toolbar must follow what it reports, or an action (Delete included) would act on the
   // photo the viewer was opened on while another is shown.
-  const [view, setView] = useState<{ index: number | null; key?: string | undefined }>({ index, key: index === null ? undefined : photos[index]?.key });
+  // A clip has no file key (it is ''), so identify a slide by its media id when the key is empty.
+  const idOf = (p: GalleryPhoto | undefined) => (p ? p.key || p.mediaId || p.streamUid || undefined : undefined);
+  const [view, setView] = useState<{ index: number | null; key?: string | undefined }>({ index, key: index === null ? undefined : idOf(photos[index]) });
   const [openedAt, setOpenedAt] = useState(index);
-  if (index !== openedAt) { setOpenedAt(index); setView({ index, key: index === null ? undefined : photos[index]?.key }); }
+  if (index !== openedAt) { setOpenedAt(index); setView({ index, key: index === null ? undefined : idOf(photos[index]) }); }
   // The list can change while open (a photo deleted, or moved): stay on the same photo by its key, or on its neighbour.
   let shown: number | null = null;
   if (view.index !== null && photos.length > 0) {
-    const moved = view.key !== undefined && photos[view.index]?.key !== view.key ? photos.findIndex((p) => p.key === view.key) : -1;
+    const moved = view.key !== undefined && idOf(photos[view.index]) !== view.key ? photos.findIndex((p) => idOf(p) === view.key) : -1;
     shown = Math.min(moved >= 0 ? moved : view.index, photos.length - 1);
   }
-  const shownKey = shown === null ? undefined : photos[shown]?.key;
+  const shownKey = shown === null ? undefined : idOf(photos[shown]);
   useEffect(() => {
     if (shown !== null && (view.index !== shown || view.key !== shownKey)) setView({ index: shown, key: shownKey });
     if (index !== null && photos.length === 0) onClose();

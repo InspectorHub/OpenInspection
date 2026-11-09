@@ -112,6 +112,16 @@ describe("the list changes while the viewer is open", () => {
     expect(onAction).toHaveBeenCalledWith("annotate", K1);
   });
 
+  it("several clips share the empty key: removing a photo before them keeps the viewer on the same clip", () => {
+    const clip = (mediaId: string) => photo("", { mediaType: "video", provider: "r2", mediaId, originalKey: "", annotated: false });
+    const [V1, V2] = [clip("m1"), clip("m2")];
+    const { onAction, again } = open([K0, V1, V2], 2);
+    again({ photos: [V1, V2] });
+    expect(screen.getByTestId("lightbox").getAttribute("data-index")).toBe("1");
+    click(m.common_delete());
+    expect(onAction).toHaveBeenCalledWith("delete", V2);
+  });
+
   it("the list empties: the viewer closes", () => {
     const { onClose, again } = open([K0], 0);
     again({ photos: [] });
