@@ -14,7 +14,8 @@ import type { ScopedDB } from '../../lib/db/scoped';
 import { InspectionSubService } from './base';
 import { templateSnapshotSectionsOrNone } from './shared';
 import type { InspectionService } from '../inspection.service';
-import { r2Keys } from '../../lib/r2-keys';
+import { r2Keys, photoMediaId } from '../../lib/r2-keys';
+import { isExistingDerivative } from '../../lib/media/derivative-key';
 import { loadFrozenFileKeys } from '../../lib/report-snapshot';
 
 /** D1's JSON column comes back as a string (D1) or a parsed object (driver
@@ -127,7 +128,7 @@ export class InspectionPhotoService extends InspectionSubService {
             sectionTitle: string;
             photoIndex: number;
             annotated: boolean;
-            defectId?: string;
+            defectId?: string; unitId?: string;
         }>;
         pool: Array<{
             id: string;
@@ -194,7 +195,7 @@ export class InspectionPhotoService extends InspectionSubService {
             parseResultData(row.data),
             itemMeta,
             (key) => `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`,
-            (k) => { const pk = parseFindingKey(k); return { itemId: pk.itemId, sectionId: pk.sectionId }; },
+            (k) => { const pk = parseFindingKey(k); return { itemId: pk.itemId, sectionId: pk.sectionId, unitId: pk.unitId }; },
         ));
 
         // Pool — loose uploads, ordered newest first.
@@ -501,16 +502,13 @@ export class InspectionPhotoService extends InspectionSubService {
     }
 
     /**
-     * DB-16 — is `key` the R2 key of a photo belonging to this inspection?
-     * The report cover (`inspections.cover_photo_id`) holds an R2 key; this
-     * validates a chosen cover. True when `key` matches any attached item photo
-     * (`inspection_results.data[*].photos[].key` or `.annotatedKey`) or any loose
-     * `inspection_media_pool` row's r2Key. Tenant-scoped; false for foreign keys.
+     * DB-16 — is `key` the R2 key of a photo belonging to this inspection? The cover (`inspections.cover_photo_id`) must
+     * always resolve. True for an attached item photo (`photos[].key` / `.croppedKey` / `.annotatedKey`) or a pool row's
+     * r2Key, else for an EXISTING baked derivative of a photo this inspection has (`isExistingDerivative`). Tenant-scoped.
      */
     async isInspectionPhotoKey(inspectionId: string, tenantId: string, key: string): Promise<boolean> {
         if (!key) return false;
         const db = this.getDrizzle();
-
         // 1. Loose pool photos.
         const pool = await db.select({ r2Key: inspectionMediaPool.r2Key })
             .from(inspectionMediaPool)
@@ -520,6 +518,7 @@ export class InspectionPhotoService extends InspectionSubService {
             ))
             .all();
         if (pool.some(p => p.r2Key === key)) return true;
+        const known = new Set(pool.map(p => photoMediaId(p.r2Key) ?? '')); // the photos this inspection has, by mediaId
 
         // 2. Attached item photos in inspection_results.data[*].photos[].
         const rows = await db.select({ data: inspectionResults.data })
@@ -531,14 +530,15 @@ export class InspectionPhotoService extends InspectionSubService {
             .all();
         for (const row of rows) {
             if (!row.data) continue;
-            const data = parseResultData<Record<string, { photos?: Array<{ key?: string; annotatedKey?: string }> }>>(row.data);
+            const data = parseResultData<Record<string, { photos?: Array<{ key?: string; croppedKey?: string; annotatedKey?: string }> }>>(row.data);
             for (const entry of Object.values(data)) {
                 const photos = Array.isArray(entry?.photos) ? entry.photos : [];
                 for (const p of photos) {
-                    if (p?.key === key || p?.annotatedKey === key) return true;
+                    if (p?.key === key || p?.croppedKey === key || p?.annotatedKey === key) return true;
+                    if (p?.key) known.add(photoMediaId(p.key) ?? '');
                 }
             }
         }
-        return false;
+        return isExistingDerivative(this.r2, r2Keys.inspectionPhotosPrefix(tenantId, inspectionId), key, known);
     }
 }

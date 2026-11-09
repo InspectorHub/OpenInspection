@@ -5,7 +5,10 @@ import { BurstCamera } from "../components/editor/BurstCamera";
 import { PhotoAnnotator } from "../components/media-studio/PhotoAnnotator";
 import { CoverCropper, coverCropFor } from "../components/media-studio/CoverCropper";
 import { PhotoCropper } from "../components/media-studio/PhotoCropper";
-import { MediaViewer, ALL_MEDIA_ACTIONS } from "../components/media-studio/MediaViewer";
+import { MediaViewer } from "../components/media-studio/MediaViewer";
+import { viewerHiddenActions } from "../components/media-studio/viewer-actions";
+import { useOptimisticCover } from "../hooks/useOptimisticCover";
+import { useConfirmedViewerDelete } from "../hooks/useConfirmedViewerDelete";
 import { useReadOnly } from "../read-only";
 import { PosterPicker } from "../components/media-studio/PosterPicker";
 import { fullResUrl } from "../components/media-studio/cropImage";
@@ -27,6 +30,7 @@ import type { useAddStatutoryInstance } from "../hooks/useAddStatutoryInstance";
 import type { useStatutoryGroups } from "../hooks/useStatutoryGroups";
 import type { useCannedComments } from "../hooks/useCannedComments";
 import type { usePhotoOps } from "../hooks/usePhotoOps";
+import type { PhotoStudioItem } from "../components/media-studio/photo-studio-target";
 import type { EditorCapabilities } from "../hooks/useEditorCapabilities";
 import type { ResultsProjection } from "../shared/results-doc.types";
 import { m } from "../i18n";
@@ -61,6 +65,8 @@ export interface SharedOverlaysProps {
     key: string | null;
     index: number;
     total: number;
+    /** The item (and section) the studio saves onto; null means the active item in the open section. */
+    item: PhotoStudioItem | null;
     setOpen: (open: boolean) => void;
   };
 
@@ -71,7 +77,7 @@ export interface SharedOverlaysProps {
     | "posterTarget" | "setPosterTarget"
     | "photoCropTarget" | "setPhotoCropTarget" | "recropWarn" | "setRecropWarn"
     | "galleryCropSource" | "setGalleryCropSource" | "sessionCoverCrop" | "setSessionCoverCrop"
-    | "performPhotoCropSave" | "performPhotoAnnotationSave"
+    | "performPhotoCropSave" | "performPhotoAnnotationSave" | "getItemPhotos"
   >;
 
   /* Statutory group instances */
@@ -120,12 +126,18 @@ export function SharedOverlays({
   const {
     viewer, setViewer, itemGalleryPhotos, onViewerAction, posterTarget, setPosterTarget, photoCropTarget,
     setPhotoCropTarget, recropWarn, setRecropWarn, galleryCropSource, setGalleryCropSource, sessionCoverCrop,
-    setSessionCoverCrop, performPhotoCropSave, performPhotoAnnotationSave,
+    setSessionCoverCrop, performPhotoCropSave, performPhotoAnnotationSave, getItemPhotos,
   } = photoOps;
   const readOnly = useReadOnly();
   const { saveCrop, cancelCrop, saveAnnotation, closeStudio } = usePhotoDialogSaves({
-    performPhotoCropSave, performPhotoAnnotationSave, setPhotoCropTarget, setRecropWarn, setStudioOpen: studio.setOpen, annotateChecked: coverWrites.annotateChecked, photoCropTarget, studioOpen: studio.open,
+    performPhotoCropSave, performPhotoAnnotationSave, setPhotoCropTarget, setRecropWarn, setStudioOpen: studio.setOpen, annotateChecked: coverWrites.annotateChecked, getItemPhotos, photoCropTarget, studioOpen: studio.open,
   });
+  // The studio belongs to the photo it was opened on, which may sit in another section than the open one.
+  const toggleCover = useOptimisticCover(state, coverWrites.setCover);
+  const deleteGate = useConfirmedViewerDelete(onViewerAction);
+  const studioSectionId = studio.item?.sectionId || state.currentSection?.id;
+  const studioSection = (studioSectionId ? state.sections.find((s) => s.id === studioSectionId) : undefined) ?? state.currentSection;
+  const viewerPhotos = viewer.index !== null ? itemGalleryPhotos(viewer.itemId) : [];
   return (
     <>
  {/* Burst camera overlay */}
@@ -142,37 +154,38 @@ export function SharedOverlays({
  <PhotoAnnotator
  open={studio.open}
  photoUrl={studio.url}
- photoIndex={studio.index}
+ photoIndex={studio.index + 1}
  totalPhotos={studio.total}
- sectionName={state.currentSection?.title || state.currentSection?.name || ""}
+ sectionName={studioSection?.title || studioSection?.name || ""}
  initialAnnotationsJson={null}
  isCover={!!studio.key && (state.inspection.coverPhotoId as string | null) === studio.key}
  onSetCover={studio.key ? () => {
-  const isCover = (state.inspection.coverPhotoId as string | null) === studio.key;
-  coverWrites.setCover(isCover ? "" : (studio.key ?? ""));
+  toggleCover(studio.key ?? "");
  } : undefined}
  onSave={({ blob, nodesJson }) => {
-  const itemId = state.activeItemId;
+  const itemId = studio.item?.itemId ?? state.activeItemId;
   if (!itemId || studio.index == null) { closeStudio(); return; }
   // #181 — the Y.Doc owns results.data: the annotation PNG is baked to R2 and its annotatedKey mirrored into the doc.
   // The studio closes once the image is admitted; a refused image leaves it open with the strokes in it.
-  saveAnnotation({ itemId, photoIndex: studio.index, sectionId: state.currentSection?.id }, blob, nodesJson);
+  saveAnnotation({ itemId, photoIndex: studio.index, sectionId: studioSectionId, expectOriginalKey: studio.item?.originalKey }, blob, nodesJson);
  }}
  onClose={closeStudio}
  />
 
  {/* Task 8 — unified MediaViewer for an item's photo strip (tap a thumbnail
   * to open; the bottom toolbar routes cover/annotate/revert/delete to the
-  * per-photo endpoints; crop opens the PhotoCropper, rotate/caption are no-ops). */}
+  * per-photo endpoints (Delete asks first); crop opens the PhotoCropper). Rotate and Caption have no handler: not offered. */}
  <MediaViewer
- photos={viewer.index !== null ? itemGalleryPhotos(viewer.itemId) : []}
+ photos={viewerPhotos}
+ coverKey={(state.inspection.coverPhotoId as string | null) ?? null}
  index={viewer.index}
  onClose={() => setViewer((v) => ({ ...v, index: null }))}
- onAction={onViewerAction}
- hideActions={readOnly ? ALL_MEDIA_ACTIONS : caps.video ? undefined : ["poster"]}
+ onAction={deleteGate.onAction}
+ hideActions={(shown) => viewerHiddenActions(shown, { readOnly, video: caps.video })}
  streamCustomerSubdomain={streamCustomerSubdomain}
  inspectionId={inspectionId}
  />
+ {deleteGate.dialog}
 
  {/* Plan 7 — poster-frame picker for a video entry (opened by the "Poster
   * frame" toolbar action). Fails closed when the Stream subdomain is absent. */}
@@ -278,6 +291,8 @@ export function SharedOverlays({
     image: new File([blob], "cover.jpg", { type: "image/jpeg" }),
    }).then((sent) => {
     if (!sent) return;
+    // The page holds the cover it was loaded with: the new cover (and its crop) must show at once, in the viewer's label too.
+    state.setInspection((prev) => ({ ...prev, coverPhotoId: source.key, coverCrop: crop }));
     setSessionCoverCrop({ key: source.key, crop });
     setGalleryCropSource(null);
    });

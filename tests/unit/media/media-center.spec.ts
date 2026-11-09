@@ -34,6 +34,7 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
     const r2Mock = {
         put:    vi.fn().mockResolvedValue(undefined),
         delete: vi.fn().mockResolvedValue(undefined),
+        head:   vi.fn().mockResolvedValue(null),
     };
 
     beforeEach(async () => {
@@ -48,6 +49,7 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
         svc = new InspectionService(testD1.binding, r2Mock as unknown as R2Bucket, sdb);
         r2Mock.put.mockClear();
         r2Mock.delete.mockClear();
+        r2Mock.head.mockReset().mockResolvedValue(null);
 
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
@@ -138,6 +140,24 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
         // Panel item lives in a different section.
         const panel = out.attached.find(p => p.key === 'k-panel-1');
         expect(panel?.sectionTitle).toBe('Electrical');
+    });
+
+    it('getMediaCenter says which unit each attached photo belongs to', async () => {
+        await testDb.insert(schema.inspectionResults).values({
+            id:            'res-units',
+            tenantId:      TENANT,
+            inspectionId:  INSPECTION_ID,
+            data:          {
+                'u1:sec-roof:item-cover':       { photos: [{ key: 'k-unit-1' }] },
+                'u2:sec-roof:item-cover':       { photos: [{ key: 'k-unit-2' }] },
+                '_default:sec-roof:item-panel': { photos: [{ key: 'k-common' }] },
+            },
+            lastSyncedAt:  new Date(),
+        });
+        const out = await svc.getMediaCenter(INSPECTION_ID, TENANT);
+        expect(out.attached.find(p => p.key === 'k-unit-1')).toMatchObject({ unitId: 'u1', sectionId: 'sec-roof', itemId: 'item-cover' });
+        expect(out.attached.find(p => p.key === 'k-unit-2')?.unitId).toBe('u2');
+        expect(out.attached.find(p => p.key === 'k-common')?.unitId).toBe('_default');
     });
 
     it('uploadPoolPhoto persists a row + getMediaCenter returns it (newest first)', async () => {
@@ -388,6 +408,58 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
             // Control: the unsupported-type refusal keeps its own code, so the two stay distinguishable.
             await expect(upload[name](new File([HTML_BYTES], 'a.jpg', { type: 'image/jpeg' }))).rejects.toMatchObject({ status: 400, code: 'UNSUPPORTED_PHOTO_TYPE' });
             expect(r2Mock.put).not.toHaveBeenCalled();
+        });
+    });
+
+    // The cover is chosen by the key a photo SHOWS: its cropped or annotated file once it has one. A freshly baked file may
+    // not be in the results row yet (it is written late under collaborative editing), so a derivative of a KNOWN photo
+    // is accepted when it exists in storage. A key that merely sits under the folder is not enough: the cover must resolve.
+    describe('isInspectionPhotoKey', () => {
+        const folder = `${TENANT}/inspections/${INSPECTION_ID}/photos/`;
+        const exists = () => r2Mock.head.mockResolvedValue({ key: 'present' });
+        beforeEach(async () => {
+            await testDb.insert(schema.inspectionResults).values({
+                id: 'res-guard', tenantId: TENANT, inspectionId: INSPECTION_ID,
+                data: { 'item-cover': { photos: [{ key: `${folder}MED.jpg`, croppedKey: 'k-cropped' }] } },
+                lastSyncedAt: new Date(),
+            });
+        });
+
+        it('accepts a key the results name (original, cropped), without asking storage', async () => {
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.jpg`)).toBe(true);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, 'k-cropped')).toBe(true);
+            expect(r2Mock.head).not.toHaveBeenCalled();
+        });
+
+        it('accepts an existing derivative of a known photo', async () => {
+            exists();
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.annotated.a1b2c3d4.png`)).toBe(true);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.cropped.a1b2c3d4.jpg`)).toBe(true);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.annotated.png`)).toBe(true); // the older unrevised name
+            expect(r2Mock.head).toHaveBeenCalledWith(`${folder}MED.annotated.a1b2c3d4.png`);
+        });
+
+        it('refuses a file that does not exist, and fails closed when storage cannot answer', async () => {
+            r2Mock.head.mockResolvedValue(null);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.annotated.a1b2c3d4.png`)).toBe(false);
+            r2Mock.head.mockRejectedValue(new Error('r2 down'));
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.annotated.a1b2c3d4.png`)).toBe(false);
+        });
+
+        it('refuses a derivative of a photo this inspection does not have, and names outside the derivative family', async () => {
+            exists();
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}OTHER.annotated.a1b2c3d4.png`)).toBe(false);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.png`)).toBe(false);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.annotated.a1b2c3d4.gif`)).toBe(false);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}nested/MED.annotated.a1b2c3d4.png`)).toBe(false);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}../MED.annotated.a1b2c3d4.png`)).toBe(false);
+        });
+
+        it('refuses another inspection\'s or another tenant\'s folder, and an unknown key', async () => {
+            exists();
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${TENANT}/inspections/OTHER/photos/MED.annotated.a1b2c3d4.png`)).toBe(false);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `OTHER-TENANT/inspections/${INSPECTION_ID}/photos/MED.annotated.a1b2c3d4.png`)).toBe(false);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, 'unknown-key')).toBe(false);
         });
     });
 });

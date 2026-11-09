@@ -23,4 +23,12 @@ describe('flattenMedia', () => {
     expect(out[0]).toMatchObject({ itemId: 'i1', photoIndex: 0, annotated: true, originalKey: 'a0' });
     expect(out[1]).toMatchObject({ label: 'Unattached' });
   });
+  it('an empty section id is dropped rather than carried', () => {
+    const out = flattenMedia({ data: { attached: [{ key: 'a', url: '/a', itemId: 'i2', sectionId: '', photoIndex: 0 }] } });
+    expect(out[0]?.sectionId).toBeUndefined();
+  });
+  it('carries the owning section, so the editor can address an item that is not the open one', () => {
+    const out = flattenMedia({ data: { attached: [{ key: 'a', url: '/a', itemId: 'i2', sectionId: 's2', photoIndex: 1 }] } });
+    expect(out[0]).toMatchObject({ itemId: 'i2', sectionId: 's2', photoIndex: 1 });
+  });
 });

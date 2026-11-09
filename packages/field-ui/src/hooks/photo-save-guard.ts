@@ -24,12 +24,16 @@ export function dropMediaSave(
   dataSource: Pick<FieldDataSource, 'notify'>,
   inFlight: Set<string>,
   saveKey: string,
-  target: { fk: string | null; originalKey: string | undefined; doc: unknown },
+  // `keepOpen`: the dialog was opened on a named photo that is no longer there; it stays so the person can cancel it.
+  target: { fk: string | null; originalKey: string | undefined; doc: unknown; keepOpen?: boolean },
   onChecked?: OnChecked,
 ): boolean {
   let mayClose = false;
   if (inFlight.has(saveKey)) dataSource.notify(m.editor_photo_save_busy(), 'info');
-  else if (!target.fk || !target.originalKey) { dataSource.notify(m.editor_photo_save_no_photo(), 'error'); mayClose = true; }
+  else if (!target.fk || !target.originalKey) {
+    dataSource.notify(target.keepOpen ? m.editor_photo_save_gone_keep_open() : m.editor_photo_save_no_photo(), 'error');
+    mayClose = !target.keepOpen;
+  }
   else if (!target.doc) dataSource.notify(m.editor_photo_save_no_document(), 'error');
   else return false;
   onChecked?.(mayClose);
