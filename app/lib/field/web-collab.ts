@@ -59,23 +59,24 @@ export function webPersistence(name: string, doc: Y.Doc): ResultsDocPersistence 
  *
  * Converts `https:` -> `wss:` and `http:` -> `ws:`. The inspection id is
  * percent-encoded so ids containing slashes or other special characters route
- * correctly.
+ * correctly. `gen` (the generation the open document belongs to) rides as `?gen=`: the server refuses a socket naming another history.
  */
 export function buildCollabWsUrl(
     inspectionId: string,
     loc: { protocol: string; host: string },
+    gen?: string | null,
 ): string {
     const wsProtocol = loc.protocol === "https:" ? "wss:" : "ws:";
     const path = `/api/inspections/${encodeURIComponent(inspectionId)}/collab/ws`;
-    return `${wsProtocol}//${loc.host}${path}`;
+    return `${wsProtocol}//${loc.host}${path}${gen ? `?gen=${encodeURIComponent(gen)}` : ""}`;
 }
 
 /** The collab URL on the page's own origin (https/localhost when there is no window). */
-export function webCollabWsUrl(inspectionId: string): string {
+export function webCollabWsUrl(inspectionId: string, gen?: string | null): string {
     const loc = typeof window !== "undefined"
         ? window.location
         : { protocol: "https:", host: "localhost" };
-    return buildCollabWsUrl(inspectionId, loc);
+    return buildCollabWsUrl(inspectionId, loc, gen);
 }
 
 /** Subscribe to the browser's `online` event; returns the unsubscribe. */

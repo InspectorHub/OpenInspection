@@ -22,7 +22,7 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { reconnectDelayMs } from './results-doc-backoff';
-import { MSG_GENERATION, backUpStale, judgeLineage, readFrameGeneration, topUpBackup, type DiscardedStoreInfo } from './results-doc-lineage';
+import { MSG_GENERATION, backUpStale, judgeLineage, judgementBasis, readFrameGeneration, topUpBackup, type DiscardedStoreInfo } from './results-doc-lineage';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -100,11 +100,10 @@ export function connectResultsDoc(
     let restoring = false;
 
     // ── Lineage guard (see results-doc-lineage.ts) ──────────────────────────────
-    // `storedGen` is what this device's store last synced with (read before the first socket opens).
-    // `lineageChecked` is false from socket open until the server's first frame is judged: local state is neither forwarded
-    // nor answered with before then. Without a lineage store the guard is off and it is always true.
+    // `docGen`: the history the IN-MEMORY document belongs to (set once, never re-read: another tab may move the shared record); `storedGen`: what an open is judged by.
+    // `lineageChecked` is false from socket open until the server's first frame is judged: nothing local is sent before then (always true without a store).
     const lineage = opts.lineage?.(inspectionId);
-    let storedGen: string | null = null;
+    let storedGen: string | null = null, docGen: string | null | undefined;
     let lineageChecked = !lineage;
     let generationSeen = false; // the socket's first frame was a generation frame (so the server has the guard)
 
@@ -225,7 +224,7 @@ export function connectResultsDoc(
             await Promise.resolve(oldPersistence.clearData?.()).catch(() => { /* ignore */ });
             if (destroyed) return;
             if (discard && lineage) await topUpBackup(lineage, oldDoc, discard, saved); // edits typed while the store was torn down
-            if (newGen !== null && lineage) { storedGen = newGen; await lineage.write(newGen).catch(warnLineage); }
+            if (newGen !== null && lineage) { storedGen = docGen = newGen; await lineage.write(newGen).catch(warnLineage); }
             if (destroyed) return;
             // (3) Fresh doc + fresh persistence, re-wired and published.
             const freshDoc = new Y.Doc();
@@ -268,7 +267,7 @@ export function connectResultsDoc(
             void handleRestore(gen, { storedGen: storedGen ?? '', serverGen: gen });
             return;
         }
-        markChecked();
+        markChecked(); docGen = gen;
         if (storedGen === null) { storedGen = gen; void lineage.write(gen).catch(warnLineage); }
     }
 
@@ -277,10 +276,11 @@ export function connectResultsDoc(
     function openSocket(): void {
         if (destroyed) return;
         if (!lineage) { connectSocket(); return; }
-        // The recorded generation is re-read at every open: another tab may have changed it since this one last looked.
-        void lineage.read().catch(() => storedGen).then((gen) => {
+        // The record is read at every open, but only the FIRST read names this document's history: after that the in-memory one wins.
+        void lineage.read().catch(() => storedGen).then((recorded) => {
             if (destroyed || (ws && (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING))) return;
-            storedGen = gen;
+            if (docGen === undefined) docGen = recorded;
+            storedGen = judgementBasis(docGen, recorded);
             connectSocket();
         });
     }
@@ -288,7 +288,7 @@ export function connectResultsDoc(
     function connectSocket(): void {
         lineageChecked = !lineage;
         generationSeen = false;
-        const url = opts.wsUrl(inspectionId);
+        const url = opts.wsUrl(inspectionId, storedGen || null); // the server refuses a socket naming another history
         ws = new WS(url);
         ws.binaryType = 'arraybuffer';
 

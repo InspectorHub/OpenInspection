@@ -49,6 +49,17 @@ export function judgeLineage(stored: string | null, served: string): LineageVerd
     return stored === served ? 'keep' : 'discard';
 }
 
+/**
+ * The generation a socket open is judged by. A connection remembers which history its IN-MEMORY document belongs to; the shared
+ * record can move under it (another tab discarded and wrote the new id, but this tab still holds the old history). So the
+ * in-memory one wins. A document that belongs to no recorded history while the record now holds one is ambiguous: '' never
+ * equals a served id, so it is discarded (after its backup) rather than trusted.
+ */
+export function judgementBasis(inMemory: string | null, recorded: string | null): string | null {
+    if (inMemory !== null) return inMemory;
+    return recorded === null ? null : '';
+}
+
 /** The generation after the type byte of a generation or restore frame, or null when the frame has no body or a malformed one. */
 export function readFrameGeneration(decoder: decoding.Decoder): string | null {
     if (!decoding.hasContent(decoder)) return null;

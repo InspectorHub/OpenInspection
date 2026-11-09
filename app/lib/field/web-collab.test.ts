@@ -21,6 +21,19 @@ async function dbNames(): Promise<string[]> {
     return (await indexedDB.databases()).map((d) => d.name ?? "");
 }
 
+describe("buildCollabWsUrl generation parameter", () => {
+    it("adds ?gen= only when a generation is given", () => {
+        const loc = { protocol: "https:", host: "example.com" };
+        expect(buildCollabWsUrl("i1", loc, "gen-abcdef-01")).toBe("wss://example.com/api/inspections/i1/collab/ws?gen=gen-abcdef-01");
+        expect(buildCollabWsUrl("i1", loc, null)).toBe("wss://example.com/api/inspections/i1/collab/ws");
+        expect(buildCollabWsUrl("i1", loc)).toBe("wss://example.com/api/inspections/i1/collab/ws");
+    });
+    it("webCollabWsUrl passes the generation through to the socket URL", () => {
+        expect(webCollabWsUrl("i1", "gen-abcdef-01")).toMatch(/\/api\/inspections\/i1\/collab\/ws\?gen=gen-abcdef-01$/);
+        expect(webCollabWsUrl("i1", null)).not.toContain("gen=");
+    });
+});
+
 describe("buildCollabWsUrl", () => {
     it("returns wss:// for https: and encodes the id", () => {
         expect(buildCollabWsUrl("insp-123", { protocol: "https:", host: "example.com" }))

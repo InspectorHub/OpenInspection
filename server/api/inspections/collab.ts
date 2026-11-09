@@ -39,6 +39,7 @@ import { tenantConfigs } from '../../lib/db/schema';
 import { parseReinspectionStatuses } from '@core/field-ui/shared/reinspection-status';
 import { forwardCollabImport } from '../../lib/collab/import-route';
 import { authorizeCollab, collabStub } from '../../lib/collab/authorize';
+import { GEN_HEADER, isGeneration } from '../../durable-objects/inspection-doc-generation';
 import { isReportContentLocked } from '../../lib/inspection/report-lock';
 import { mayEditReports } from '../../lib/inspection/report-authoring-guard';
 import {
@@ -266,6 +267,7 @@ collabRoutes.get('/:id/collab/ws', async (c) => {
 
         // ── Forward the WS upgrade to the INSPECTION_DOC Durable Object ────────
         // `?ack=1` opts the socket in to ack frames. The header is set here from the query, never copied from the client.
+        const claimedGen = c.req.query('gen');
         const stub = collabStub(c, auth.tenantId, auth.reportId);
         const fwd = new Request('https://do.local/ws', {
             method:  'GET',
@@ -279,6 +281,8 @@ collabRoutes.get('/:id/collab/ws', async (c) => {
                 'x-report-checked-at': String(Date.now()),
                 'x-report-locked': (await isReportContentLocked(getDrizzle(c), auth.tenantId, auth.inspectionId, auth.reportId)) ? '1' : '0',
                 ...(c.req.query('ack') === '1' ? { 'x-collab-ack': '1' } : {}),
+                // The generation the client's document belongs to; a malformed value is forwarded as a mismatch, never dropped.
+                ...(claimedGen ? { [GEN_HEADER]: isGeneration(claimedGen) ? claimedGen : 'invalid' } : {}),
             },
         });
         return stub.fetch(fwd);

@@ -115,7 +115,7 @@ function world(init: { bytes: Uint8Array | null; gen: string | null }, withLinea
     };
     return {
         stored, lineage, cleared: () => clears,
-        opts: { persistence, wsUrl: () => 'wss://x/collab', WebSocketImpl: WS, ...(withLineage ? { lineage: () => store } : {}) },
+        opts: { persistence, wsUrl: (_id, gen) => 'wss://x/collab' + (gen ? `?gen=${gen}` : ''), WebSocketImpl: WS, ...(withLineage ? { lineage: () => store } : {}) },
     };
 }
 
@@ -365,22 +365,75 @@ describe('lineage guard: no step 1 before the lineage is judged', () => {
     });
 });
 
-describe('lineage guard: the recorded generation is read at every open', () => {
-    it('notices a generation another tab recorded since the last open', async () => {
+describe('lineage guard: the in-memory document decides, not the shared record (two tabs)', () => {
+    /** This tab is in sync with `gen-same-001`; then another tab discards, records `gen-new-0002` and clears the store; this tab's socket drops. */
+    async function tabBAfterTabADiscarded(): Promise<{ w: World; next: FakeSocket; destroy: () => void }> {
         const w = world({ bytes: staleStoreBytes(), gen: 'gen-same-001' });
         const { socket, destroy } = await connected(w);
+        expect(socket.url).toBe('wss://x/collab?gen=gen-same-001');
         socket.push(genFrame('gen-same-001'));
         await settle();
-        w.lineage.gen = 'gen-other-001'; // another tab re-synced with a different history
+        w.lineage.gen = 'gen-new-0002'; // tab A: discarded, wrote the new id, cleared the shared IndexedDB
+        w.stored.bytes = null;
         socket.readyState = 3;
         socket.dispatchEvent(Object.assign(new Event('close'), { code: 1006 }));
         await new Promise<void>((r) => setTimeout(r, 600));
         const next = FakeSocket.instances[1];
         if (!next) throw new Error('no reconnect');
+        return { w, next, destroy };
+    }
+
+    it('reconnects naming the generation of its own document, and never hands the old history to the new lineage', async () => {
+        const { w, next, destroy } = await tabBAfterTabADiscarded();
+        expect(next.url).toBe('wss://x/collab?gen=gen-same-001'); // not the recorded gen-new-0002
+        next.push(genFrame('gen-new-0002'));
+        const server = new Y.Doc();
+        loadResultsProjection(server, { kitchen: { photos: [photo('K1')] } } as never);
+        next.push(step1From(server));
+        await settle();
+        expect(photoKeys(whatServerReceived(next.sent))).toEqual([]);
+        expect(w.lineage.discarded[0]?.storedGen).toBe('gen-same-001');
+        expect(w.lineage.gen).toBe('gen-new-0002');
+        const copy = new Y.Doc();
+        Y.applyUpdate(copy, w.lineage.discarded[0]?.update ?? new Uint8Array());
+        expect(photoKeys(copy)).toEqual(['STALE1', 'STALE2']); // the history went to the backup slot
+        destroy();
+    });
+
+    it('control: when the server still holds this document history, the reconnect keeps it and answers the server', async () => {
+        const w = world({ bytes: staleStoreBytes(), gen: 'gen-same-001' });
+        const { socket, destroy } = await connected(w);
+        socket.push(genFrame('gen-same-001'));
+        await settle();
+        socket.readyState = 3;
+        socket.dispatchEvent(Object.assign(new Event('close'), { code: 1006 }));
+        await new Promise<void>((r) => setTimeout(r, 600));
+        const next = FakeSocket.instances[1];
+        if (!next) throw new Error('no reconnect');
+        expect(next.url).toBe('wss://x/collab?gen=gen-same-001');
         next.push(genFrame('gen-same-001'));
+        next.push(step1From(new Y.Doc()));
+        await settle();
+        expect(w.cleared()).toBe(0);
+        expect(photoKeys(whatServerReceived(next.sent))).toEqual(['STALE1', 'STALE2']);
+        destroy();
+    });
+
+    it('a document that belongs to no recorded history is discarded when the record now holds one, not trusted', async () => {
+        const w = world({ bytes: staleStoreBytes(), gen: null });
+        const { socket, destroy } = await connected(w);
+        expect(socket.url).toBe('wss://x/collab'); // nothing recorded: no parameter
+        socket.readyState = 3;
+        socket.dispatchEvent(Object.assign(new Event('close'), { code: 1006 })); // dropped before any frame was judged
+        w.lineage.gen = 'gen-new-0002';
+        await new Promise<void>((r) => setTimeout(r, 600));
+        const next = FakeSocket.instances[1];
+        if (!next) throw new Error('no reconnect');
+        next.push(genFrame('gen-new-0002'));
+        next.push(step1From(new Y.Doc()));
         await settle();
         expect(w.cleared()).toBe(1);
-        expect(w.lineage.discarded[0]?.storedGen).toBe('gen-other-001');
+        expect(photoKeys(whatServerReceived(next.sent))).toEqual([]);
         destroy();
     });
 });
