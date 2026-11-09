@@ -125,7 +125,9 @@ Public booking: the page is a React Router route at `/book/:tenant`, and its dat
 
 3. Inspector photographs defects
    → POST /api/inspections/:id/upload → R2
-   → binary upload needs a connection; offline it is declined, not queued
+   → online: uploaded straight away. Offline, item photos, crops and annotations
+     queue in IndexedDB and upload when the connection returns; photos attached
+     to a defect and web video upload need a connection
 
 4. The Durable Object merges and persists
    → edits sync over the collab WebSocket; the DO is the only writer of

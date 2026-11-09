@@ -13,7 +13,7 @@
 > 🧪 **Try it in 60 seconds — no install, no credit card.**
 > [**Start free on inspectorhub.io →**](https://inspectorhub.io/register)
 >
-> Activation-link signup; the hosted Free Plan includes up to 5 new inspections and 50 built-in emails each calendar month, with no card. Your workspace ships pre-loaded with starter templates + canned comments so you can click through a real inspection immediately. Decide to self-host later? It is the same open-source codebase, and the engine exports your inspections, results, templates and agreements as JSON.
+> Activation-link signup; the hosted service has a free plan that needs no card. Your workspace ships pre-loaded with starter templates + canned comments so you can click through a real inspection immediately. The app is the same open-source codebase you can run yourself. The engine can export inspections, results, templates and agreement records as JSON, plus contacts, members and inspections as CSV. It does not yet export photos, report PDFs, settings or invoices, and the JSON export cannot be re-imported, so moving a workspace between deployments is not automatic today.
 
 ---
 
@@ -33,13 +33,13 @@ OpenInspection is [open source home inspection software](https://inspectorhub.io
 - 3-pane editor; a new workspace starts with 250+ canned comments, 80 repair items, 4 rating systems and 7 inspection templates (residential, pre-listing, new construction ×2, sewer scope, radon, mold)
 - Keyboard-driven: `1`-`5` ratings, `/` canned-comment library, `;` snippets, `?` cheatsheet, `⌘K` palette in the workspace
 - Simultaneous editing — inspection results are a Yjs CRDT in a Durable Object
-- Installable PWA; field data is offline-capable (the results document buffers in IndexedDB and merges on reconnect). Photo and video *binary* upload needs a connection and says so rather than queueing
+- Installable PWA; field data is offline-capable (the results document buffers in IndexedDB and merges on reconnect). Item photos, crops and annotations taken offline are held in IndexedDB and upload when the connection returns. Photos attached to a defect and video upload in the web app need a connection (the add-video control is disabled while offline)
 - Migrate from Spectora through the import wizard, which shows what the conversion produced before anything is written
 - Native client: [OpenInspection-App](https://github.com/InspectorHub/OpenInspection-App) is the offline-first native client, built with Capacitor, in its own AGPL-3.0 repository; it talks to this engine through the generated API contract. Android builds are published as signed APKs on its Releases page; iOS and a Windows client (Electron) are in development and not yet publicly available
 
 ### Customer experience
 - Company-level public booking widget (`/book/<slug>`) with auto-assignment, optional inspector choice, and Turnstile bot protection
-- E-sign agreements with Ed25519 audit chain — server-rendered signed PDF + Certificate of Completion via Browser Run, evidence-pack zip with email delivery, public verifier URL (`/v/<token>`) with QR code on PDFs + offline self-verify (`/verify`) for court-friendly independence from the server, optional inspector pre-sign
+- E-sign agreements with Ed25519 audit chain — server-rendered signed PDF + Certificate of Completion via Browser Run, evidence-pack zip with email delivery, public verifier URL (`/v/<token>`) with QR code on PDFs + offline self-verify (`/verify`) that does not depend on the server, optional inspector pre-sign
 - Branded report viewer with print-as-PDF
 
 ### Agent / referral
@@ -50,15 +50,15 @@ OpenInspection is [open source home inspection software](https://inspectorhub.io
 ### Self-host friendly
 - Runs **standalone** (single-tenant) by default — one fixed tenant holds all your data, no subdomains to manage
 - Branded UI (logo, colors) configurable in Settings
-- Tenant-scoped D1 data isolation baked into every table
+- Every tenant-owned table carries the tenant id, and tenant queries are scoped by it
 
 ## Why OpenInspection
 
-- **Open**: the whole stack is AGPL-3.0 source you can read, fork and run yourself, and the engine exports a company's inspections, results, templates and agreements as JSON (`GET /api/admin/export`, see the API reference).
+- **Open**: the whole stack is AGPL-3.0 source you can read, fork and run yourself, and the engine can export a company's inspections, results, templates and agreement records as JSON (`GET /api/admin/export`, see the API reference), plus contacts, members and inspections as CSV. Photos, report PDFs, settings and invoices are not part of the export, and the JSON cannot be re-imported.
 - **Cheap to run**: a solo inspector's whole year fits in Cloudflare's smallest paid Workers plan, plus a domain (~$10/yr). The free plan is enough to try it and enough to deploy it, but ⚠️ **not enough to run it**: its CPU ceiling is in the low milliseconds and this application's p95 request is ~49ms (measured over seven days of live traffic, 2026-09-05). A statutory-form render alone is ~470ms.
 - **Yours**: fork it, change templates, add integrations.
-- **Fast**: edge-deployed, < 100 ms response times globally
-- **Compliant**: PBKDF2-SHA256 password hashing, hash-chained Ed25519 audit log on e-signatures (ESIGN Act + UETA), server-rendered PDF + Certificate of Completion via Browser Run, offline-verifiable evidence pack, tenant-scoped data isolation
+- **Fast**: runs at the Cloudflare edge; over seven days of live traffic a request used a median of 8 ms of CPU and 49 ms at p95 (2026-09-05); this excludes network distance and heavy renders such as statutory forms.
+- **Security and signing**: PBKDF2-SHA256 password hashing, tenant-scoped data, a hash-chained Ed25519 record of signer intent and consent that can be verified offline, and a server-rendered signed PDF with a certificate of completion
 - **Modern**: React Router v8 + React 19 + Hono API + Drizzle + Tailwind v4 — small surface, easy to read
 
 ## Quick start
@@ -67,7 +67,7 @@ There are three ways to run OpenInspection, from zero effort to full control. Pi
 
 ### 1. Try the hosted service (no deployment)
 
-Want to evaluate the product without running any infrastructure? Register at [**inspectorhub.io/register**](https://inspectorhub.io/register) with your email, click the activation link, and a workspace is created for you — the app lives at `app.inspectorhub.io`. This is the managed edition of this exact codebase (first 5 inspections free, no card), pre-loaded with starter templates so you can click through a real inspection immediately. You can export your data and switch to a self-hosted deploy at any time.
+Want to evaluate the product without running any infrastructure? Register at [**inspectorhub.io/register**](https://inspectorhub.io/register) with your email, click the activation link, and a workspace is created for you — the app lives at `app.inspectorhub.io`. This is the managed edition of this exact codebase (there is a free plan, no card needed), pre-loaded with starter templates so you can click through a real inspection immediately. You can download your data from Settings, Data (JSON and CSV). A hosted workspace cannot yet be loaded into a self-hosted deployment automatically; see the export limits above.
 
 ### 2. Deploy to Cloudflare (one-click)
 
@@ -122,16 +122,9 @@ Deep dive: [`docs/operate/deploy.md`](docs/operate/deploy.md). Architecture over
 - 💡 [Ideas & feature requests](https://github.com/InspectorHub/OpenInspection/discussions/categories/ideas)
 - 🐛 [Issue tracker](https://github.com/InspectorHub/OpenInspection/issues)
 
-## Prefer a managed setup?
+## Hosted version
 
-If you'd rather skip the infrastructure work, **[InspectorHub](https://inspectorhub.io/)** offers a fully-hosted version of this software — same codebase, managed for you.
-
-- First 5 inspections free — no credit card required
-- Simple per-seat pricing
-- Any-month money-back guarantee
-- Upgrade to self-hosted at any time — your data, your choice
-
-[Try InspectorHub free →](https://inspectorhub.io/)
+Prefer not to run it yourself? InspectorHub runs OpenInspection for you at [inspectorhub.io](https://inspectorhub.io): sign up and start inspecting, with no servers to set up or keep updated. It is the same open-source software, and there is a free plan to try it. Current plans, limits and terms are on the site. For what differs between the hosted service and a copy you run yourself, see [Deployment modes](https://github.com/InspectorHub/OpenInspection/blob/main/docs/reference/deployment-modes.md).
 
 ## License
 

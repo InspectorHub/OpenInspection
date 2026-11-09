@@ -280,10 +280,14 @@ authoritative, and its next persist overwrites the blob.
   deterministically (last-writer-by-clientID). No operation is "lost" in the CRDT,
   but one value wins — the **version history** surfaces the overwritten value so it
   is recoverable.
-- **Network-only operations**: photo/video binary upload and crop/annotate image
-  baking require a connection (they write to R2). Offline, the editor declines these
-  with a "needs a connection" notice; all field data and photo array operations
-  (reorder/detach/move/revert) work offline.
+- **Offline media**: photos, crops and annotations made offline are stored in
+  IndexedDB (`app/lib/field/web-media-store.ts`) and uploaded to R2 by the media
+  drain when the connection returns (`packages/field-ui/src/hooks/useMediaDrain.ts`);
+  the document entry carries `pendingUpload` until then. All field data and photo
+  array operations (reorder/detach/move/revert) also work offline.
+- **Network-only operations**: video upload in the web app needs a connection
+  (clips are not queued; the add-video control is disabled while offline), and
+  so do photos attached to a defect (the web queue stores item photos only).
 
 ## Version history & restore
 

@@ -66,7 +66,7 @@ import newConstructionFinalSeed from '../data/seed-templates/new-construction-fi
 import sewerScopeSeed          from '../data/seed-templates/sewer-scope.json';
 import radonSeed               from '../data/seed-templates/radon.json';
 import moldInspectionSeed      from '../data/seed-templates/mold-inspection.json';
-const INSPECTION_TEMPLATES = [
+export const INSPECTION_TEMPLATES = [
     residentialSeed,
     preListingSeed,
     newConstructionSeed,
