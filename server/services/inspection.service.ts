@@ -275,7 +275,7 @@ export class InspectionService {
             sectionTitle: string;
             photoIndex: number;
             annotated: boolean;
-            defectId?: string;
+            defectId?: string; unitId?: string;
         }>;
         pool: Array<{
             id: string;

@@ -25,6 +25,22 @@
 const PLAIN_ID = /^[A-Za-z0-9_-]+$/;
 const PHOTO_FILENAME = /^[A-Za-z0-9_-]+\.(?:png|jpe?g|webp)$/i;
 
+/**
+ * The mediaId of a new-convention photo key (`{t}/inspections/{i}/photos/{mediaId}.{ext}`), or null for the old ad-hoc
+ * shapes. The stem may not contain dots, so a derivative (`MED.annotated.png`) returns null rather than `MED.annotated`.
+ */
+export function photoMediaId(key: string): string | null {
+  return /\/photos\/([^/.]+)\.[^/.]+$/.exec(key)?.[1] ?? null;
+}
+
+/** A baked derivative's file name: `{mediaId}.annotated|cropped[.{rev}].png|jpg`. Captures the mediaId. */
+const DERIVATIVE_NAME = /^([^/.]+)\.(?:annotated|cropped)(?:\.[0-9a-f]{8})?\.(?:png|jpg)$/;
+
+/** The mediaId a baked derivative's file name belongs to, or null when the name is not in the derivative family. */
+export function derivativeMediaId(fileName: string): string | null {
+  return DERIVATIVE_NAME.exec(fileName)?.[1] ?? null;
+}
+
 export const r2Keys = {
   /**
    * An authority's published form PDF. NOT tenant-scoped -- see the exception in
@@ -39,10 +55,12 @@ export const r2Keys = {
   /** The folder `inspectionPhoto` and its annotated and cropped variants write into: the part of the current layout the orphan sweep reads. */
   inspectionPhotosPrefix: (t: string, i: string) =>
     `${t}/inspections/${i}/photos/`,
-  inspectionPhotoAnnotated: (t: string, i: string, mediaId: string) =>
-    `${t}/inspections/${i}/photos/${mediaId}.annotated.png`,
-  inspectionPhotoCropped: (t: string, i: string, mediaId: string) =>
-    `${t}/inspections/${i}/photos/${mediaId}.cropped.jpg`,
+  // `rev` makes each bake its own object. /photo is cached per key and a published report keeps showing the file it was
+  // made from, so a derivative baked again must never overwrite the earlier one (the orphan sweep removes it once unreferenced).
+  inspectionPhotoAnnotated: (t: string, i: string, mediaId: string, rev?: string) =>
+    `${t}/inspections/${i}/photos/${mediaId}.annotated${rev ? `.${rev}` : ''}.png`,
+  inspectionPhotoCropped: (t: string, i: string, mediaId: string, rev?: string) =>
+    `${t}/inspections/${i}/photos/${mediaId}.cropped${rev ? `.${rev}` : ''}.jpg`,
   inspectionVideo: (t: string, i: string, mediaId: string, ext: string) =>
     `${t}/inspections/${i}/videos/${mediaId}.${ext}`,
   inspectionVideoPoster: (t: string, i: string, mediaId: string) =>

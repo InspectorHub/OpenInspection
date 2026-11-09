@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { PhotoCropSchema } from '../../../server/lib/validations/inspection.schema';
-import { InspectionService } from '../../../server/services/inspection.service';
+import { InspectionService, resolveCoverUrl } from '../../../server/services/inspection.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { ScopedDB } from '../../../server/lib/db/scoped';
@@ -98,7 +98,7 @@ describe('saveCroppedItemPhoto', () => {
     const { croppedKey } = await svc.saveCroppedItemPhoto(
       INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(8), CROP, undefined,
     );
-    expect(croppedKey).toMatch(/\.cropped\.jpg$/);
+    expect(croppedKey).toMatch(/\.cropped\.[0-9a-f]{8}\.jpg$/);
     expect(r2.store.has(croppedKey)).toBe(true);
     const entry = await readEntry(0);
     expect(entry.croppedKey).toBe(croppedKey);
@@ -119,7 +119,7 @@ describe('saveCroppedItemPhoto', () => {
     );
 
     // R2 object still written + key returned (authoritative binary).
-    expect(croppedKey).toMatch(/\.cropped\.jpg$/);
+    expect(croppedKey).toMatch(/\.cropped\.[0-9a-f]{8}\.jpg$/);
     expect(r2.store.has(croppedKey)).toBe(true);
 
     // results.data is byte-identical — the seeded annotation is NOT cleared
@@ -161,9 +161,59 @@ describe('saveCroppedItemPhoto', () => {
     const { croppedKey } = await svc.saveCroppedItemPhoto(
       INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(8), CROP, undefined,
     );
-    expect(croppedKey).toBe(
-      `${TENANT}/inspections/${INSPECTION_ID}/photos/${MEDIAID}.cropped.jpg`,
-    );
+    expect(croppedKey).toMatch(new RegExp(`^${TENANT}/inspections/${INSPECTION_ID}/photos/${MEDIAID}\.cropped\.[0-9a-f]{8}\.jpg$`));
     expect(r2.store.has(croppedKey)).toBe(true);
+  });
+
+  it('a cover that pointed at the earlier file follows it to the new crop; another cover is left alone', async () => {
+    await testDb.update(schema.inspections).set({ coverPhotoId: 'old-ann.png' }).where(eq(schema.inspections.id, INSPECTION_ID));
+    const { croppedKey } = await svc.saveCroppedItemPhoto(INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(8), CROP, undefined);
+    const after = await testDb.select().from(schema.inspections).where(eq(schema.inspections.id, INSPECTION_ID)).get();
+    expect(after?.coverPhotoId).toBe(croppedKey);
+
+    await testDb.update(schema.inspections).set({ coverPhotoId: 'someone-else.jpg' }).where(eq(schema.inspections.id, INSPECTION_ID));
+    await svc.saveCroppedItemPhoto(INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(8), CROP, undefined);
+    const kept = await testDb.select().from(schema.inspections).where(eq(schema.inspections.id, INSPECTION_ID)).get();
+    expect(kept?.coverPhotoId).toBe('someone-else.jpg');
+  });
+
+  // The stored cover crop is a rectangle in the SOURCE frame, and the baked cover file was cut with it. A crop of the
+  // photo changes that frame, so both go when the cover moves to the new crop: the rectangle would frame a region of an
+  // image it was never measured against, and the report prefers the baked file, so it would keep showing the old frame.
+  it('moving a cover to the new crop drops its stored crop rectangle and its baked file, so the report cover is the new photo', async () => {
+    const rect = { aspect: '3:2' as const, orientation: 'landscape' as const, x: 5, y: 6, width: 70, height: 40 };
+    await testDb.update(schema.inspections)
+      .set({ coverPhotoId: 'old-ann.png', coverCrop: rect, coverImageKey: 'T/inspections/I/cover/baked.jpg' })
+      .where(eq(schema.inspections.id, INSPECTION_ID));
+    const { croppedKey } = await svc.saveCroppedItemPhoto(INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(8), CROP, undefined);
+    const after = await testDb.select().from(schema.inspections).where(eq(schema.inspections.id, INSPECTION_ID)).get();
+    expect(after?.coverPhotoId).toBe(croppedKey);
+    expect(after?.coverCrop).toBeNull();
+    expect(after?.coverImageKey).toBeNull();
+    // What the report header and the public report show:
+    expect(resolveCoverUrl({ coverImageKey: after?.coverImageKey ?? null, coverPhotoId: after?.coverPhotoId ?? null }, (k) => k)).toBe(croppedKey);
+  });
+
+  it('a cover on another photo keeps its crop rectangle', async () => {
+    const rect = { aspect: '3:2' as const, orientation: 'landscape' as const, x: 5, y: 6, width: 70, height: 40 };
+    await testDb.update(schema.inspections).set({ coverPhotoId: 'someone-else.jpg', coverCrop: rect }).where(eq(schema.inspections.id, INSPECTION_ID));
+    await svc.saveCroppedItemPhoto(INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(8), CROP, undefined);
+    const after = await testDb.select().from(schema.inspections).where(eq(schema.inspections.id, INSPECTION_ID)).get();
+    expect(after?.coverCrop).toEqual(rect);
+  });
+
+  it('two quick crops of the cover photo with the results row not yet updated: the cover follows both', async () => {
+    const MEDIAID = 'a1b2c3d4-0000-0000-0000-000000000006';
+    const original = `${TENANT}/inspections/${INSPECTION_ID}/photos/${MEDIAID}.jpg`;
+    await testDb.update(schema.inspectionResults)
+      .set({ data: { [ITEM_ID]: { photos: [{ key: original }] } } })
+      .where(eq(schema.inspectionResults.inspectionId, INSPECTION_ID));
+    await testDb.update(schema.inspections).set({ coverPhotoId: original }).where(eq(schema.inspections.id, INSPECTION_ID));
+    const crop = () => svc.saveCroppedItemPhoto(INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(8), CROP, undefined, { skipResultsWrite: true });
+    const first = await crop();
+    const second = await crop();
+    const after = await testDb.select().from(schema.inspections).where(eq(schema.inspections.id, INSPECTION_ID)).get();
+    expect(second.croppedKey).not.toBe(first.croppedKey);
+    expect(after?.coverPhotoId).toBe(second.croppedKey);
   });
 });

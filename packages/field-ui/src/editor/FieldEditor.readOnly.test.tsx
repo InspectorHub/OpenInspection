@@ -59,7 +59,7 @@ describe("readOnly editor: reading works", () => {
     await mountSeen(true);
     fireEvent.click(await screen.findByTestId("thumb-0"));
     await waitFor(() => expect(document.querySelector(".yarl__root")).not.toBeNull());
-    expect(screen.queryByRole("button", { name: m.media_viewer_caption() })).toBeNull();
+    expect(screen.queryByRole("button", { name: m.media_viewer_cover() })).toBeNull();
   });
 
   it("navigates to another item and a later remote change shows up", async () => {

@@ -4,6 +4,7 @@ import { MediaViewer, ALL_MEDIA_ACTIONS, type MediaAction } from "./MediaViewer"
 import { useReadOnly } from "../../read-only";
 import { useFieldDataSource, usePhotoUrlVersion } from "../../context";
 import type { MediaPoolListing } from "../../data-source-types";
+import type { GalleryPhoto } from "../../shared/inspection-media";
 import { m } from "../../i18n";
 
 /**
@@ -15,19 +16,37 @@ import { m } from "../../i18n";
  */
 export const GALLERY_UNHANDLED_ACTIONS: readonly MediaAction[] = ["crop", "rotate", "caption", "revert", "delete", "poster"];
 
+const NO_ANNOTATE_ACTIONS: readonly MediaAction[] = [...GALLERY_UNHANDLED_ACTIONS, "annotate"];
+
+/**
+ * A studio opened from here saves onto `photos[photoIndex]` of the row's item, so Annotate is offered only for a photo
+ * attached to an item. A defect's photo is indexed inside the defect, and a loose pool photo belongs to no item.
+ */
+// Results are keyed unit:section:item and the editor follows the open unit, so a row from another unit is left out too.
+const COMMON_SCOPE = "_default";
+const canAnnotate = (p: GalleryPhoto | undefined, activeUnitId: string | null): boolean =>
+  !!p && !!p.itemId && p.photoIndex != null && !p.defectId && p.mediaType !== "video" && (p.unitId ?? COMMON_SCOPE) === (activeUnitId ?? COMMON_SCOPE);
+
 export interface PhotoGalleryProps {
   inspectionId: string;
+  /** The open unit (null = the common scope): only its photos can be annotated from here. */
+  activeUnitId?: string | null;
+  /** The report cover, so the viewer can say which photo is it. */
+  coverKey?: string | null;
+  /** Shows a listed photo as the editor has it now (the listing can be behind a save). */
+  liveRow?: (photo: GalleryPhoto) => GalleryPhoto;
   onSetCover: (photo: { key: string; url: string }) => void;
-  onAnnotate: (photo: { key: string; url: string }) => void;
+  /** Gets the whole row: the editor needs its item, section and index to save onto the right photo. */
+  onAnnotate: (photo: GalleryPhoto) => void;
 }
-export function PhotoGallery({ inspectionId, onSetCover, onAnnotate }: PhotoGalleryProps) {
+export function PhotoGallery({ inspectionId, activeUnitId = null, coverKey = null, liveRow, onSetCover, onAnnotate }: PhotoGalleryProps) {
   const mediaPool = useFieldDataSource().resources.mediaPool;
   const readOnly = useReadOnly();
   const photoUrlVersion = usePhotoUrlVersion();
   // null until the first answer. A reload keeps the previous answer on screen until the next one lands.
   const [listing, setListing] = useState<MediaPoolListing | null>(null);
   const [lightbox, setLightbox] = useState<number | null>(null);
-  const photos = listing?.photos ?? [];
+  const photos = (listing?.photos ?? []).map((p) => liveRow?.(p) ?? p);
   // The newest read wins: an answer for an earlier read (or another inspection) is dropped.
   const latestRead = useRef(0);
   const load = useCallback(() => {
@@ -71,12 +90,13 @@ export function PhotoGallery({ inspectionId, onSetCover, onAnnotate }: PhotoGall
       <PhotoGrid items={photos.map((p) => ({ key: p.key, src: p.url, width: 4, height: 3, label: p.label }))} onClick={(i) => setLightbox(i)} />
       <MediaViewer
         photos={photos}
+        coverKey={coverKey}
         index={lightbox}
         onClose={() => setLightbox(null)}
-        hideActions={readOnly ? ALL_MEDIA_ACTIONS : GALLERY_UNHANDLED_ACTIONS}
+        hideActions={readOnly ? ALL_MEDIA_ACTIONS : (shown) => (canAnnotate(shown, activeUnitId) ? GALLERY_UNHANDLED_ACTIONS : NO_ANNOTATE_ACTIONS)}
         onAction={(a, p) => {
           if (a === "cover") onSetCover({ key: p.key, url: p.url });
-          else if (a === "annotate") onAnnotate({ key: p.key, url: p.url });
+          else if (a === "annotate") onAnnotate(p);
         }}
       />
     </div>

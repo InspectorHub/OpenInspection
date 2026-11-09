@@ -18,6 +18,7 @@ const MediaCenterAttachedPhotoSchema = z.object({
     photoIndex:    z.number().int().nonnegative(),
     annotated:     z.boolean(),
     defectId:      z.string().optional().describe('Defect id when the photo hangs off a canned/custom defect rather than the item'),
+    unitId:        z.string().optional().describe('Unit the finding belongs to; "_default" is the common scope'),
 }).openapi('MediaCenterAttachedPhoto');
 
 const MediaCenterPoolPhotoSchema = z.object({

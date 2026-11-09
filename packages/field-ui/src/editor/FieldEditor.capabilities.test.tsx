@@ -289,7 +289,7 @@ const ENTRIES: Entry[] = [
       await openItem(phone);
       fireEvent.click(await screen.findByTestId("thumb-0"));
       // The other toolbar actions are the control: the viewer itself opened.
-      await screen.findByRole("button", { name: m.media_viewer_caption() });
+      await screen.findByRole("button", { name: m.media_viewer_cover() });
       return has(m.media_viewer_poster());
     },
   },

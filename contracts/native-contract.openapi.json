@@ -14910,6 +14910,10 @@
           "defectId": {
             "type": "string",
             "description": "Defect id when the photo hangs off a canned/custom defect rather than the item"
+          },
+          "unitId": {
+            "type": "string",
+            "description": "Unit the finding belongs to; \"_default\" is the common scope"
           }
         },
         "required": [

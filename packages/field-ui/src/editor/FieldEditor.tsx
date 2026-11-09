@@ -55,7 +55,7 @@ import { InspectionSettingsSheet } from "../components/editor/InspectionSettings
 import { VideoCapture } from "../components/media-studio/VideoCapture";
 import { bakePhoto } from "../components/media-studio/bakePhoto";
 import { bakeBatch } from "../components/media-studio/bakeBatch";
-import { photoStudioTarget } from "../components/media-studio/photo-studio-target";
+import { photoStudioTarget, type PhotoStudioItem } from "../components/media-studio/photo-studio-target";
 import type { PhotoEntry } from "../shared/results-doc.types";
 import { PublishGateModal } from "../components/editor/PublishGateModal";
 import { AddMediaChooser } from "../components/editor/AddMediaChooser";
@@ -620,10 +620,13 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  const [photoStudioKey, setPhotoStudioKey] = useState<string | null>(null);
  const [photoStudioIndex, setPhotoStudioIndex] = useState(0);
  const [photoStudioTotal, setPhotoStudioTotal] = useState(0);
+ // The item (and section) the open studio saves onto; null falls back to the active item.
+ const [photoStudioItem, setPhotoStudioItem] = useState<PhotoStudioItem | null>(null);
  // Single entry point for opening the PhotoAnnotator — keeps the five state
  // setters in lockstep across every caller (gallery annotate, tools dock).
  const openPhotoStudio = useCallback(
-  (next: { url: string | null; key: string | null; index: number; total: number }) => {
+  (next: { url: string | null; key: string | null; index: number; total: number; item?: PhotoStudioItem }) => {
+   setPhotoStudioItem(next.item ?? null);
    setPhotoStudioUrl(next.url);
    setPhotoStudioKey(next.key);
    setPhotoStudioIndex(next.index);
@@ -714,7 +717,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
   onBulkDetachPhotos,
   moveTargets,
   onBulkMovePhotos,
-  onViewerAction,
+  onViewerAction, getItemPhotos,
   performPhotoCropSave,
   performPhotoAnnotationSave,
  } = guardPhotoOps(usePhotoOps({
@@ -730,6 +733,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
   setPhotoStudioIndex,
   setPhotoStudioTotal,
   setPhotoStudioOpen,
+  setPhotoStudioItem,
  }), readOnly);
 
  /* Mobile shell state */
@@ -1567,8 +1571,9 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  getRatingLabel={state.getRatingLabel}
  inspectionId={String(state.inspection.id)}
  photoCount={inspectionPhotoCount}
+ activeUnitId={activeUnitId} coverKey={(state.inspection.coverPhotoId as string | null) ?? null} getItemPhotos={getItemPhotos}
  onGallerySetCover={(p) => setGalleryCropSource(p)}
- onGalleryAnnotate={(p) => openPhotoStudio({ url: p.url, key: p.key, index: 0, total: 0 })}
+ onGalleryAnnotate={(p) => onViewerAction("annotate", p)}
  serverComments={serverComments}
  librarySort={comments.sort}
  onLibrarySearch={(q) => state.setCommentLibrarySearch(q)}
@@ -1790,8 +1795,8 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  streamCustomerSubdomain={streamCustomerSubdomain}
  onReload={() => dataSource.reload()}
  handleBurstCommit={handleBurstCommit}
- studio={{ open: photoStudioOpen, url: photoStudioUrl, key: photoStudioKey, index: photoStudioIndex, total: photoStudioTotal, setOpen: setPhotoStudioOpen }}
- photoOps={{ viewer, setViewer, itemGalleryPhotos, onViewerAction, posterTarget, setPosterTarget, photoCropTarget, setPhotoCropTarget, recropWarn, setRecropWarn, galleryCropSource, setGalleryCropSource, sessionCoverCrop, setSessionCoverCrop, performPhotoCropSave, performPhotoAnnotationSave }}
+ studio={{ open: photoStudioOpen, url: photoStudioUrl, key: photoStudioKey, index: photoStudioIndex, total: photoStudioTotal, item: photoStudioItem, setOpen: setPhotoStudioOpen }}
+ photoOps={{ viewer, setViewer, itemGalleryPhotos, onViewerAction, posterTarget, setPosterTarget, photoCropTarget, setPhotoCropTarget, recropWarn, setRecropWarn, galleryCropSource, setGalleryCropSource, sessionCoverCrop, setSessionCoverCrop, performPhotoCropSave, performPhotoAnnotationSave, getItemPhotos }}
  addingToGroup={addingToGroup}
  setAddingToGroup={setAddingToGroup}
  versionHistoryOpen={versionHistoryOpen}
@@ -1858,7 +1863,8 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  onPhotoStudio={() => {
  if (!state.activeItemId) return;
  const result = state.getResult(state.activeItemId);
- openPhotoStudio(photoStudioTarget(result?.photos as PhotoEntry[] | undefined, String(state.inspection.id), (id, key, size) => dataSource.urls.photo(id, key, size)));
+ const target = photoStudioTarget(result?.photos as PhotoEntry[] | undefined, String(state.inspection.id), (id, key, size) => dataSource.urls.photo(id, key, size));
+ openPhotoStudio({ ...target, item: { itemId: state.activeItemId, sectionId: state.currentSection?.id ?? state.sectionIdForItem(state.activeItemId) ?? undefined, originalKey: target.originalKey ?? undefined } });
  }}
  onToggleCheatsheet={() =>
  state.setShowCheatsheet(!state.showCheatsheet)

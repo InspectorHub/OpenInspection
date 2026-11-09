@@ -52,6 +52,7 @@ function setup(opts: { withDoc?: boolean } = {}) {
     sectionIdForItem: (itemId: string) => (itemId === 'i1' ? 's1' : null),
     setResults: vi.fn(),
     setDirty: vi.fn(),
+    setInspection: vi.fn(),
   };
   const findings = { getResult: () => ({ photos: [{ key: 'base.jpg' }] }) };
   const ctx = {
@@ -307,6 +308,8 @@ describe('annotation', () => {
 describe('urls and pending blobs', () => {
   it('the studio and the cropper open on urls.photo of the right key', () => {
     const { hook, ctx } = setup();
+    // The studio is built from the live entry, which is what the row describes.
+    ctx.findings.getResult = () => ({ photos: [{ key: 'base.jpg', croppedKey: 'crop.jpg', annotatedKey: 'ann.jpg' }] });
     const photo = { key: 'ann.jpg', url: '', label: '', itemId: 'i1', photoIndex: 0, originalKey: 'base.jpg', croppedKey: 'crop.jpg' } as never;
     act(() => hook.result.current.onViewerAction('annotate', photo));
     expect(ctx.setPhotoStudioUrl).toHaveBeenCalledWith('/photo-url/insp1/crop.jpg');

@@ -65,7 +65,7 @@ Worker stores the file in R2 under `{tenantId}/{inspectionId}/{filename}`. Photo
 
 (There is no `GET /api/inspections/files/:key`. This page named one for a long time and no such route has ever existed.)
 
-Photos can have annotations and captions (`inspection_media_pool` table).
+Photos can have annotations and captions (`inspection_media_pool` table). Annotating a photo again replaces its earlier strokes rather than adding to them: the studio always draws on the original photo or its crop, never on an earlier annotation, and each save is stored as a new image (the previous one is removed by the orphan sweep once nothing references it). A re-crop likewise drops the annotation.
 
 ## 4. Report Generation & PDF
 

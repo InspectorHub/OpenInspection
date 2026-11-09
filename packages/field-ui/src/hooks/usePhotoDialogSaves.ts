@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useFieldDataSource } from "../context";
 import { m } from "../i18n";
 import { refuseInadmissibleImage } from "./photo-save-guard";
+import { resolvePhotoIndex } from "../components/media-studio/photo-studio-target";
 import type { usePhotoOps } from "./usePhotoOps";
 import type { useReportCoverWrites } from "./useReportCoverWrites";
 
@@ -27,10 +28,11 @@ export function usePhotoDialogSaves(a: {
   setRecropWarn: PhotoOps["setRecropWarn"];
   setStudioOpen: (open: boolean) => void;
   annotateChecked: ReturnType<typeof useReportCoverWrites>["annotateChecked"];
+  getItemPhotos: PhotoOps["getItemPhotos"];
   photoCropTarget: PhotoOps["photoCropTarget"];
   studioOpen: boolean;
 }) {
-  const { performPhotoCropSave, performPhotoAnnotationSave, setPhotoCropTarget, setRecropWarn, setStudioOpen, annotateChecked, photoCropTarget, studioOpen } = a;
+  const { performPhotoCropSave, performPhotoAnnotationSave, setPhotoCropTarget, setRecropWarn, setStudioOpen, annotateChecked, getItemPhotos, photoCropTarget, studioOpen } = a;
   const dataSource = useFieldDataSource();
   const cropAttempt = useRef<object | null>(null);
   const studioAttempt = useRef<object | null>(null);
@@ -90,7 +92,10 @@ export function usePhotoDialogSaves(a: {
       });
       if (handled) return;
       // The brief window before the results document is live: the online relay, checked the same way.
-      annotateChecked({ itemId: target.itemId, photoIndex: target.photoIndex, nodes: nodesJson, image: new File([blob], "annotated.png", { type: "image/png" }), ...(target.sectionId ? { sectionId: target.sectionId } : {}) },
+      // The relay addresses by index too: follow the photo by its key, as the document path does.
+      const photoIndex = resolvePhotoIndex(getItemPhotos(target.itemId, target.sectionId), { photoIndex: target.photoIndex, originalKey: target.expectOriginalKey });
+      if (photoIndex < 0) { dataSource.notify(m.editor_photo_save_gone_keep_open(), "error"); t.settle(); return; }
+      annotateChecked({ itemId: target.itemId, photoIndex, nodes: nodesJson, image: new File([blob], "annotated.png", { type: "image/png" }), ...(target.sectionId ? { sectionId: target.sectionId } : {}) },
         // A studio closed meanwhile is no longer waiting: its refusal is not announced.
         () => (t.live() ? undefined : false))
         .then((ok) => { if (!t.live()) return; if (ok) setStudioOpen(false); else t.settle(); }, t.failed);

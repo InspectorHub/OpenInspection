@@ -169,7 +169,7 @@ describe("phone user paths into the shared overlays", () => {
     fireEvent.click((await screen.findAllByText("Flashing condition"))[0]);
     fireEvent.click(await screen.findByTestId("thumb-0"));
     // The viewer's own toolbar is on screen, and it is the only one.
-    expect(await screen.findAllByRole("button", { name: m.media_viewer_caption() })).toHaveLength(1);
+    expect(await screen.findAllByRole("button", { name: m.media_viewer_cover() })).toHaveLength(1);
   });
 
   async function openSections() {

@@ -4,6 +4,8 @@ import { renderTemplate } from "../../shared/mustache";
 import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "../../shared/defect-fields";
 import { photoDisplayName, withDownload } from "../../shared/photo-name";
 import { PhotoGallery } from "../media-studio/PhotoGallery";
+import { useLiveGalleryRow } from "../../hooks/useLiveGalleryRow";
+import type { GalleryPhoto } from "../../shared/inspection-media";
 import { CommentLibraryList } from "./CommentLibraryList";
 import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 import type { EditorMode } from "../editor-shared/editor-mode";
@@ -21,8 +23,14 @@ interface SideRailProps {
   getRatingLabel?: (id: string) => string;
   inspectionId?: string;
   photoCount?: number;
+  /** The open unit (null = common scope); the photos drawer annotates only that unit's photos. */
+  activeUnitId?: string | null;
+  /** The report cover (the key its photo shows). */
+  coverKey?: string | null;
+  /** Reads an item's photos from the live results, so the drawer can show a row as the editor has it now. */
+  getItemPhotos?: Parameters<typeof useLiveGalleryRow>[0];
   onGallerySetCover?: (photo: { key: string; url: string }) => void;
-  onGalleryAnnotate?: (photo: { key: string; url: string }) => void;
+  onGalleryAnnotate?: (photo: GalleryPhoto) => void;
   serverComments?: Array<{ id: string; text: string; useCount?: number; lastUsedAt?: string | null }>;
   /** Viewer locale for the comment library timestamps; the route owns it. */
   locale: string;
@@ -54,10 +62,11 @@ const TABS: Array<{ id: TabId; label: () => string; icon: string }> = [
   { id: "photos", label: () => m.editor_siderail_tab_photos(), icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" },
 ];
 
-export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, onGallerySetCover, onGalleryAnnotate, serverComments, librarySort, onLibrarySearch, onLibraryInsert, onLibraryTabChange, initialOpen, fill = false, categoryColor, locale }: SideRailProps) {
+export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, activeUnitId, coverKey, getItemPhotos, onGallerySetCover, onGalleryAnnotate, serverComments, librarySort, onLibrarySearch, onLibraryInsert, onLibraryTabChange, initialOpen, fill = false, categoryColor, locale }: SideRailProps) {
   const { urls, resources } = useFieldDataSource();
   const readOnly = useReadOnly();
   const [activeTab, setActiveTab] = useState<TabId>("preview");
+  const liveGalleryRow = useLiveGalleryRow(getItemPhotos);
   const [openState, setOpen] = useState(initialOpen ?? false);
   // In a bottom drawer the panel is the drawer's content: the drawer's own close dismisses it, nothing collapses it.
   const open = fill || openState;
@@ -254,7 +263,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
             )}
             {effectiveTab === "photos" && (
               inspectionId ? (
-                <PhotoGallery inspectionId={inspectionId} onSetCover={(p) => onGallerySetCover?.(p)} onAnnotate={(p) => onGalleryAnnotate?.(p)} />
+                <PhotoGallery inspectionId={inspectionId} activeUnitId={activeUnitId ?? null} coverKey={coverKey ?? null} liveRow={liveGalleryRow} onSetCover={(p) => onGallerySetCover?.(p)} onAnnotate={(p) => onGalleryAnnotate?.(p)} />
               ) : (
                 <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.editor_siderail_photos_empty()}</p>
               )

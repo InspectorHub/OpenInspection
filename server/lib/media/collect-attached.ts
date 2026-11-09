@@ -16,6 +16,7 @@ export interface AttachedPhoto {
   photoIndex: number;   // index within its own photos[] array
   annotated: boolean;
   defectId?: string;    // present when the photo hangs off a defect, not the item
+  unitId?: string;      // the unit the finding belongs to ('_default' for the common scope), when the key parser knows it
 }
 export interface ItemMeta { itemLabel: string; sectionId: string; sectionTitle: string }
 
@@ -32,7 +33,7 @@ export function collectAttachedPhotos(
   data: Record<string, ResultEntry>,
   itemMeta: Map<string, ItemMeta>,
   makeUrl: (key: string) => string,
-  parseKey: (key: string) => { itemId: string; sectionId?: string } = (k) => ({ itemId: k }),
+  parseKey: (key: string) => { itemId: string; sectionId?: string; unitId?: string } = (k) => ({ itemId: k }),
 ): AttachedPhoto[] {
   const out: AttachedPhoto[] = [];
   const push = (itemId: string, sectionFallback: string | undefined, p: PhotoEntry | null, idx: number, defectId?: string) => {
@@ -48,7 +49,8 @@ export function collectAttachedPhotos(
     out.push(attached);
   };
   for (const [key, entry] of Object.entries(data)) {
-    const { itemId, sectionId } = parseKey(key);
+    const { itemId, sectionId, unitId } = parseKey(key);
+    const from = out.length;
     (Array.isArray(entry?.photos) ? entry.photos : []).forEach((p, i) => push(itemId, sectionId, p, i));
     const cannedDefects = entry?.tabs?.defects ?? {};
     for (const [defectId, d] of Object.entries(cannedDefects)) {
@@ -57,6 +59,7 @@ export function collectAttachedPhotos(
     for (const d of (entry?.customComments?.defects ?? [])) {
       (Array.isArray(d?.photos) ? d.photos : []).forEach((p, i) => push(itemId, sectionId, p, i, d.id));
     }
+    if (unitId !== undefined) for (const a of out.slice(from)) a.unitId = unitId;
   }
   return out;
 }
