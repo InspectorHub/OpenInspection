@@ -139,6 +139,20 @@ interface CachedToken {
 const tokenCache = new Map<string, CachedToken>();
 const inFlight = new Map<string, Promise<string>>();
 
+/** Bumped by the test reset so an exchange that was already running cannot write into the emptied cache. */
+let generation = 0;
+
+/**
+ * Forget every cached token and every exchange in flight. Nothing in the product calls this: it exists
+ * for the unit suite, whose `api-shared` project reuses one module registry across spec files and calls
+ * it after each file (`tests/unit/setup-shared.ts`) so a token cached by one file is never served to the next.
+ */
+export function resetServiceAccountTokenCache(): void {
+    generation += 1;
+    tokenCache.clear();
+    inFlight.clear();
+}
+
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
 /**
@@ -165,12 +179,16 @@ export function createServiceAccountTokenSource(
             const pending = inFlight.get(cacheKey);
             if (pending) return pending;
 
-            const attempt = exchange(account, scope)
+            const startedIn = generation;
+            const attempt: Promise<string> = exchange(account, scope)
                 .then(({ token, expiresIn }) => {
-                    tokenCache.set(cacheKey, {
-                        token,
-                        servableUntil: nowSeconds() + expiresIn - REFRESH_MARGIN_SECONDS,
-                    });
+                    // An exchange that began before a reset must not refill the cache the reset emptied.
+                    if (startedIn === generation) {
+                        tokenCache.set(cacheKey, {
+                            token,
+                            servableUntil: nowSeconds() + expiresIn - REFRESH_MARGIN_SECONDS,
+                        });
+                    }
                     return token;
                 })
                 .finally(() => {
@@ -178,7 +196,8 @@ export function createServiceAccountTokenSource(
                     // exchange does not become an hour of refusals served from
                     // a poisoned entry. Nothing is written to the cache on the
                     // failing path, so the next caller simply tries again.
-                    inFlight.delete(cacheKey);
+                    // Only this attempt's own entry: after a reset a newer attempt may hold the slot.
+                    if (inFlight.get(cacheKey) === attempt) inFlight.delete(cacheKey);
                 });
 
             inFlight.set(cacheKey, attempt);

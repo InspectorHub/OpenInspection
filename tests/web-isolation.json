@@ -502,6 +502,7 @@
       "packages/field-ui/src/components/editor/AiAssistPanel.test.tsx",
       "packages/field-ui/src/components/editor/AppBar.test.tsx",
       "packages/field-ui/src/components/editor/BreadcrumbDropdown.test.tsx",
+      "packages/field-ui/src/components/editor/CommentLibraryDrawer.test.tsx",
       "packages/field-ui/src/components/editor/CommentLibraryList.test.tsx",
       "packages/field-ui/src/components/editor/CommentTypeahead.test.tsx",
       "packages/field-ui/src/components/editor/CostItemsHost.test.tsx",

@@ -77,5 +77,14 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href) {
         console.error(`\nFix: node scripts/gen-web-isolation.mjs  (shared ${shared} of ${total} specs)`);
         process.exit(1);
     }
+    // Advisory, not a failure: a spec the rules accept that nobody listed runs isolated (slower, never wrong),
+    // so a new spec must not break the build. Printing it keeps the manifest from drifting unnoticed.
+    const listed = new Set([...manifest.shared.node, ...manifest.shared.dom, ...Object.keys(manifest.forcedIsolated ?? {})]);
+    const graph = new Map();
+    const unlisted = specs.filter((s) => !listed.has(s) && webSharedProblems(root, s, graph).problems.length === 0);
+    if (unlisted.length) {
+        console.log(`note: ${unlisted.length} spec(s) pass every rule but are not in the manifest, so they run isolated; run node scripts/gen-web-isolation.mjs:`);
+        for (const s of unlisted) console.log(`  ${s}`);
+    }
     console.log(`web isolation OK (shared ${shared}: node ${manifest.shared.node.length}, dom ${manifest.shared.dom.length}; isolated ${total - shared}, of ${total} specs)`);
 }

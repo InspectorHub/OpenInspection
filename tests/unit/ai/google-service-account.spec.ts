@@ -15,6 +15,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
     createServiceAccountTokenSource,
     parseServiceAccountJson,
+    resetServiceAccountTokenCache,
     CLOUD_PLATFORM_SCOPE,
     VERTEX_PROVIDER_ID,
 } from '../../../server/lib/ai/credentials/google-service-account';
@@ -38,8 +39,8 @@ let privateKeyPem: string;
 let fetchMock: ReturnType<typeof vi.fn>;
 
 /** A distinct identity per test. The token cache is keyed on it, so this is
- *  what keeps one test's cached token out of the next test — no reset hook,
- *  and therefore no test-only export on the module under test. */
+ *  what keeps one test's cached token out of the next test; the reset hook is
+ *  exercised separately below and by the shared unit setup between files. */
 let seq = 0;
 const account = () => ({
     client_email: `sa-${++seq}@example.iam.gserviceaccount.test`,
@@ -202,5 +203,65 @@ describe('parsing the credential a deployment supplies', () => {
         const parsed = parseServiceAccountJson(JSON.stringify(rest));
         expect(parsed.ok).toBe(true);
         if (parsed.ok) expect(parsed.account.token_uri).toMatch(/^https:\/\//);
+    });
+});
+
+describe('resetServiceAccountTokenCache while an exchange is pending', () => {
+    /** A fetch whose answer the test releases by hand. */
+    const held = () => {
+        let release!: (token: string) => void;
+        fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => {
+            release = (token) => { void tokenResponse(token).then(resolve); };
+        }));
+        return { release: (token: string) => release(token) };
+    };
+
+    it('lets the stale exchange finish without evicting the newer attempt that took its slot', async () => {
+        const source = createServiceAccountTokenSource(account());
+        const first = held();
+        const stale = source.getAccessToken();
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+        resetServiceAccountTokenCache();
+        const second = held();
+        const newer = source.getAccessToken();
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+        first.release('tok-stale');
+        await expect(stale).resolves.toBe('tok-stale');
+        // The stale attempt's cleanup must not have deleted the newer attempt's slot: this call joins it.
+        const joined = source.getAccessToken();
+        second.release('tok-fresh');
+        await expect(joined).resolves.toBe('tok-fresh');
+        await expect(newer).resolves.toBe('tok-fresh');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not let a stale exchange refill the cache the reset emptied', async () => {
+        const source = createServiceAccountTokenSource(account());
+        const first = held();
+        const stale = source.getAccessToken();
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+        resetServiceAccountTokenCache();
+        const second = held();
+        const newer = source.getAccessToken();
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+        second.release('tok-fresh');
+        await expect(newer).resolves.toBe('tok-fresh');
+
+        first.release('tok-stale');
+        await expect(stale).resolves.toBe('tok-stale');
+        // The cache still holds the post-reset token, and nothing called the endpoint again.
+        await expect(source.getAccessToken()).resolves.toBe('tok-fresh');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('serves nothing cached from before the reset', async () => {
+        const source = createServiceAccountTokenSource(account());
+        await expect(source.getAccessToken()).resolves.toBe('tok-A');
+        resetServiceAccountTokenCache();
+        await expect(source.getAccessToken()).resolves.toBe('tok-A');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 });

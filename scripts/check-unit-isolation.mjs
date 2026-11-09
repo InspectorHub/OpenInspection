@@ -19,7 +19,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { sharedProblems } from './lib/unit-isolation.mjs';
+import { exemptStateProblems, setupProblems, sharedProblems } from './lib/unit-isolation.mjs';
 
 /** Pure: returns { errors, shared, total }. `specsOnDisk` is the list of every api unit spec. */
 export function checkManifest(root, manifest, specsOnDisk) {
@@ -59,11 +59,21 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href) {
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     const specs = listSpecs(root);
     const { errors, shared, total } = checkManifest(root, manifest, specs);
+    errors.push(...setupProblems(root), ...exemptStateProblems(root));
     if (!cfg.includes('isolation.json')) errors.push('vitest.api.config.ts does not read tests/unit/isolation.json, so the list decides nothing');
     if (errors.length) {
         console.error(`Unit-isolation violations (${errors.length}):\n  ${errors.join('\n  ')}`);
         console.error(`\nFix: node scripts/gen-unit-isolation.mjs  (shared ${shared} of ${total} specs)`);
         process.exit(1);
+    }
+    // Advisory, not a failure: a spec the rules accept that nobody listed runs isolated (slower, never wrong),
+    // so a new spec must not break the build. Printing it keeps the manifest from drifting unnoticed.
+    const listed = new Set([...(manifest.shared ?? []), ...Object.keys(manifest.forcedIsolated ?? {})]);
+    const graph = new Map();
+    const unlisted = specs.filter((s) => !listed.has(s) && sharedProblems(root, s, graph).length === 0);
+    if (unlisted.length) {
+        console.log(`note: ${unlisted.length} spec(s) pass every rule but are not in the manifest, so they run isolated; run node scripts/gen-unit-isolation.mjs:`);
+        for (const s of unlisted) console.log(`  ${s}`);
     }
     console.log(`unit isolation OK (shared ${shared}, isolated ${total - shared}, of ${total} specs)`);
 }

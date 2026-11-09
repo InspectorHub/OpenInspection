@@ -173,6 +173,22 @@ tests/
   passes the rules but fails or flakes when shared goes under `forcedIsolated` with a
   reason, and stays there). A new spec is isolated until the generator lists it, so
   nothing breaks by default.
+  A module that keeps state is handled in one of three ways, all in `scripts/lib/unit-isolation.mjs`:
+  `BENIGN_MODULE_STATE` (a memo or registry no spec can observe, each with a written reason),
+  `RESET_BY_SHARED_SETUP` (real state with an exported reset that `tests/unit/setup-shared.ts` calls after
+  every file of `api-shared`: the Google service-account token cache, the last-active debounce, the CSP
+  report sampling window), or `KNOWN_MUTABLE_MODULES` (state the patterns cannot see; keeps every spec that
+  reaches it isolated). `lint:unit-isolation` fails when the setup file stops calling a reset it is promised.
+  A test helper that trips a text rule without being a hazard is listed under `VETTED_HELPERS` with its
+  reason (the tenant-email harness's fetch double, which its `close()` undoes). The setup file also unstubs
+  globals and restores spies after each file as a net under a spec that forgot to (a spec that calls
+  `createHarness(` must call `.close(`, which the gate checks). The helper exemption covers `fetch` only;
+  stubbing any other global in it fails the gate. A new module-level cache that a spec can observe needs one of those
+  three entries, not a bigger manifest. The exempt files are skipped by the module-state rules as a whole, so
+  `EXEMPT_STATE_PINS` records how many top-level state statements each has: a new cache in one fails
+  `lint:unit-isolation` until someone reads it and updates the number. A spec that imports the worker entry
+  (`workers/app`) or installs a fake API app loader is never shared. Both isolation gates also print, without
+  failing, any spec the rules accept but the manifest does not list, so a manifest that fell behind is visible.
 - **Do not mock `drizzle-orm/d1` to inject the test database.** A module mock keeps the spec in
   `api-isolated`. Give the code under test a real binding instead: `tests/unit/helpers/d1-binding.ts`
   has `d1For(db)` (a `D1Database` over the database `createTestDb()` returned), `lazyD1()` (a binding

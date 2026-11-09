@@ -198,6 +198,8 @@ export default defineConfig({
           name: 'api-shared',
           isolate: false,
           include: isolation.shared,
+          // Per-file resets of the module state the shared files may leave behind (see the file).
+          setupFiles: ['tests/unit/setup-shared.ts'],
         },
       },
       {

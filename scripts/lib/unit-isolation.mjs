@@ -35,25 +35,74 @@ export const SPEC_HAZARDS = [
     ['spy on a global', /\bvi\.spyOn\(\s*(globalThis|global|window|self|Date|console|Math|crypto|process|JSON|performance|Intl)\b/],
     ['fetch reassignment', /\b(globalThis|global)\.fetch\s*=|vi\.stubGlobal\(\s*['"]fetch/],
     ['environment docblock', /@vitest-environment/],
-    ['wall-clock bound', /\bperformance\.now\(\)|\bprocess\.hrtime|\bDate\.now\(\)\s*-/],
+    // `new Date(Date.now() - ageMs)` builds a timestamp in the past; it bounds nothing. A bare
+    // `Date.now() - start` is an elapsed time and still counts, and so does a `new Date(Date.now() - t0)`
+    // that is read back as a number (`.getTime()` / `.valueOf()`), which is the same probe in a wrapper.
+    [
+        'wall-clock bound',
+        /\bperformance\.now\(\)|\bprocess\.hrtime|(?<!new Date\(\s*)\bDate\.now\(\)\s*-|\bnew Date\(\s*Date\.now\(\)\s*-[^;\n]*?\)\s*\.(?:getTime|valueOf)\s*\(/,
+    ],
+    // The loader registry holds whatever the last caller installed. The worker entry installs the real one
+    // and nothing else does, so a spec that installs a fake is the only other writer.
+    ['api app loader registration', /\bregisterApiAppLoader\s*\(/],
+    // Importing the worker entry runs its top level, which installs the real API app loader (see above).
+    ['worker entry import', /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*|^\s*import\s+)['"][^'"]*\bworkers\/app(?:\.[cm]?[jt]sx?)?['"]/m],
     ['global write', /\b(globalThis|global|self|window)\s*\[[^\]]+\]\s*(=(?!=)|\+=|\|\|=|\?\?=)/],
     ['vitest globals write', /\bvi\.(setConfig|stubGlobal)\b/],
     ['unrestored fake DOM', /\bdocument\.(body|head)\./],
 ];
 
 /**
- * Modules whose top level keeps state that outlives a test, found by reading
- * them. Listing a name here keeps every spec that reaches it in `api-isolated`
- * without having to find the pattern again.
+ * Modules whose top level keeps state that outlives a test but that the patterns below cannot see,
+ * found by reading them. Listing a name here keeps every spec that reaches it in `api-isolated`
+ * without having to find the pattern again. Empty today: every module read so far is either caught by
+ * the patterns, benign, or reset per file.
  */
-export const KNOWN_MUTABLE_MODULES = [
-    // service-account token cache and in-flight request map
-    'server/lib/ai/credentials/google-service-account.ts',
-    // per-process counter locks
-    'server/api/inspections/report-send-guards.ts',
-    // debounce map for the last-active touch
-    'server/lib/middleware/touch-last-active.ts',
-];
+export const KNOWN_MUTABLE_MODULES = [];
+
+/**
+ * Modules whose state is real, outlives a spec file, and is cleared by an exported function that
+ * `tests/unit/setup-shared.ts` calls after every file of the `api-shared` project. The value is that
+ * function's name; `setupProblems` fails when the setup file stops calling it, so an entry cannot
+ * outlive its reset.
+ */
+export const RESET_BY_SHARED_SETUP = {
+    'server/lib/ai/credentials/google-service-account.ts': 'resetServiceAccountTokenCache',
+    'server/lib/middleware/touch-last-active.ts': 'resetTouchLastActiveDebounce',
+    'server/lib/csp-report.ts': 'resetCspReportSampling',
+};
+
+/**
+ * Helpers under tests/ that look like a hazard to the text rules and are not. Each entry names the
+ * hazards it may carry and why that is safe; any other hazard in the same file still counts.
+ */
+export const VETTED_HELPERS = {
+    'tests/unit/helpers/tenant-email-harness.ts': {
+        hazards: ['global stub', 'fetch reassignment', 'vitest globals write'],
+        // The exemption covers `fetch` and nothing else: `vettedHelperProblems` fails on any other stubGlobal
+        // target, on stubEnv / unstubAllEnvs / setConfig, and on a stubGlobal whose target is not a literal.
+        stubs: ['fetch'],
+        reason: "its vi.stubGlobal('fetch') is undone by the vi.unstubAllGlobals() in the close() every spec calls, and tests/unit/setup-shared.ts restores spies and unstubs again after each file",
+    },
+};
+
+/**
+ * The part of a vetted helper's exemption that the text rules would otherwise hide: everything the
+ * exempted rules match must be a `vi.stubGlobal` of one of the helper's named globals.
+ */
+export function vettedHelperProblems(source, vetted) {
+    const src = stripComments(source);
+    const problems = [];
+    const calls = [...src.matchAll(/\bvi\.stubGlobal\s*\(\s*([^,)]*)/g)];
+    for (const [, target] of calls) {
+        const m = /^(['"])(\w+)\1$/.exec(target.trim());
+        if (!m) problems.push('stubs a global whose name is not a string literal');
+        else if (!vetted.stubs.includes(m[2])) problems.push(`stubs the global ${m[2]}, which is not one of: ${vetted.stubs.join(', ')}`);
+    }
+    if (/\bvi\.(stubEnv|unstubAllEnvs|setConfig)\s*\(/.test(src)) problems.push('stubs the environment or changes the vitest config');
+    if (/\b(globalThis|global)\.(?!fetch\b)\w+\s*=(?!=)/.test(src)) problems.push('assigns a global other than fetch');
+    return problems;
+}
 
 /**
  * Top-level (column 0) statements that create state living as long as the module.
@@ -62,6 +111,9 @@ export const KNOWN_MUTABLE_MODULES = [
  */
 export const BENIGN_MODULE_STATE = {
     'server/lib/tz.ts': 'Intl.DateTimeFormat memo keyed by zone and options',
+    'server/api/inspections/report-send-guards.ts': 'counterLocks holds a promise only while a send is in flight and deletes it when the chain drains; the per-request WeakMap is keyed by the Request object, which no later file can share',
+    'server/lib/api-app.ts': 'the loader is written once by the worker entry; a spec that imports the entry or installs a fake loader is kept out of the shared project by the worker entry import and api app loader registration rules',
+    'server/index.ts': "the OpenAPI document memo is built from this module's own immutable app object, so every spec that reads it gets the same answer",
     'server/lib/openapi/enrich-facts.ts': 'compiled RegExp memo keyed by token',
     'packages/field-ui/src/shared/intl-cache.ts': 'FormatterCache is a bounded memo of Intl formatters keyed by locale and options; a formatter is immutable, so every spec gets the same answer',
 };
@@ -214,17 +266,128 @@ export function moduleStateHazards(file) {
  */
 export function sharedProblems(root, specFile, graphCache = new Map()) {
     const abs = resolve(root, specFile);
-    const problems = specHazards(readFileSync(abs, 'utf8')).map((h) => `spec: ${h}`);
+    const specText = readFileSync(abs, 'utf8');
+    const problems = specHazards(specText).map((h) => `spec: ${h}`);
+    // The harness stubs fetch and spies on the usage meter until its close(); a spec that opens one and never
+    // closes it would leave both for the next file. (A spec that gets a harness through another helper is
+    // judged by that helper; the setup file's restore is the net under it.)
+    if (/\bcreateHarness\s*\(/.test(stripComments(specText)) && !/\.close\s*\(/.test(stripComments(specText))) {
+        problems.push('spec: createHarness without close()');
+    }
     const norm = (p) => p.replace(/\\/g, '/');
     for (const dep of reachableFiles(root, abs, graphCache)) {
         const rel = norm(dep).slice(norm(root).length + 1);
         if (KNOWN_MUTABLE_MODULES.includes(rel)) problems.push(`imports known mutable module ${rel}`);
         // A helper under tests/ is judged by the spec rules; product code by the module-state rules.
         if (rel.startsWith('tests/')) {
-            for (const h of specHazards(readFileSync(dep, 'utf8'))) problems.push(`helper ${rel}: ${h}`);
+            const vetted = VETTED_HELPERS[rel];
+            const text = readFileSync(dep, 'utf8');
+            for (const h of specHazards(text)) if (!vetted?.hazards.includes(h)) problems.push(`helper ${rel}: ${h}`);
+            if (vetted) for (const p of vettedHelperProblems(text, vetted)) problems.push(`helper ${rel}: ${p}`);
         } else if (rel.startsWith('server/') || rel.startsWith('app/') || rel.startsWith('packages/')) {
-            if (BENIGN_MODULE_STATE[rel] || GENERATED_I18N.test(rel)) continue;
+            if (BENIGN_MODULE_STATE[rel] || RESET_BY_SHARED_SETUP[rel] || GENERATED_I18N.test(rel)) continue;
             for (const h of moduleStateHazards(dep)) problems.push(`${rel}: ${h}`);
+        }
+    }
+    return problems;
+}
+
+/**
+ * What is wrong with the shared project's per-file setup: it must exist, call every reset named in
+ * RESET_BY_SHARED_SETUP, and `vitest.api.config.ts` must load it for api-shared.
+ */
+export function setupProblems(root) {
+    const rel = 'tests/unit/setup-shared.ts';
+    let setup = '';
+    try {
+        setup = stripComments(readFileSync(join(root, rel), 'utf8'));
+    } catch {
+        return [`${rel} is missing, so the resets in RESET_BY_SHARED_SETUP are never called`];
+    }
+    const problems = [];
+    for (const [mod, fn] of Object.entries(RESET_BY_SHARED_SETUP)) {
+        if (!new RegExp(`\\b${fn}\\s*\\(`).test(setup)) problems.push(`${rel} does not call ${fn}(), which ${mod} relies on`);
+    }
+    let cfg = '';
+    try {
+        // stripComments would read the `/**` of a '**/node_modules/**' glob in this file as a block comment, so
+        // only comments that start a line are removed (a trailing comment on a code line is left in place).
+        cfg = readFileSync(join(root, 'vitest.api.config.ts'), 'utf8')
+            .replace(/^[ \t]*\/\*[\s\S]*?\*\//gm, '')
+            .replace(/^[ \t]*\/\/.*$/gm, '');
+    } catch {
+        /* reported below */
+    }
+    // A mention in a comment (stripped above) or in the other project's block does not count.
+    const from = cfg.search(/name\s*:\s*['"]api-shared['"]/);
+    const to = cfg.search(/name\s*:\s*['"]api-isolated['"]/);
+    const block = from >= 0 ? cfg.slice(from, to > from ? to : undefined) : '';
+    if (!/\bsetupFiles\s*:\s*\[[^\]]*['"]tests\/unit\/setup-shared\.ts['"]/.test(block)) {
+        problems.push("vitest.api.config.ts does not list tests/unit/setup-shared.ts in the api-shared project's setupFiles");
+    }
+    return problems;
+}
+
+/**
+ * How many top-level statements of one file create module state, by the same detector the rules use
+ * (`let`/`var`, a global written at the top level, a mutated top-level container, a top-level instance of
+ * a class with collection state). Used to pin the files whose state is exempted wholesale.
+ */
+export function topLevelStateCount(file) {
+    let text = '';
+    try {
+        text = stripComments(readFileSync(file, 'utf8'));
+    } catch {
+        return 0;
+    }
+    let n = (text.match(/^(?:export\s+)?(?:let|var)\s+\w/gm) ?? []).length;
+    n += (text.match(/^\s*(?:globalThis|global)\.\w+\s*=(?!=)/gm) ?? []).length;
+    for (const c of text.matchAll(CLASS_RE)) {
+        const body = text.slice(c.index, (text.indexOf(`
+}`, c.index) + 1) || text.length);
+        const field = /^\s+(?:(?:private|protected|public|readonly|static)\s+)*\w+(?:\s*:(?:[^=\n]|=>)+)?\s*=\s*(?:new\s+(?:Map|Set|WeakMap|WeakSet)\b|\[\])/m;
+        const made = new RegExp(`^(?:export\\s+)?(?:const|let|var)\\s+\\w+(?:\\s*:(?:[^=\\n]|=>)+)?\\s*=\\s*new\\s+${c[1]}\\b`, 'gm');
+        if (field.test(body)) n += (text.match(made) ?? []).length;
+    }
+    for (const m of text.matchAll(CONTAINER_RE)) if (MUTATING(m[1]).test(text)) n += 1;
+    return n;
+}
+
+/**
+ * The state-creating statements of each file that is exempt from the module-state rules, as last
+ * reviewed by a person. A file in BENIGN_MODULE_STATE or RESET_BY_SHARED_SETUP is skipped by the rules
+ * as a whole, so without a pin a NEW top-level cache added to it would be invisible. Changing a number
+ * here means the new state was read and is still benign (or is reset by the setup file).
+ */
+export const EXEMPT_STATE_PINS = {
+    'server/lib/tz.ts': 1,
+    'server/api/inspections/report-send-guards.ts': 2,
+    'server/lib/api-app.ts': 1,
+    'server/index.ts': 1,
+    'server/lib/openapi/enrich-facts.ts': 1,
+    'packages/field-ui/src/shared/intl-cache.ts': 3,
+    'server/lib/ai/credentials/google-service-account.ts': 3,
+    'server/lib/middleware/touch-last-active.ts': 1,
+    'server/lib/csp-report.ts': 3,
+};
+
+/** Pure over the files under `root`: what is wrong with the pins of the exempt files. */
+export function exemptStateProblems(
+    root,
+    pins = EXEMPT_STATE_PINS,
+    exempt = [...Object.keys(BENIGN_MODULE_STATE), ...Object.keys(RESET_BY_SHARED_SETUP)],
+) {
+    const problems = [];
+    for (const rel of exempt) {
+        const abs = join(root, rel);
+        if (!existsSync(abs)) {
+            problems.push(`${rel}: exempt from the module-state rules but not a file on disk`);
+            continue;
+        }
+        const actual = topLevelStateCount(abs);
+        if (!(rel in pins)) problems.push(`${rel}: exempt from the module-state rules with no pinned state count (it has ${actual})`);
+        else if (pins[rel] !== actual) {
+            problems.push(`${rel}: has ${actual} top-level state statement(s), pinned at ${pins[rel]}; read the change, then update EXEMPT_STATE_PINS`);
         }
     }
     return problems;
