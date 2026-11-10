@@ -16,3 +16,18 @@
 export function purgePathMatches(pathname: string): boolean {
     return /\/purge$/.test(pathname);
 }
+
+/** Header a caller sets to say which tenant it believes owns the object it is purging. Optional: the cascade deletes by name. */
+export const PURGE_TENANT_HEADER = 'x-expected-tenant';
+
+/**
+ * Whether a purge that names an expected tenant may proceed. The object's own stored identity is the authority, because a
+ * Cloudflare object id cannot be turned back into the name it came from. An object that stores another tenant's identity is
+ * refused; an object that holds a document but never stored an identity cannot be attributed to anyone, so it is refused too;
+ * an object that holds nothing at all has nothing to protect and may be purged.
+ */
+export function purgeAllowed(expectedTenant: string | null, storedTenant: string | null, holdsData: boolean): 'ok' | 'wrong-tenant' | 'unattributed' {
+    if (expectedTenant === null) return 'ok';
+    if (storedTenant !== null) return storedTenant === expectedTenant ? 'ok' : 'wrong-tenant';
+    return holdsData ? 'unattributed' : 'ok';
+}

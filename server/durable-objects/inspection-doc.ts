@@ -49,7 +49,7 @@ import { followupResponse } from '../lib/collab/followup-patch';
 import { findingKeysFromTemplateSnapshot } from '@core/field-ui/shared/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
-import { purgePathMatches } from './purge-path';
+import { PURGE_TENANT_HEADER, purgeAllowed, purgePathMatches } from './purge-path';
 import { CLOSE_REASON, CLOSE_REPORT_PUBLISHED, isDocLocked, lockDoc, refusedSocketResponse, unlockDoc, upgradeRefused } from './inspection-doc-lock';
 import { writeResultsProjection } from './inspection-doc-d1';
 import { importResponse, newestImportSeq, resolvePendingResponse } from './inspection-doc-import';
@@ -447,6 +447,14 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         // back — every persistence path in this class writes through storage
         // that has just been emptied, and the object is evicted once idle.
         if (purgePathMatches(url.pathname) && req.method === 'POST') {
+            const expectedTenant = req.headers.get(PURGE_TENANT_HEADER);
+            if (expectedTenant !== null) {
+                const identity = await this.ctx.storage.get<PersistedIdentity>(IDENTITY_KEY);
+                // The lineage id is minted on wake, so it alone does not count as content.
+                const holdsData = [...(await this.ctx.storage.list({ limit: 2 })).keys()].some((k) => k !== GEN_KEY);
+                const verdict = purgeAllowed(expectedTenant, identity?.tenantId ?? null, holdsData);
+                if (verdict !== 'ok') return Response.json({ error: verdict }, { status: 403 });
+            }
             await this.ctx.storage.deleteAlarm();
             await this.ctx.storage.deleteAll();
             return Response.json({ purged: true });

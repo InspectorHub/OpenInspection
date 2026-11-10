@@ -17,6 +17,7 @@ import { requireServiceBinding } from './service-binding-guard';
 import { collabNamespaces } from '../lib/collab/collab-namespaces';
 import { DEFAULT_BATCH, MAX_BATCH, listCollabDocRefs, loadResultsBlobs, migrateCollabDocs, restoreDerivedBackup } from '../lib/collab/do-jurisdiction-migrate';
 import { inspectionResults } from '../lib/db/schema';
+import { PURGE_TENANT_HEADER } from '../durable-objects/purge-path';
 
 const api = new Hono<HonoConfig>();
 
@@ -106,9 +107,13 @@ const InspectionDocPurgeSchema = z.object({
  * Clear one orphaned InspectionDocDO by its Cloudflare durable object id.
  *
  * This is deliberately narrower than tenant purge: it does not touch D1, R2,
- * KV, or any other Durable Object. The tenant check confirms the caller named
- * a real tenant; the exact DO id comes from Workers Logs because an id cannot
+ * KV, or any other Durable Object. The exact DO id comes from Workers Logs because an id cannot
  * be reversed into the report name after that report has been deleted.
+ *
+ * Ownership: because an id cannot be mapped back to a name, the route sends the tenant's id with the purge and the OBJECT
+ * checks it against the identity it stored. An object that stores another tenant's identity answers 403 and nothing is
+ * deleted; so does one that holds a document but never stored an identity (it cannot be attributed). An empty object is purged.
+ * A refusal ends the request: the other namespace is not tried.
  *
  * The id may belong to the pinned namespace or, for an object created before pinning, to the old one: a pinned namespace
  * refuses an id minted outside its jurisdiction. The pinned namespace is tried first, then the old one, and the answer says
@@ -145,7 +150,11 @@ api.post('/tenants/:slug/inspection-doc/purge', requireServiceBinding, async (c)
         try {
             const stub = ns.get(ns.idFromString(durableObjectId));
             recognised = true;
-            const response = await stub.fetch('https://do/purge', { method: 'POST' });
+            const response = await stub.fetch('https://do/purge', { method: 'POST', headers: { [PURGE_TENANT_HEADER]: t.id } });
+            if (response.status === 403) {
+                logger.warn('Inspection document purge refused: the object does not belong to the tenant', { slug, durableObjectId, namespace });
+                return c.json({ success: false, error: { message: 'The object does not belong to this tenant, or cannot be attributed to one' } }, 403);
+            }
             if (!response.ok) throw new Error(`purge returned ${response.status}`);
             return c.json({ success: true, data: { purged: true, durableObjectId, namespace } });
         } catch (error: unknown) {
