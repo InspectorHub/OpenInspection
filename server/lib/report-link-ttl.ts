@@ -86,7 +86,7 @@ const REPORT_LINK_TTL_DEFAULT: ReportLinkTtlDuration = { count: 2, unit: 'years'
  */
 export function resolveReportLinkTtl(prefs: PrefsLike | null | undefined): ReportLinkTtl {
     const raw = prefs?.reportLinkTtl;
-    if (raw == null) return REPORT_LINK_TTL_DEFAULT;
+    if (raw == null) return { ...REPORT_LINK_TTL_DEFAULT };
     if (raw === 'never') return 'never';
     if (typeof raw !== 'object') return 'never';
     const { count, unit } = raw as Partial<ReportLinkTtlDuration>;

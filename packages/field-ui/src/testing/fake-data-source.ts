@@ -14,6 +14,7 @@ import type {
   SessionInfo,
 } from '../data-source';
 import type { InspectionPrefs, PcaNarrative } from '../data-source-types';
+import { DEFAULT_INSPECTION_PREFS } from '../hooks/useInspectionPrefs';
 
 export {
   createFakeAiAssist,
@@ -184,15 +185,8 @@ export function createEmptyEditorData(overrides: Partial<EditorData> = {}): Edit
   };
 }
 
-const DEFAULT_PREFS: InspectionPrefs = {
-  cloneDefault: 'rating_notes',
-  autoAdvance: 'always',
-  autoAdvanceDelayMs: 200,
-  pinnedTagIds: [],
-  requireDefectFields: 'none',
-  agentRepairAccess: 'readwrite',
-  reportLinkTtl: 'never',
-};
+// The editor hook's own fallback, not a second copy: a copy of it drifted once.
+const DEFAULT_PREFS: InspectionPrefs = DEFAULT_INSPECTION_PREFS;
 
 /** The `prefs` resource, in memory. Pass it as `resources.prefs`. */
 export interface FakePrefs {
