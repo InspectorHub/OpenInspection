@@ -26,7 +26,6 @@
     "publish": true
   },
   "scripts": {
-    "postinstall": "node scripts/patch-wrangler.mjs",
     "dev": "npm run build && wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state --port 8787",
     "dev:hmr": "npm run vendor:copy && npm run i18n:compile:cached && react-router dev",
     "dev:tunnel": "npm run build && wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state --tunnel",
@@ -121,7 +120,6 @@
     "lint:ext-collisions": "node scripts/check-extension-collisions.mjs",
     "lint:raw-nul": "node scripts/check-raw-nul.mjs",
     "lint:eol": "node scripts/check-line-endings.mjs",
-    "lint:wrangler-patch": "node scripts/check-wrangler-patch.mjs",
     "deps:watch-minimatch": "node scripts/check-minimatch-upstream.mjs",
     "lint:i18n": "node scripts/check-i18n.mjs",
     "lint:i18n-catalog": "node scripts/check-i18n-catalog.mjs",
