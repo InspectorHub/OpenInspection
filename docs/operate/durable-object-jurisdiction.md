@@ -47,7 +47,7 @@ The migration routes exist only on the SaaS profile (`APP_MODE=saas`, `getDeploy
 | same, `dryRun: false` | Per document: read the database blob, export from the old object (no document: `empty`), check the old document against the database (a difference is `source-differs-from-database`), then import. The import itself refuses a target that is not empty with a 409 and merges nothing; only after that refusal is the target's stored document compared with the source (base64 string equality): equal is `alreadyThere`, different is a `conflicts` row with the target's reason. | The counters and lists; one `collab migrate batch` log line per call. |
 | same, `dryRun: false, replaceDerived: true` | Replaces a database-built target with the old document, keeping the displaced document as `replaced-derived-backup`. | `replaced`; one audit line with both ids and SHA-256 sums. |
 | `{ "restoreBackupFor": "<rowId>" }` | Undoes one completed replacement: puts the displaced document back. | `{ restored: true }`, or 404 (no such document or no backup) / 409 / 502 with the reason. |
-| `POST /api/platform/tenants/:slug/inspection-doc/purge` with `{ "durableObjectId": "<64 hex>" }` | Empties one object by its Cloudflare id. Tries the pinned namespace, then the old one. | `namespace: "pinned"` or `"legacy"`. Errors: 400 invalid body; 404 unknown tenant slug or an id neither namespace recognises; 502 a recognised id whose clear failed. |
+| `POST /api/platform/tenants/:slug/inspection-doc/purge` with `{ "durableObjectId": "<64 hex>" }` | Empties one object by its Cloudflare id, only if the object belongs to the tenant in the path. Tries the pinned namespace, then the old one. | `namespace: "pinned"` or `"legacy"`. Errors: 400 invalid body; 403 the object stores another tenant's identity, or holds a document but no identity; 404 unknown tenant slug or an id neither namespace recognises; 502 a recognised id whose clear failed. |
 
 Authorization on both routes is the signed `x-portal-m2m` header (`requireServiceBinding` verifies the HMAC; `server/lib/m2m-auth.ts`). Both answer 404 on a deployment without the platform API (see above). The migration route answers 409 when pinning is off, and restore and purge answer 503 when the collaborative-document namespaces are not bound.
 
@@ -75,6 +75,10 @@ namespace is a no-op, so this is safe to repeat. A failure in either namespace i
 
 The single-object purge takes a Cloudflare object id from your logs. It tries the pinned namespace first and then the
 old one, and its answer says which took the id (`namespace: "pinned"` or `"legacy"`). An id neither recognises is a 404.
+A Cloudflare id cannot be turned back into the name it came from, so ownership is checked by the object itself: the route
+sends the tenant's id with the purge, and the object compares it with the tenant identity it stored when the document was
+first stored its identity. A different tenant, or a document with no stored identity (it cannot be attributed), is refused with a 403 and
+nothing is deleted; an object that holds no document is simply emptied.
 
 ## Copying existing documents
 
@@ -203,12 +207,14 @@ Consequences for an operator:
 
 ## Known limits
 
-- **Old objects keep their content.** The copy never changes or deletes the old (unpinned) object. After migration it still holds the document, and the personal data in it, until its inspection is deleted. Nothing else cleans it.
+- **Old objects keep their content.** The copy never changes or deletes the old (unpinned) object. After migration it still holds the document, and the personal data in it, until its inspection is deleted. Nothing else cleans it. If your retention or data-residency obligations require the old copies to be gone, plan for it: after the copy is verified, delete the inspections you no longer need (a delete clears both namespaces), or purge the old objects one at a time with the single-object purge using ids from your logs. Record that you did so.
 - **Deleting an inspection** clears both the pinned and the unpinned namespace for the report ids it owns, best effort (see "Deleting").
-- **Changing `DO_JURISDICTION` later orphans every pinned object.** The same name yields a different id in a different jurisdiction (and in none). Do not change the value after objects exist; moving to another value needs the same copy procedure from scratch, and the tooling copies from the unpinned namespace only.
+- **Changing `DO_JURISDICTION` later orphans every pinned object.** The same name yields a different id in a different jurisdiction (and in none). Do not change the value after objects exist; moving to another value needs the same copy procedure from scratch, and the tooling copies from the unpinned namespace only. The worker cannot warn you: it keeps no record of the value it ran with before, and adding such a record would be extra state to maintain. An accidental change therefore shows up only as documents that open empty and rebuild from the database. Keep the value in version control and review any change to it as a data move.
 - **Standalone deployments have no platform routes.** Both answer 404 outside the SaaS profile; run the migration functions from a maintenance script (see "Copying existing documents"). The single-object purge route is likewise unavailable there.
-- **Orphans whose report row is gone** (for example a delete that failed, or inspections deleted before the purge existed) cannot be found by name. They are removable only by Cloudflare object id, taken from your logs, through the single-object purge route.
-- **The single-object purge does not verify ownership.** It checks that the tenant slug in the URL exists, but not that the object belongs to that tenant. Treat the service key as able to empty any inspection-document object of the deployment.
+- **Orphans whose report row is gone** (for example a delete that failed, or inspections deleted before the purge existed) cannot be found by name. They are removable only by Cloudflare object id, taken from your logs, through the single-object purge route. That route refuses an object that belongs to another tenant (403). It also refuses an old object that holds a document but never stored an identity, so such an object cannot be removed through it.
+- **The copy reads each document from the database whole.** A batch of up to ten documents is read in one query, and each document's stored results are loaded in full. A row too large for the database to return makes that query fail; the batch then falls back to one query per row, and a row that still cannot be read is reported as `database-row-unreadable`. Nothing is written for it, and the rest of the batch carries on. Use a small `limit` if your reports are large.
+- **A displaced document has one backup slot.** A replacement stores the document it displaced under a single key. A second replacement of the same object is refused (`target-edited`), because the first one cleared the database-built marker, and a restore spends the backup. A backup is lost only by an operator action: a restore spends it, a purge or an inspection delete removes it with the object, and editing the stored values by hand loses it silently.
+- **The MCP namespace is bound but unused.** `INSPECTOR_MCP` is still listed among the pinned namespaces. The MCP endpoint is now a stateless handler (`createMcpHandler`, `server/lib/mcp/handler.ts`), no code in `server/` or `workers/` addresses `INSPECTOR_MCP`, and the retained class answers 410 to anything. So no MCP session data is stored in it. This was checked by reading the source and configuration; it was not tested against a deployed jurisdiction.
 
 ## What to check in production
 
