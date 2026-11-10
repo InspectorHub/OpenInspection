@@ -686,7 +686,6 @@
     "tests/unit/offline-package/run-import-failures.spec.ts",
     "tests/unit/offline-package/run-import.property.spec.ts",
     "tests/unit/offline-package/run-import.spec.ts",
-    "tests/unit/ops/preflight-self-host.spec.ts",
     "tests/unit/pay-splits/populate.spec.ts",
     "tests/unit/pay-splits/schema.spec.ts",
     "tests/unit/people/agent-repair-access.spec.ts",
