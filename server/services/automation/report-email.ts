@@ -6,6 +6,7 @@ import { buildRenderReportUrl } from '../../lib/public-urls';
 import { logger } from '../../lib/logger';
 import { interpolate, isStaffRecipient } from './shared';
 import { buildBaseTemplateVars } from './template-vars';
+import { resolveAutomationCompanyName } from './company-name';
 import { readTenantDisplay } from '../../lib/inspection/scheduled-date-display';
 import { createOiTemplateStore } from './template-store';
 import { createRecipientLocaleResolver } from '../../lib/i18n/recipient-locale';
@@ -56,7 +57,6 @@ export interface ReportDeliveryDeps {
 export interface ReportCopyDeps {
     /** Raw D1 handle — the message-template store builds its own drizzle instance. */
     rawDb: D1Database;
-    appName: string;
     appHost: string;
 }
 
@@ -180,8 +180,9 @@ export async function deliverReportEmail(
             // server/lib/tenant-display.ts for why it is the tenant's and not
             // this recipient's.
             const display = await readTenantDisplay(db, inspection.tenantId);
+            const namesCompany = ruleCopy.body.includes('{{company_name}}') || ruleCopy.subject.includes('{{company_name}}');
             const vars = {
-                ...buildBaseTemplateVars(inspection, tenant, copyDeps.appName, copyDeps.appHost, display),
+                ...buildBaseTemplateVars(inspection, tenant, namesCompany ? await resolveAutomationCompanyName(db, inspection.tenantId) : '', copyDeps.appHost, display),
                 // The tokenized, per-recipient link — NOT the bare report URL
                 // buildBaseTemplateVars derives. A recipient with no login gets
                 // "Report not found" from the bare one, which is the whole

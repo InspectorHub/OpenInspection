@@ -38,6 +38,7 @@ import { logger } from '../../lib/logger';
 import { currentPeriodKey } from '../../lib/usage/period';
 import { interpolate, type FlushInspection } from './shared';
 import { buildBaseTemplateVars } from './template-vars';
+import { resolveSmsBrand } from '../../lib/sms/brand-name';
 import { readTenantDisplay } from '../../lib/inspection/scheduled-date-display';
 import type { ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
 import { smsSendGate } from '../../lib/sms/send-gate';
@@ -75,7 +76,6 @@ export type SendOneSmsArgs = {
      */
     classId?: string | undefined;
     sms: SmsProviderSeam;
-    appName: string;
     appHost: string;
     env: ManagedSendGateEnv;
     quotaGuard?: PlanQuotaGuard | undefined;
@@ -123,7 +123,7 @@ export async function sendOneSms(args: SendOneSmsArgs): Promise<void> {
     const { classId } = args;
     const {
         db, log, inspection, tenant, bodyTemplate, sms,
-        appName, appHost, env, quotaGuard, metering,
+        appHost, env, quotaGuard, metering,
     } = args;
 
     const skip = (reason: string) =>
@@ -179,7 +179,7 @@ export async function sendOneSms(args: SendOneSmsArgs): Promise<void> {
     // no subject line or layout to explain "2026-09-16T08:00:00Z" away.
     const display = await readTenantDisplay(db, inspection.tenantId);
     const vars: Record<string, string> = {
-        ...buildBaseTemplateVars(inspection, tenant, appName, appHost, display),
+        ...buildBaseTemplateVars(inspection, tenant, bodyTemplate.includes('{{company_name}}') ? await resolveSmsBrand(db, inspection.tenantId) : '', appHost, display),
         company_phone: gate.companyPhone ?? '',
     };
     // SUBORDINATE TO THE GATE, and no longer the first answer. The gate refuses

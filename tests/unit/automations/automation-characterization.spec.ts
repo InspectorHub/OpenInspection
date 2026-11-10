@@ -132,11 +132,14 @@ const statusOf = async (id: string) =>
 describe('CHARACTERIZATION — automation delivery (freeze before SP-ENG refactor)', () => {
   it('email path: conditions pass → sent, interpolates company_name + client_name', async () => {
     const insp = await seedInspection({ paymentStatus: 'paid' });
+    // company_name is the tenant's own brand name, not the app name flush() is handed.
+    await db.insert(schema.tenantConfigs).values(
+      { tenantId: TENANT, companyName: 'Acme', updatedAt: new Date() } as never);
     const logId = await seedRuleAndLog({
       conditions: { requirePaid: true }, subject: 'Hi {{client_name}}',
       body: 'From {{company_name}}', inspectionId: insp,
     });
-    await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com');
+    await svc.flush(stubEmailFor, 'PlatformApp', 'https://acme.example.com');
     expect((await statusOf(logId))?.status).toBe('sent');
     expect(sent).toEqual([{ subject: 'Hi Jane', html: 'From Acme' }]);
   });

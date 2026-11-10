@@ -98,7 +98,6 @@ app.openapi(sendSmsRoute, async (c) => {
         resolveProvider: (tid: string) => loadProviderForTenant(c.env, tid),
     };
 
-    const appName = c.env.APP_NAME || 'OpenInspection';
     const appHost = getBaseUrl(c);
     const sentTo: string[] = [];
     const skipped: Array<{ recipient: string; reason: string; outcome: 'skipped' | 'failed' }> = [];
@@ -167,7 +166,6 @@ app.openapi(sendSmsRoute, async (c) => {
                 tenant,
                 bodyTemplate,
                 sms,
-                appName,
                 appHost,
                 env: c.env,
                 ...(quotaGuard ? { quotaGuard } : {}),

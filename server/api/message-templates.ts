@@ -7,6 +7,7 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { MessageTemplateService, type TemplateChannel } from '../services/message-template.service';
 import { smsSegmentInfo } from '../lib/sms/segments';
 import { interpolate } from '../services/automation/shared';
+import { previewVariables } from '../services/automation/variable-catalogue';
 import { buildTenantEmailService } from '../lib/email/build-email-service';
 import { PlanQuotaGuard, readTenantTier } from '../features/plan-quota/guard';
 import { tenantAiCapsLoader } from '../features/plan-quota/ai-caps';
@@ -140,7 +141,7 @@ app.openapi(deleteRoute, async (c) => {
 });
 app.openapi(previewRoute, async (c) => {
     const { channel, subject, body, sampleVars } = c.req.valid('json');
-    const vars = sampleVars ?? {};
+    const vars = previewVariables(sampleVars);
     if (channel === 'sms') {
         const text = interpolate(body, vars);
         return c.json({ success: true as const, data: { text, segments: smsSegmentInfo(text) } }, 200);
@@ -153,7 +154,7 @@ app.openapi(previewRoute, async (c) => {
 app.openapi(testSendRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
     const { channel, subject, body, to, sampleVars } = c.req.valid('json');
-    const vars = sampleVars ?? {};
+    const vars = previewVariables(sampleVars);
     if (channel === 'sms') {
         const normalized = normalizeE164(to);
         if (!normalized) return c.json({ success: false, error: 'That phone number could not be parsed.' }, 200);
@@ -221,7 +222,8 @@ app.openapi(testSendRoute, async (c) => {
     // there is no recipient who could hold a preference about it — but the
     // boundary still has to be able to say what it is sending.
     const { delivered } = await emailSvc.sendEmail(
-        [to], interpolate(subject ?? '', vars), interpolate(body, vars),
+        // Marked so a real inbox can tell a template test from a message sent to a client.
+        [to], `[Test] ${interpolate(subject ?? '', vars)}`, interpolate(body, vars),
         undefined, { classId: 'admin-test-send' },
     );
     return delivered ? c.json({ success: true }, 200) : c.json({ success: false, error: 'Email is not configured.' }, 200);

@@ -165,7 +165,7 @@ export interface HasDeliverSms {
         ctx: { log: typeof import('../../lib/db/schema').automationLogs.$inferSelect; automation: typeof automations.$inferSelect;
                inspection: FlushInspection; tenant: typeof import('../../lib/db/schema').tenants.$inferSelect },
         sms: import('./sms').SmsRuntime,
-        appName: string, appHost: string,
+        appHost: string,
         env?: import('../../lib/sms/managed-send-gate').ManagedSendGateEnv,
         quotaGuard?: import('../../features/plan-quota/guard').PlanQuotaGuard,
     ): Promise<void>;

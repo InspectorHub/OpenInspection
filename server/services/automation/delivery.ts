@@ -74,7 +74,8 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
     return class extends Base {
         async flush(
             emailFor: (tenantId: string, options?: { humanVerified?: boolean }) => Promise<EmailService>,
-            appName: string, appBaseUrl: string,
+            // Unread: {{company_name}} is the tenant's own name now. Kept so every caller's argument list stays put.
+            _appName: string, appBaseUrl: string,
             sms?: SmsRuntime,
             batchSize = 50,
             env?: ManagedSendGateEnv,
@@ -349,7 +350,7 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                                 .where(eq(automationLogs.id, log.id));
                             continue;
                         }
-                        await this.deliverSms(db, { log, automation, inspection, tenant }, sms, appName, appHost, env, quotaGuard);
+                        await this.deliverSms(db, { log, automation, inspection, tenant }, sms, appHost, env, quotaGuard);
                         continue;
                     }
 
@@ -367,7 +368,7 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                         const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor, !!log.humanVerifiedAt);
                         await deliverReportEmail(db, { log, automation, inspection, tenant },
                             emailSvc, appBaseUrl, reportDelivery, pdfMemo,
-                            { rawDb: this.db, appName, appHost });
+                            { rawDb: this.db, appHost });
                         continue;
                     }
 
@@ -381,7 +382,7 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                         agreementService: this.agreementService,
                         latestSummary,
                         emailSvc,
-                        appName, appHost, appBaseUrl,
+                        appHost, appBaseUrl,
                     });
                 } catch (err) {
                     await db.update(automationLogs).set({
