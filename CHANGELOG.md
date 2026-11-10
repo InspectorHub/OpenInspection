@@ -26,6 +26,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Unused API routes that no client called: `PUT /api/event-types/:id`, `DELETE /api/event-types/:id`, `POST /api/event-types/seed`, `GET /api/events/upcoming`, `GET /api/calendar/connections/:id/calendars`, `GET /api/inspections/{id}/full`, `GET /api/inspections/{id}/sign-status`, the `statusFlags` object on dashboard rows, `POST /api/auth/setup/skip` and `POST /api/auth/onboarding/flag`. Missing default event types are filled in by `POST /api/admin/data/install-bundled-content`; the signed state of an inspection is still returned as `signedByClient` by the inspection read.
 * The unreachable `feature-disabled` page and its translation strings.
 
+## [2.6.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.5.0...openinspection-v2.6.0) (2026-11-10)
+
+
+### Features
+
+* **collab:** migrate collaborative documents into jurisdiction-pinned objects ([c4fb5a3](https://github.com/InspectorHub/OpenInspection/commit/c4fb5a3ae5fd5303dbe7fef03c720fe0eaa94b0e))
+* **collab:** pin Durable Objects to a jurisdiction and copy stored state between ids ([f9dfc7a](https://github.com/InspectorHub/OpenInspection/commit/f9dfc7ac1078e041b39641601e9190a87c81c3b7))
+* **collab:** safe, batched, resumable copy of collaboration documents into the jurisdiction-pinned namespace, and purge of pre-pinning objects ([08ea0db](https://github.com/InspectorHub/OpenInspection/commit/08ea0db1f35572e776412aa78bcf5b6978ff70e3))
+* **field-ui:** name the tag button, head the tag row, and link to the tag library when there are no tags ([962c590](https://github.com/InspectorHub/OpenInspection/commit/962c590adfaf7ba6416860514fb831574e654d49))
+* **field-ui:** open the editor on an item and add previous/next item on touch layouts ([e93cbf4](https://github.com/InspectorHub/OpenInspection/commit/e93cbf4c879b93587918dd84c753c544de307c13))
+* **field-ui:** open the editor on an item, previous/next item, and a worded way out of every sheet ([9be67d6](https://github.com/InspectorHub/OpenInspection/commit/9be67d621ffaf9fd910a6303c3007e0c7a220e15))
+* **field-ui:** put a finished video on the item it was added to ([2c86a4d](https://github.com/InspectorHub/OpenInspection/commit/2c86a4dc10aea5cdd057a60a4beab08f6cd646b6))
+* **migration:** accept a staged-object reference for large delivered bundles ([dbc05bf](https://github.com/InspectorHub/OpenInspection/commit/dbc05bf44dadfc07a1111360094f3b2c1fcd8eae))
+* **migration:** accept a staged-object reference for large delivered bundles ([0c318f2](https://github.com/InspectorHub/OpenInspection/commit/0c318f2723760cff825ae63581b2131aa28e9777))
+* **payments:** let a company collect a deposit or the full fee at booking, and always ask the client for what is still owed ([4683ada](https://github.com/InspectorHub/OpenInspection/commit/4683ada6b93518abb4260b11af9968df6c638c54))
+* **quota:** count the free-plan allowance per UTC calendar month ([716ca22](https://github.com/InspectorHub/OpenInspection/commit/716ca227e71336dc20ad7558928f3146cf530540))
+* **quota:** monthly plan allowance, video on items and collab fixes ([17d98b9](https://github.com/InspectorHub/OpenInspection/commit/17d98b9db7763b2043cf94a01b097c5cf9775f11))
+* show R2 videos on the item strip and keep every clip when results are merged, loaded or reordered ([a9869fc](https://github.com/InspectorHub/OpenInspection/commit/a9869fc186917378f7958f3dadca2291cfe89562))
+* **ui:** show the monthly allowance and when it renews ([b15ab6a](https://github.com/InspectorHub/OpenInspection/commit/b15ab6ad466b3f796d14848853f32377293bac91))
+
+
+### Bug Fixes
+
+* **agents:** signup Turnstile, one-batch terms ledger, responsive agent header, localized notification classes ([4792f04](https://github.com/InspectorHub/OpenInspection/commit/4792f0438d4f1d3782386199323644e6db5e81a8))
+* booking empty state, dashboard rows, banner layout and report photo retry ([00bed5d](https://github.com/InspectorHub/OpenInspection/commit/00bed5dfdadffd5c38d56276c9deacb895ce0563))
+* **collab:** keep the refused-socket set on the Durable Object instance, not in module state ([bf7a416](https://github.com/InspectorHub/OpenInspection/commit/bf7a416c79a340d911b0e8f73e3b7c61cf0b72c7))
+* **collab:** lineage guard so a stale offline copy cannot merge into a rebuilt results document ([7bf0ea7](https://github.com/InspectorHub/OpenInspection/commit/7bf0ea7de5c4d8e7d4ba78e1522885ff58109136))
+* **collab:** the server also checks the generation a client reports, and a second tab keeps the lineage its own document belongs to ([d4a8fa0](https://github.com/InspectorHub/OpenInspection/commit/d4a8fa007f58a03d0636aede21d89fe3a4c41de0))
+* **collab:** the single-object purge refuses an object that belongs to another tenant ([74e146e](https://github.com/InspectorHub/OpenInspection/commit/74e146e71c9f47b5b33a1caa4d300265309dbecc))
+* **collab:** the single-object purge refuses an object that belongs to another tenant, and the Durable Object limits are written down ([7c83031](https://github.com/InspectorHub/OpenInspection/commit/7c83031e9ea45c8458cd7cd93f182ac757167ff5))
+* **collab:** the stale-socket check can never throw on the close, error or message path ([d674617](https://github.com/InspectorHub/OpenInspection/commit/d67461792fb7c9f52241b066c86d0e71e33c14ff))
+* **field-ui:** every sheet and dialog has a worded way out, and the close targets reach 44px ([a519794](https://github.com/InspectorHub/OpenInspection/commit/a519794904fb76723b33d87ba08ca727c0b0b09c))
+* **field-ui:** photo studio follows the viewed photo; cover label, hidden actions and delete confirm ([7836e86](https://github.com/InspectorHub/OpenInspection/commit/7836e864a7bed1b815eed2948a8eb3fd35854472))
+* **field-ui:** the media viewer follows a clip by its media id, not by its empty key ([b333b45](https://github.com/InspectorHub/OpenInspection/commit/b333b45b128b5faab51822fae6418d0801ad2f78))
+* **migration:** keep a referenced bundle until the whole apply succeeded, and tidy up its edges ([7df467b](https://github.com/InspectorHub/OpenInspection/commit/7df467b53d6df601fc0d989161b32be82dd4b5c3))
+* **migration:** mark the size message as operator-facing so the locale gate accepts it ([12cdca0](https://github.com/InspectorHub/OpenInspection/commit/12cdca076296997d3fa25366a2a10f06daf6c0f4))
+* **migration:** stop exporting the bundle size helper nothing imports ([8341f47](https://github.com/InspectorHub/OpenInspection/commit/8341f470d172f843a16c92bb0f77bed3ea96baab))
+* **pay-splits:** order a correction after its original even when both rows share a millisecond; move the README count spec into a domain directory ([db97ae8](https://github.com/InspectorHub/OpenInspection/commit/db97ae84f25b47c11bb0ef6d1313b1c8753cf35d))
+* **prefs:** one default for agent repair-list access, and an unrelated preference save no longer widens it ([4f947ce](https://github.com/InspectorHub/OpenInspection/commit/4f947cee7969e12edb530b09ea4019016af1bdcc))
+* **prefs:** the report-link expiry default is two years in every layer, not never on the settings page ([9dbe155](https://github.com/InspectorHub/OpenInspection/commit/9dbe155b3e5771b3ef06ba47cfe4a121fbff8286))
+* **prefs:** use one default for agent repair-list access and report-link expiry in every layer ([5d7f910](https://github.com/InspectorHub/OpenInspection/commit/5d7f91049d1c604b055d52d348e5f84ee20d6f33))
+* **secrets:** an explicit empty string clears a stored key, and a narrow screen no longer collapses the company link ([4b7ab3e](https://github.com/InspectorHub/OpenInspection/commit/4b7ab3e31535776a21d7f89652de599cea08248f))
+* **secrets:** an explicit empty string clears a stored key, and the company link no longer collapses on a narrow screen ([33b2e9e](https://github.com/InspectorHub/OpenInspection/commit/33b2e9e49504e264befa8af1bfc85243954c734c))
+* **security:** clear the two CodeQL findings on the release PR ([ca5ef16](https://github.com/InspectorHub/OpenInspection/commit/ca5ef1634a5cd99f64a9a7c1a397b38bff86cc07))
+* **ui:** a bottom sheet or dialog never reaches up under the status bar while the keyboard is open ([de3f19c](https://github.com/InspectorHub/OpenInspection/commit/de3f19cc023f59c13487fb644e43fb95e61b3866))
+* **ui:** bottom bars fade instead of popping, bottom sheets end at the keyboard, and text fields ask for the right keyboard ([c250543](https://github.com/InspectorHub/OpenInspection/commit/c2505431599f317bc9feecfd8e8700e08d0655f4))
+* **ui:** buttons grow with their label instead of overflowing; use the shared Button ([9b1e0e1](https://github.com/InspectorHub/OpenInspection/commit/9b1e0e10d876122959671d8a35bea37d7ec14e2d))
+* **ui:** dialogs stay above the soft keyboard; rating tiles and the item stepper fit a phone ([39e5264](https://github.com/InspectorHub/OpenInspection/commit/39e52640561969e6b387b1f8f4277070970eb198))
+* **ui:** iOS web view pins the page behind a layer when the host asks; the photo studio ends at the keyboard and clears the status bar ([4512467](https://github.com/InspectorHub/OpenInspection/commit/45124671264da42228d35adc73afe293a7ea35cd))
+* **ui:** number fields without a minimum keep the default keyboard; the item stepper only hides for a soft keyboard ([6400b6e](https://github.com/InspectorHub/OpenInspection/commit/6400b6e8aef812639f2b0aa614f974de830248b7))
+* **ui:** the dim backdrop of a dialog ends at the soft keyboard instead of running behind it ([db3121a](https://github.com/InspectorHub/OpenInspection/commit/db3121ae31c4fcbae7644f5f310eb74ffbce20bd))
+* **web:** raise text fields to 16px on iOS so focusing one does not zoom the page ([d43482e](https://github.com/InspectorHub/OpenInspection/commit/d43482e3032908bc987c0bb8065f861cd766aed6))
+
 ## [2.5.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.4.0...openinspection-v2.5.0) (2026-11-05)
 
 
