@@ -696,7 +696,7 @@ A package is a zip with only these entries; any other name refuses the package.
 | `manifest.json` | `format` (`openinspection-offline-package`), `version` (`1`), `tenantId`, `deviceId`, `exportedBy`, `exportedAt`, and the list of `inspections` (`id`, `reportId`). Unknown keys are ignored, so a later writer can add fields within version 1. |
 | `yjs/<inspectionId>.bin` | The collaborative results document of one inspection, as a Yjs update. |
 | `outbox.json` | The writes the device queued. Each entry has an `idempotencyKey`, an `op` (`inspection.create`, `inspection.update` or `inspection.complete`) and a `payload` whose `id` names the inspection. The envelope is strict: an unknown key or an unknown `op` refuses the package. |
-| `media/index.json` | One row per photo: `pendingId`, `inspectionId`, `contentType`. |
+| `index.json` in the `media` folder | One row per photo: `pendingId`, `inspectionId`, `contentType`. |
 | `media/<pendingId>.<jpg\|png\|heic>` | The photo bytes. |
 
 Identifiers match `^[A-Za-z0-9_-]{1,64}$`, so an id can never smuggle a path

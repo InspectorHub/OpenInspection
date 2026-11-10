@@ -7,9 +7,9 @@
  * the code by naming who required it, or by pointing at a tracker that only
  * exists somewhere else:
  *
- *     // Counsel round 26 requires the chain to show the signer was presented
- *     // ... a distinction the reader is entitled to (counsel ruling 17c).
- *     // see docs/superpowers/specs/2026-07-30-sms-consent-isv-strategy.md
+ *     // Counsel round N requires the chain to show the signer was presented
+ *     // ... a distinction the reader is entitled to (counsel ruling Xy).
+ *     // see the private strategy document that covers it
  *
  * Each of those is two separate problems. It discloses that a private review
  * happened and roughly what it said, and it points a reader at a document they

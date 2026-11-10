@@ -2017,7 +2017,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `repair_request_id` | text | NN IX |  |  | *App-layer reference to another row — no database foreign key.* |
-| `finding_key` | text | NN |  |  | `unitId:sectionId:itemId` (`lib/finding-key.ts`; `_default` when the template has no units) — one item's entry in `inspection_results.data`, the same key shape `cost_items.finding_key` points at. |
+| `finding_key` | text | NN |  |  | `unitId:sectionId:itemId` (`packages/field-ui/src/shared/finding-key.ts`; `_default` when the template has no units) — one item's entry in `inspection_results.data`, the same key shape `cost_items.finding_key` points at. **[more]** |
 | `section_title` | text | NN |  |  | Snapshots of the report's `section.title` / `item.label` at add time, so a contractor reading the shared list still knows where the defect is after the template or the report has been edited under it. |
 | `item_label` | text | NN |  |  | add-time snapshot of item.label, beside section_title |
 | `comment_snapshot` | text |  |  |  | *Serialized JSON snapshot.* |

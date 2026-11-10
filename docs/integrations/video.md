@@ -98,7 +98,7 @@ PDF renders (via `env.BROWSER.quickAction('pdf', ...)`) cannot embed video. `ser
 | `packages/field-ui/src/components/media-studio/VideoCapture.test.tsx` | `VideoCapture` — privacy notice present (R2) / absent (Stream), and that accepting it is what ENABLES the pick button |
 
 ⚠️ The last two live beside the components (`app/**/*.test.tsx`), not under
-`tests/`. This table previously named files under `tests/web/unit/` — a
+`tests/`. This table previously named files under a `tests/` web-unit directory — a
 directory that does not exist — so it claimed coverage for years that was never
 written. If a row here names a file, open it before believing it.
 

@@ -54,7 +54,7 @@ developer machine move by 2–3× under load, so a before/after pair taken at
 different times means nothing.
 
 The argument that actually justifies the design is **short-circuiting**. A chain
-of `npm run a && npm run b && npm run c` stops at the first failure, so each
+of gate commands joined with `&&` (one gate, then the next, then a third) stops at the first failure, so each
 broken gate hides every gate behind it and costs a whole round trip to reveal the
 next one. Measured on one pull request: a run died at gate 12, and the run 17
 minutes later died at gate 42. Fixing the twelfth is what exposed the

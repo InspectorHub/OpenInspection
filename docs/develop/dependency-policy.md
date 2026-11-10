@@ -29,7 +29,7 @@ patched release. This page says how those are handled, and records the one that 
 
 `exceljs` is installed with the production dependencies and pulls minimatch through `archiver` (`archiver-utils`,
 `readdir-glob`) and through `unzipper` (`fstream`, `rimraf`, `glob`). Server code does not import it: the product serves the
-prebuilt browser bundle (`exceljs/dist/exceljs.min.js`, copied by `scripts/vendor-copy.js`), and only specs load the Node
+prebuilt browser bundle (the package's `dist/exceljs.min.js`, copied by `scripts/vendor-copy.js`), and only specs load the Node
 build. So `archiver`, `unzipper` and `glob` are not part of the Worker bundle; they are reported because they are installed
 with the production dependencies. Those copies are now on the patched line, using `overrides` in `package.json`:
 
