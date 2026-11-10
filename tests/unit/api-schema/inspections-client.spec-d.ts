@@ -20,7 +20,7 @@ type Keys<T> = Exclude<keyof T, '$url' | '$path'>;
  * Every path the inspections router served when it was one chain of `.route('/', child)` calls, read from the
  * declaration the chain produced before the conversion (126 distinct paths), less the two native collab routes
  * (`/:id/collab/ws`, `/:id/collab/import`: a WebSocket upgrade and a binary body, neither reachable through the typed
- * client) and plus `/:id/sign`, which became an OpenAPI route: 125 paths.
+ * client) and plus `/:id/sign`, which became an OpenAPI route, and `/:id/copy-report`: 126 paths.
  */
 type ChainPaths =
     | '/'
@@ -29,6 +29,7 @@ type ChainPaths =
     | '/:id/agreement'
     | '/:id/agreement-requests'
     | '/:id/cancel'
+    | '/:id/copy-report'
     | '/:id/cancellation-quote'
     | '/:id/clone'
     | '/:id/collab/followup'
