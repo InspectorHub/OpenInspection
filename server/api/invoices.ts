@@ -25,6 +25,7 @@ import { getTenantId, getDrizzle } from '../lib/route-helpers';
 import { resolveLocale } from '../lib/locale';
 import { formatCurrency } from '../lib/format';
 import { qboPaymentKey } from '../lib/qbo-payment-key';
+import { getOutstandingCents } from '../services/payment-ledger.service';
 import invoicePaymentRoutes, { invoicePaymentRouteConfigs } from './invoices/payments';
 
 import { fireAndForget } from '../lib/fire-and-forget';
@@ -317,6 +318,15 @@ app.openapi(requestPaymentRoute, async (c) => {
         invoiceCurrency = created.currency;
     }
 
+    // What the client is asked for is what is still owed, not the invoice total: a booking
+    // deposit applied to a new invoice, or an earlier part-payment, already counts. When the
+    // ledger covers the whole amount there is nothing to request, so say so before marking
+    // the invoice sent or emailing anyone.
+    const outstandingCents = await getOutstandingCents(db, tenantId, { id: invoiceId, amountCents });
+    if (outstandingCents <= 0) {
+        throw Errors.Conflict('Payments already received cover this invoice in full. Nothing is left to collect.');
+    }
+
     // Mark sent (tenant-scoped inside the service) before notifying.
     await c.var.services.invoice.markSent(invoiceId, tenantId);
 
@@ -336,7 +346,7 @@ app.openapi(requestPaymentRoute, async (c) => {
         .from(tenantConfigs)
         .where(eq(tenantConfigs.tenantId, tenantId))
         .get();
-    const amountLabel = formatCurrency(amountCents, {
+    const amountLabel = formatCurrency(outstandingCents, {
         locale: resolveLocale(cfg?.defaultLocale),
         currency: invoiceCurrency,
     });

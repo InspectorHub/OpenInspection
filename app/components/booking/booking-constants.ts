@@ -40,4 +40,20 @@ export interface CompanyProfile {
    * freezes its own answer on the order.
    */
   depositPolicy?: DepositPolicy | null;
+  /**
+   * Whether the company's own Stripe account holds every key a card payment
+   * needs. Absent reads as false: a Pay button is only offered on a positive
+   * answer, so an older server never promises a payment it cannot take.
+   */
+  paymentsAvailable?: boolean;
+}
+
+/**
+ * True when the up-front amount is the whole fee (the 100% preset, or a fixed
+ * amount at or above the total). The deposit wording ("a deposit", "comes off
+ * your total") is then untrue, so the booking copy branches on this. Compared
+ * in whole cents so a $450.00 total and a 45000-cent deposit agree.
+ */
+export function isFullFeeDeposit(depositCents: number, totalPrice: number): boolean {
+  return depositCents > 0 && depositCents >= Math.round(totalPrice * 100);
 }

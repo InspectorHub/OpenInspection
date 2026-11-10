@@ -30,7 +30,8 @@ describe('projectFields', () => {
 describe('the public invoice field list', () => {
     it('with the three parts built beside it is exactly the declared body, so a column is carried only when it is named', () => {
         const declared = Object.keys(PublicInvoiceBodySchema.shape).sort();
-        expect([...PUBLIC_INVOICE_FIELDS, 'lineItems', 'brand', 'tenantSlug'].sort()).toEqual(declared);
+        // `balanceDueCents` is derived from the payment ledger by the route, not read off the invoice row.
+        expect([...PUBLIC_INVOICE_FIELDS, 'balanceDueCents', 'lineItems', 'brand', 'tenantSlug'].sort()).toEqual(declared);
         for (const column of ['notes', 'tenantId', 'contactId', 'clientEmail', 'qboSyncStatus']) expect(PUBLIC_INVOICE_FIELDS).not.toContain(column);
     });
 });

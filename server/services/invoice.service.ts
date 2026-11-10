@@ -264,8 +264,8 @@ export class InvoiceService {
      */
 
     /** @see ledger.markPaid — returns the ledger row appended, or null. */
-    async markPaid(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi', method?: PaymentMethod): Promise<AppendedPayment | null> {
-        return ledger.markPaid(this.getDrizzle(), id, tenantId, source, method);
+    async markPaid(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi', method?: PaymentMethod, cardSettlement?: ledger.CardSettlement): Promise<AppendedPayment | null> {
+        return ledger.markPaid(this.getDrizzle(), id, tenantId, source, method, cardSettlement);
     }
 
     /** @see ledger.recordOfflinePayment — money that moved outside the system. */

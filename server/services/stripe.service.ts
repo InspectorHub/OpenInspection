@@ -14,6 +14,14 @@
 import Stripe from 'stripe';
 import { buildPaymentIntentParams, buildDepositIntentParams, type PayableInvoice } from '../lib/stripe-helpers';
 
+/** PaymentIntent statuses a customer can still pay. Anything else (succeeded, canceled) is over. */
+const LIVE_INTENT_STATUSES: ReadonlySet<string> = new Set([
+    'requires_payment_method', 'requires_confirmation', 'requires_action', 'processing',
+]);
+
+/** How many replacement intents one balance may have gone through (pay, refund, pay, refund ...). */
+const MAX_KEY_ATTEMPTS = 5;
+
 export class StripeService {
     private stripe: Stripe;
 
@@ -36,17 +44,12 @@ export class StripeService {
         ctx: { tenantId: string; currency?: string; descriptionPrefix?: string },
     ): Promise<{ id: string; clientSecret: string }> {
         const params = buildPaymentIntentParams(invoice, ctx);
-        const intent = await this.stripe.paymentIntents.create({
-            amount: params.amount,
-            currency: params.currency,
-            automatic_payment_methods: { enabled: true },
-            description: params.description,
-            metadata: params.metadata,
-        });
-        if (!intent.client_secret) {
-            throw new Error('Stripe did not return a client secret');
-        }
-        return { id: intent.id, clientSecret: intent.client_secret };
+        // Reaching the key below means `buildPaymentIntentParams` accepted a positive outstanding
+        // amount, so a fresh intent is never minted for an invoice that owes nothing.
+        // A double click, or a retry, must not mint a second chargeable intent for the same balance.
+        // The amount is part of the key, so a balance that has moved gets a new intent and the same
+        // balance gets the same one. Mirrors the deposit key below.
+        return this.createLiveIntent(params, `oi-invoice:${ctx.tenantId}:${invoice.id}:${params.amount}`);
     }
 
     /**
@@ -73,15 +76,46 @@ export class StripeService {
         ctx: { tenantId: string; currency?: string; descriptionPrefix?: string },
     ): Promise<{ id: string; clientSecret: string }> {
         const params = buildDepositIntentParams(order, ctx);
-        const intent = await this.stripe.paymentIntents.create({
+        return this.createLiveIntent(params, `oi-deposit:${ctx.tenantId}:${order.inspectionId}:${order.outstandingCents}`);
+    }
+
+    /**
+     * Creates the intent under `baseKey`, which Stripe replays for 24 hours: a repeat call
+     * for the same balance returns the same intent, so a double click is one charge path.
+     *
+     * A replay is only useful while the intent can still be paid. If the replayed intent has
+     * ended (it succeeded and was later refunded so the same amount is owed again, or it was
+     * cancelled), its client secret cannot be confirmed and the customer would be locked out for
+     * a day. Then ONE new intent is minted under a key with an attempt component. Only
+     * requires_payment_method, requires_confirmation, requires_action and processing are live.
+     * The caller has already established that a positive amount is owed.
+     */
+    private async createLiveIntent(
+        params: { amount: number; currency: string; description: string; metadata: Record<string, string> },
+        baseKey: string,
+    ): Promise<{ id: string; clientSecret: string }> {
+        const create = (idempotencyKey: string) => this.stripe.paymentIntents.create({
             amount: params.amount,
             currency: params.currency,
             automatic_payment_methods: { enabled: true },
             description: params.description,
             metadata: params.metadata,
-        }, {
-            idempotencyKey: `oi-deposit:${ctx.tenantId}:${order.inspectionId}:${order.outstandingCents}`,
-        });
+        }, { idempotencyKey });
+        // Walk a deterministic ladder of keys: the base key, then base:r1, base:r2 ... and stop
+        // at the first intent that can still be paid. A random suffix would mint a NEW chargeable
+        // intent on every click once the base-key intent had ended; this way a double click or a
+        // reload replays the same replacement.
+        let intent = await create(baseKey);
+        for (let attempt = 1; attempt <= MAX_KEY_ATTEMPTS; attempt += 1) {
+            // Stripe replays the response stored at creation, so its `status` is frozen at
+            // requires_payment_method; read the intent's current state before trusting it.
+            const current = await this.stripe.paymentIntents.retrieve(intent.id);
+            if (current.status === undefined || LIVE_INTENT_STATUSES.has(current.status)) break;
+            if (attempt === MAX_KEY_ATTEMPTS) {
+                throw new Error('Stripe returned only ended payment intents for this balance');
+            }
+            intent = await create(`${baseKey}:r${attempt}`);
+        }
         if (!intent.client_secret) {
             throw new Error('Stripe did not return a client secret');
         }

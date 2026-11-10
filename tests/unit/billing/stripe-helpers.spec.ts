@@ -8,7 +8,7 @@ import {
 } from '../../../server/lib/stripe-helpers';
 
 describe('buildPaymentIntentParams', () => {
-    const base = { id: 'inv_1', amountCents: 35000, inspectionId: 'insp_9', status: 'sent' };
+    const base = { id: 'inv_1', amountCents: 35000, outstandingCents: 35000, inspectionId: 'insp_9', status: 'sent' };
 
     it('maps amountCents to amount and defaults currency to usd', () => {
         const p = buildPaymentIntentParams(base, { tenantId: 't_1' });

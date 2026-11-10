@@ -95,3 +95,21 @@ export function depositPolicyFromChoice(input: {
     if (cents === null || !Number.isFinite(cents) || cents <= 0) return { ok: false, field: "amount" };
     return { ok: true, policy: { type: "fixed", amountCents: Math.round(cents) } };
 }
+
+/**
+ * The three answers the "Collect payment when clients book" section offers.
+ *
+ * `full` is not a policy type of its own: it is a 100% policy, so the server,
+ * the booking quote and the invoice arithmetic all keep one vocabulary. A stored
+ * `{ percent: 100 }` therefore reads back as `full` whichever control wrote it.
+ */
+export type DepositPreset = "off" | "full" | "custom";
+
+/** The policy the "Charge the full fee when booking" preset stores. */
+export const FULL_FEE_POLICY: DepositPolicy = { type: "percent", percent: 100 };
+
+export function depositPresetOf(policy: DepositPolicy | null | undefined): DepositPreset {
+    if (!policy || policy.type === "none") return "off";
+    if (policy.type === "percent" && policy.percent === 100) return "full";
+    return "custom";
+}

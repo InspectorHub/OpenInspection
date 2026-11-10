@@ -233,6 +233,11 @@ export const InspectionHubSchema = z.object({
     unread:         z.number().describe('Unread counterparty-authored messages on this inspection.'),
     rulesActive:    z.number().describe("Active automation rules in the tenant — distinguishes the Outbox's three empty states."),
   }).describe('Communication section header counts, so the section summary renders without a second round trip.'),
+  heldDeposit: z.object({
+    amountCents: z.number().describe('Net deposit collected at booking and not yet applied to an invoice, in cents.'),
+    paidAt: z.string().describe('ISO instant the latest deposit receipt moved.'),
+  }).nullable().optional().describe('A booking deposit that has been paid and is still held against the order. Display only: it never marks the order paid. Null when none is held; ABSENT without the companyFinance capability.'),
+  receivedCents: z.number().int().optional().describe('Net money already received against what the client is billed, in cents: the ledger receipts of the invoice when an invoice exists, otherwise the held booking deposit. The request-payment amount is the billed total minus this. ABSENT without the companyFinance capability.'),
   lifecycle: z.object({
     moneyCollected: z.boolean().describe('Whether any payment has been collected (on the invoice or as a held deposit). A yes or no, never an amount; office staff cannot cancel once it is true.'),
     statusBeforeCancel: z.enum(['requested', 'scheduled', 'confirmed', 'completed']).nullable().describe('For a cancelled inspection, the status it had before it was cancelled; null when it is not cancelled or the cancellation recorded none.'),

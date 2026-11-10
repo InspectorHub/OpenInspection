@@ -66,7 +66,7 @@
     "app/routes/settings-advanced.tsx": 4,
     "app/routes/settings-automations.tsx": 3,
     "app/routes/settings-billing.tsx": 2,
-    "app/routes/settings-booking.tsx": 5,
+    "app/routes/settings-booking.tsx": 6,
     "app/routes/settings-communication-template.tsx": 5,
     "app/routes/settings-communication-templates.tsx": 3,
     "app/routes/settings-communication.tsx": 3,

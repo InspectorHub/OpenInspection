@@ -28,6 +28,8 @@ export function StripePayPanel({ id, portalToken, balanceDue, inspectorName, bra
   const locale = useDisplayLocale();
   const [phase, setPhase] = useState<PayPhase>("idle");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  // What the server actually minted the charge for. Wins over the page's own figure once known.
+  const [chargedCents, setChargedCents] = useState<number | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<StripeJs | null> | null>(null);
   // The return target is captured at click time so `window` is never read during
   // render (SSR-safe). It is the CURRENT url — the invoice page standalone, or the
@@ -51,12 +53,13 @@ export function StripePayPanel({ id, portalToken, balanceDue, inspectorName, bra
         body: "{}",
       });
       const body = (await res.json().catch(() => ({}))) as {
-        data?: { clientSecret?: string; publishableKey?: string };
+        data?: { clientSecret?: string; publishableKey?: string; amountCents?: number };
         error?: { code?: string };
       };
       if (res.ok && body.data?.clientSecret && body.data?.publishableKey) {
         setStripePromise(loadStripe(body.data.publishableKey));
         setClientSecret(body.data.clientSecret);
+        if (typeof body.data.amountCents === "number") setChargedCents(body.data.amountCents);
         setPhase("ready");
         return;
       }
@@ -66,11 +69,13 @@ export function StripePayPanel({ id, portalToken, balanceDue, inspectorName, bra
     }
   }
 
+  const shownDue = chargedCents != null ? chargedCents / 100 : balanceDue;
+
   return (
     <div className="rounded-xl border border-ih-border bg-ih-bg-muted p-4">
       <div className="flex items-center justify-between mb-3">
         <span className="text-[13px] font-semibold text-ih-fg-1">{m.portal_pay_this_invoice()}</span>
-        <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{money(balanceDue, cur)}</span>
+        <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{money(shownDue, cur)}</span>
       </div>
 
       {(phase === "idle" || phase === "loading") && (
@@ -80,7 +85,7 @@ export function StripePayPanel({ id, portalToken, balanceDue, inspectorName, bra
             {...pendingProps(phase === "loading", () => latch(startPayment))}
             className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0 ${PENDING_CLASS}`}
           >
-            {phase === "loading" ? m.portal_pay_starting_checkout() : m.portal_pay_amount({ amount: money(balanceDue, cur) })}
+            {phase === "loading" ? m.portal_pay_starting_checkout() : m.portal_pay_amount({ amount: money(shownDue, cur) })}
           </button>
           <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-ih-fg-2">
             <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -97,7 +102,7 @@ export function StripePayPanel({ id, portalToken, balanceDue, inspectorName, bra
           stripe={stripePromise}
           options={buildStripeElementsOptions({ clientSecret, brandColor, displayLocale: locale })}
         >
-          <CheckoutForm balanceDue={balanceDue} returnUrl={returnUrl} currency={currency} />
+          <CheckoutForm balanceDue={shownDue} returnUrl={returnUrl} currency={currency} />
         </Elements>
       )}
 

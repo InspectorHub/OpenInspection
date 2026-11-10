@@ -56,7 +56,7 @@ function post(api: unknown, json: Record<string, unknown>): Promise<JsonReadable
  * `null` means the form carried no `depositPolicy` at all — leave the stored one
  * alone. Anything else is an attempt, and a `message` on it means it failed.
  */
-export async function saveDepositFromForm(
+async function saveDepositFromForm(
   api: unknown,
   form: FormData,
 ): Promise<{ ok: boolean; message?: string | undefined } | null> {
@@ -70,8 +70,33 @@ export async function saveDepositFromForm(
     return { ok: false, message: m.settings_holiday_save_failed() };
   }
 
-  const res = await post(api, { depositPolicy: parseDepositPolicy(raw) });
+  // `null` is the one explicit "no deposit". Anything else that does not parse
+  // into a policy (`{}`, `"x"`, a half-formed object) is a malformed request, and
+  // must not be read as the clear instruction that `parseDepositPolicy` would turn
+  // it into.
+  const policy = parseDepositPolicy(raw);
+  if (raw !== null && policy === null) {
+    return { ok: false, message: m.settings_holiday_save_failed() };
+  }
+
+  const res = await post(api, { depositPolicy: policy });
   return res.ok ? { ok: true } : { ok: false, message: await errorMessage(res) };
+}
+
+/**
+ * The "Collect payment when clients book" section's own save. One intent, one
+ * field: it never touches the three checkbox policies, so saving a deposit
+ * cannot flip them, and saving them (which omits `depositPolicy`) cannot clear it.
+ */
+export async function handleDepositIntent(
+  api: unknown,
+  form: FormData,
+  intent: string,
+): Promise<BookingActionResult | null> {
+  if (intent !== "deposit-save") return null;
+  const result = await saveDepositFromForm(api, form);
+  if (!result) return { ok: false, intent };
+  return { ok: result.ok, intent, message: result.message };
 }
 
 /**

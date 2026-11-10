@@ -33,6 +33,9 @@ export function InvoiceCard({
     canManagePrice,
     canEditGate = true,
     canRequestPayment = true,
+    heldDeposit,
+    requestableCents,
+    formatDate,
     onRequestPayment,
 }: {
     /** `detail` carries the one-line money sentence a pill has no room for. */
@@ -55,6 +58,12 @@ export function InvoiceCard({
     canEditGate?: boolean;
     /** False for a viewer the API refuses to request payment on this inspection (not on it, and no scheduleOthers). */
     canRequestPayment?: boolean;
+    /** A paid booking deposit still held against the order (no invoice yet). Display only; absent/null shows nothing. */
+    heldDeposit?: { amountCents: number; paidAt: string } | null | undefined;
+    /** Formats the deposit's ISO instant in the viewer's timezone. */
+    formatDate?: ((iso: string) => string) | undefined;
+    /** What a request would ask for (billed total minus money already received); 0 means nothing is left to collect, undefined means unknown/redacted. */
+    requestableCents?: number | undefined;
     onRequestPayment: () => void;
 }) {
     const [priceOpen, setPriceOpen] = useState(false);
@@ -89,6 +98,26 @@ export function InvoiceCard({
             {pill.detail && (
                 <p className="text-[12px] font-medium text-ih-watch-fg mb-1">{pill.detail}</p>
             )}
+            {/* The deposit is money received, but it is held against the order, not
+                an invoice, so the status pill still says unpaid. Say it landed and
+                what is left; this changes no state and marks nothing paid. */}
+            {heldDeposit && (
+                <div className="mb-1" data-testid="hub-deposit-paid">
+                    <p className="text-[12px] font-medium text-ih-ok-fg">
+                        {m.inspections_hub_invoice_deposit_paid({
+                            amount: formatCents(heldDeposit.amountCents, { currency }),
+                            date: formatDate ? formatDate(heldDeposit.paidAt) : heldDeposit.paidAt.slice(0, 10),
+                        })}
+                    </p>
+                    {amountCents !== undefined && amountCents > 0 && (
+                        <p className="text-[12px] text-ih-fg-2" data-testid="hub-deposit-balance">
+                            {m.inspections_hub_invoice_balance_due({
+                                amount: formatCents(Math.max(0, amountCents - heldDeposit.amountCents), { currency }),
+                            })}
+                        </p>
+                    )}
+                </div>
+            )}
             {hasServiceLines && (
                 <p className="text-[11px] text-ih-fg-3 mb-3">{m.inspections_hub_invoice_from_services()}</p>
             )}
@@ -114,9 +143,11 @@ export function InvoiceCard({
                         redacted for this viewer (see the prop's own note), and
                         who may request payment is a permission question this
                         does not answer. */}
-                    {amountCents === 0 ? (
+                    {amountCents === 0 || (amountCents !== undefined && requestableCents === 0) ? (
                         <p className="text-[12px] text-ih-fg-3">
-                            {m.inspections_hub_invoice_nothing_to_request()}
+                            {amountCents === 0
+                                ? m.inspections_hub_invoice_nothing_to_request()
+                                : m.inspections_hub_invoice_already_covered()}
                         </p>
                     ) : canRequestPayment && (
                         <Button variant="secondary" size="sm" onClick={onRequestPayment}>

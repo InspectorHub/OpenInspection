@@ -27,6 +27,7 @@ export const CompanyBookingProfileResponseSchema = z.object({
         })).describe('Inspectors the visitor may choose from; empty unless inspector choice is enabled.'),
         currency: z.string().describe('ISO currency code prices are quoted in.'),
         depositPolicy: DepositPolicySchema.nullable().describe('The company default deposit, quoted for the page; null when none is set.'),
+        paymentsAvailable: z.boolean().describe('True when the company own Stripe account holds every key a card payment needs, so a client can be offered a Pay button. A boolean only; no key is ever returned.'),
         services: z.array(z.object({
             id: z.string().describe('Service id.'),
             name: z.string().describe('Service name.'),

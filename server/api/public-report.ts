@@ -14,6 +14,8 @@ import publicViewTrackingRoutes, { viewTrackingRouteConfigs } from './public/vie
 export { resolveOwnerPreviewToken } from '../lib/public-access';
 export { resolveRenderAccess } from '../lib/render-token';
 import { InvoiceNotPayableError } from '../lib/stripe-helpers';
+import { getOutstandingCents } from '../services/payment-ledger.service';
+import { companyStripeKeysComplete } from '../lib/integrations/stripe-keys';
 import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
 import { getBookingHost, getBaseUrl } from '../lib/url';
@@ -497,7 +499,8 @@ app.openapi(invoiceRoute, async (c) => {
         privacyUrl: brand?.privacyUrl ?? null,
         termsUrl: brand?.termsUrl ?? null,
     };
-    const view = PublicInvoiceBodySchema.parse({ ...projectFields(inv, PUBLIC_INVOICE_FIELDS), lineItems, brand: brandView, tenantSlug: tenantRow?.slug ?? null });
+    const balanceDueCents = await getOutstandingCents(getDrizzle(c), tenantId, inv);
+    const view = PublicInvoiceBodySchema.parse({ ...projectFields(inv, PUBLIC_INVOICE_FIELDS), balanceDueCents, lineItems, brand: brandView, tenantSlug: tenantRow?.slug ?? null });
     return c.json({ success: true as const, data: view }, 200);
 });
 app.openapi(payIntentRoute, async (c) => {
@@ -520,7 +523,10 @@ app.openapi(payIntentRoute, async (c) => {
     const env = c.env;
     const secretKey = env.STRIPE_SECRET_KEY;
     const publishableKey = env.STRIPE_PUBLISHABLE_KEY;
-    if (!secretKey || !publishableKey) {
+    // Same completeness rule as the booking page and the deposit route: no webhook secret means a
+    // payment could be taken and never recorded.
+    if (!secretKey || !publishableKey
+        || !await companyStripeKeysComplete({ env: c.env, profile: c.var.profile, tenantId })) {
         return c.json({ success: false as const, error: { code: 'STRIPE_NOT_CONFIGURED', message: 'Online payment is not set up for this inspector.' } }, 503);
     }
 
@@ -530,14 +536,17 @@ app.openapi(payIntentRoute, async (c) => {
     try {
         const { StripeService } = await import('../services/stripe.service');
         const svc = new StripeService(secretKey);
+        // Charge what is still owed, never the invoice total: a booking deposit or part-payment
+        // already received is not collected twice. The page is told the same figure it is charged.
+        const outstandingCents = await getOutstandingCents(getDrizzle(c), tenantId, inv);
         const { clientSecret } = await svc.createPaymentIntent(
-            { id: inv.id, amountCents: inv.amountCents, inspectionId: inv.inspectionId, status: inv.status, paidAt: inv.paidAt },
+            { id: inv.id, amountCents: inv.amountCents, outstandingCents, inspectionId: inv.inspectionId, status: inv.status, paidAt: inv.paidAt },
             // Phase B — charge in the invoice's snapshot currency (Stripe lowercases,
             // e.g. 'cad'), not a hardcoded USD, so the charge matches the billed amount.
             { tenantId, currency: inv.currency, descriptionPrefix: 'Inspection invoice' },
         );
         // projection-allow: the client secret and publishable key of this invoice's payment intent, which the payment form needs
-        return c.json({ success: true as const, data: { clientSecret, publishableKey, amountCents: inv.amountCents } }, 200);
+        return c.json({ success: true as const, data: { clientSecret, publishableKey, amountCents: outstandingCents } }, 200);
     } catch (err) {
         if (err instanceof InvoiceNotPayableError) {
             return c.json({ success: false as const, error: { code: 'INVOICE_NOT_PAYABLE', message: err.message } }, 409);

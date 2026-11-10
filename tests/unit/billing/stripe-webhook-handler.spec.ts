@@ -14,6 +14,8 @@ vi.mock('../../../server/services/stripe.service', () => ({
 const { recordPayment } = vi.hoisted(() => ({ recordPayment: vi.fn() }));
 vi.mock('../../../server/services/payment-ledger.service', () => ({ recordPayment }));
 vi.mock('../../../server/lib/route-helpers', () => ({ getDrizzle: () => ({}) }));
+const applyHeldDepositsToInvoice = vi.hoisted(() => vi.fn());
+vi.mock('../../../server/services/invoice/deposit-application', () => ({ applyHeldDepositsToInvoice }));
 
 import stripeWebhookApi from '../../../server/api/stripe-webhook';
 import { makeExecutionContext } from '../helpers/exec-ctx';
@@ -27,6 +29,8 @@ function makeApp(opts: {
     env?: Record<string, unknown>;
     markPaid?: ReturnType<typeof vi.fn>;
     markPaymentReceived?: ReturnType<typeof vi.fn>;
+    findById?: ReturnType<typeof vi.fn>;
+    findByInspectionId?: ReturnType<typeof vi.fn>;
     kvPut?: ReturnType<typeof vi.fn>;
 }) {
     const kv = { get: vi.fn().mockResolvedValue(null), put: opts.kvPut ?? vi.fn() };
@@ -37,7 +41,7 @@ function makeApp(opts: {
         // Replace env wholesale (Hono allows reading c.env in handlers).
         (c as { env: Record<string, unknown> }).env = { TENANT_CACHE: kv, ...(opts.env ?? {}) };
         c.set('services' as never, {
-            invoice: { markPaid: opts.markPaid ?? vi.fn() },
+            invoice: { markPaid: opts.markPaid ?? vi.fn(), findById: opts.findById ?? vi.fn().mockResolvedValue(null), findByInspectionId: opts.findByInspectionId ?? vi.fn().mockResolvedValue(null) },
             inspection: { markPaymentReceived: opts.markPaymentReceived ?? vi.fn() },
         } as never);
         Object.defineProperty(c, 'executionCtx', {
@@ -95,7 +99,7 @@ describe('stripe webhook handler', () => {
         expect(String(kvPut.mock.calls[0][1])).toContain('tenant_mismatch');
     });
 
-    it('happy path → SYNCHRONOUS markPaid with PATH tenant + processed logged', async () => {
+    it('happy path (an event with no amount or intent id falls back to the plain remainder call) → SYNCHRONOUS markPaid with PATH tenant + processed logged', async () => {
         verifyWebhook.mockResolvedValue({ type: 'payment_intent.succeeded', data: { object: { metadata: { invoiceId: 'i1', tenantId: 'tA', inspectionId: 'insp1' } } } });
         const markPaid = vi.fn().mockResolvedValue(undefined);
         const markPaymentReceived = vi.fn().mockResolvedValue(undefined);
@@ -105,6 +109,53 @@ describe('stripe webhook handler', () => {
         expect(markPaid).toHaveBeenCalledWith('i1', 'tA', 'oi', 'card');
         expect(markPaymentReceived).toHaveBeenCalledWith('tA', 'insp1');
         expect(String(kvPut.mock.calls[0][1])).toContain('"processed"');
+    });
+
+    it('passes what Stripe actually took, with the intent id, so the ledger records the charge and a redelivery is a no-op', async () => {
+        verifyWebhook.mockResolvedValue({ type: 'payment_intent.succeeded', data: { object: { id: 'pi_inv_1', amount_received: 36000, metadata: { invoiceId: 'i1', tenantId: 'tA' } } } });
+        const markPaid = vi.fn().mockResolvedValue(undefined);
+        const res = await makeApp({ tenantId: 'tA', env: KEYS, markPaid }).request('/', { method: 'POST', headers: SIG, body: '{}' });
+        expect(res.status).toBe(200);
+        expect(markPaid).toHaveBeenCalledWith('i1', 'tA', 'oi', 'card', { amountCents: 36000, providerRef: 'pi_inv_1' });
+    });
+
+    describe('the report gate opens only when the invoice is paid', () => {
+        const event = { type: 'payment_intent.succeeded', data: { object: { id: 'pi_inv_1', amount_received: 30000, metadata: { invoiceId: 'i1', tenantId: 'tA', inspectionId: 'insp1' } } } };
+        const row = { id: 'p1' };
+
+        it('positive control: the charge settles the invoice in full → gate opens', async () => {
+            verifyWebhook.mockResolvedValue(event);
+            const markPaymentReceived = vi.fn(); const findById = vi.fn().mockResolvedValue({ paidAt: new Date(), voidedAt: null });
+            await makeApp({ tenantId: 'tA', env: KEYS, markPaid: vi.fn().mockResolvedValue(row), markPaymentReceived, findById })
+                .request('/', { method: 'POST', headers: SIG, body: '{}' });
+            expect(markPaymentReceived).toHaveBeenCalledWith('tA', 'insp1');
+        });
+
+        it('the charge is less than the total (total raised after the intent was minted) → invoice stays partial, gate stays shut', async () => {
+            verifyWebhook.mockResolvedValue(event);
+            const markPaymentReceived = vi.fn(); const findById = vi.fn().mockResolvedValue({ paidAt: null, voidedAt: null });
+            const res = await makeApp({ tenantId: 'tA', env: KEYS, markPaid: vi.fn().mockResolvedValue(row), markPaymentReceived, findById })
+                .request('/', { method: 'POST', headers: SIG, body: '{}' });
+            expect(res.status).toBe(200);
+            expect(findById).toHaveBeenCalledWith('tA', 'i1');
+            expect(markPaymentReceived).not.toHaveBeenCalled();
+        });
+
+        it('a redelivery appends nothing and must not re-open a gate the owner re-locked', async () => {
+            verifyWebhook.mockResolvedValue(event);
+            const markPaymentReceived = vi.fn(); const findById = vi.fn().mockResolvedValue({ paidAt: new Date(), voidedAt: null });
+            await makeApp({ tenantId: 'tA', env: KEYS, markPaid: vi.fn().mockResolvedValue(null), markPaymentReceived, findById })
+                .request('/', { method: 'POST', headers: SIG, body: '{}' });
+            expect(markPaymentReceived).not.toHaveBeenCalled();
+        });
+
+        it('a voided invoice never opens the gate', async () => {
+            verifyWebhook.mockResolvedValue(event);
+            const markPaymentReceived = vi.fn(); const findById = vi.fn().mockResolvedValue({ paidAt: new Date(), voidedAt: new Date() });
+            await makeApp({ tenantId: 'tA', env: KEYS, markPaid: vi.fn().mockResolvedValue(row), markPaymentReceived, findById })
+                .request('/', { method: 'POST', headers: SIG, body: '{}' });
+            expect(markPaymentReceived).not.toHaveBeenCalled();
+        });
     });
 
     it('DB failure → 500 (Stripe retries) and no processed entry', async () => {
@@ -152,6 +203,35 @@ describe('stripe webhook handler', () => {
             providerRef:  'pi_dep_1',
         });
         expect(String(kvPut.mock.calls[0][1])).toContain('"processed"');
+    });
+
+    describe('a deposit that lands after an invoice exists', () => {
+        const dep = { type: 'payment_intent.succeeded', data: { object: { id: 'pi_dep_9', amount_received: 9000, metadata: { kind: 'deposit', inspectionId: 'insp1', tenantId: 'tA' } } } };
+        beforeEach(() => { applyHeldDepositsToInvoice.mockReset(); recordPayment.mockReset(); });
+
+        it('is attached to that invoice', async () => {
+            verifyWebhook.mockResolvedValue(dep); recordPayment.mockResolvedValue({ id: 'row1' });
+            const findByInspectionId = vi.fn().mockResolvedValue({ id: 'inv9', voidedAt: null });
+            await makeApp({ tenantId: 'tA', env: KEYS, findByInspectionId }).request('/', { method: 'POST', headers: SIG, body: '{}' });
+            expect(applyHeldDepositsToInvoice).toHaveBeenCalledWith({}, 'tA', 'inv9', 'insp1');
+        });
+        it('positive control: with no invoice nothing is attached (the deposit stays held)', async () => {
+            verifyWebhook.mockResolvedValue(dep); recordPayment.mockResolvedValue({ id: 'row1' });
+            await makeApp({ tenantId: 'tA', env: KEYS }).request('/', { method: 'POST', headers: SIG, body: '{}' });
+            expect(applyHeldDepositsToInvoice).not.toHaveBeenCalled();
+        });
+        it('is not attached to a voided invoice', async () => {
+            verifyWebhook.mockResolvedValue(dep); recordPayment.mockResolvedValue({ id: 'row1' });
+            const findByInspectionId = vi.fn().mockResolvedValue({ id: 'inv9', voidedAt: new Date() });
+            await makeApp({ tenantId: 'tA', env: KEYS, findByInspectionId }).request('/', { method: 'POST', headers: SIG, body: '{}' });
+            expect(applyHeldDepositsToInvoice).not.toHaveBeenCalled();
+        });
+        it('a redelivery appends nothing and attaches nothing', async () => {
+            verifyWebhook.mockResolvedValue(dep); recordPayment.mockResolvedValue(null);
+            const findByInspectionId = vi.fn().mockResolvedValue({ id: 'inv9', voidedAt: null });
+            await makeApp({ tenantId: 'tA', env: KEYS, findByInspectionId }).request('/', { method: 'POST', headers: SIG, body: '{}' });
+            expect(applyHeldDepositsToInvoice).not.toHaveBeenCalled();
+        });
     });
 
     it('a deposit does not mark any invoice paid and does not unlock the report', async () => {

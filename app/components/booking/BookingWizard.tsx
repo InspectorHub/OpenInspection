@@ -44,6 +44,7 @@ export function BookingWizard({
     totalPrice,
     depositQuoteCents,
     depositDueCents,
+    paymentsAvailable,
     bookedInspectionId,
     currency,
     needsTurnstile,
@@ -207,6 +208,7 @@ export function BookingWizard({
           clientEmail={clientEmail}
           depositQuoteCents={depositQuoteCents}
           depositDueCents={depositDueCents}
+          paymentsAvailable={paymentsAvailable}
           bookedInspectionId={bookedInspectionId}
           currency={currency}
           companyName={profile.company}

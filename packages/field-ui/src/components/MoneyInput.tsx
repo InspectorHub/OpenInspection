@@ -22,9 +22,11 @@ export function MoneyInput({
   onChange,
   onBlur,
   disabled,
-  placeholder = "$0",
+  placeholder,
   className,
   ariaLabel,
+  currency,
+  locale,
 }: {
   id?: string;
   cents: number | null;
@@ -34,13 +36,18 @@ export function MoneyInput({
   placeholder?: string;
   className?: string;
   ariaLabel?: string;
+  /** ISO 4217 code for the display form. Omitted: USD, as every existing caller expects. */
+  currency?: string;
+  /** BCP 47 locale for the display form. Omitted: en-US. */
+  locale?: string;
 }) {
+  const fmt = { ...(currency ? { currency } : {}), ...(locale ? { locale } : {}) };
   const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState("");
 
   // Plain, comma-free editable form (e.g. "8500" or "8500.5") seeded on focus.
   const editable = cents == null ? "" : String(cents / 100);
-  const display = focused ? draft : cents == null ? "" : formatDollars(cents);
+  const display = focused ? draft : cents == null ? "" : formatDollars(cents, fmt);
 
   return (
     <input
@@ -49,7 +56,7 @@ export function MoneyInput({
       inputMode="decimal"
       aria-label={ariaLabel}
       value={display}
-      placeholder={placeholder}
+      placeholder={placeholder ?? (currency ? formatDollars(0, fmt) : "$0")}
       disabled={disabled}
       className={className}
       onFocus={() => {

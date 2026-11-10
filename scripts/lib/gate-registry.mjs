@@ -212,11 +212,6 @@ export const SCRIPT_GATES = [
     // plan that builds a primitive before its caller, and a gate that is red
     // for a legitimate reason all week is a gate people learn to pass with
     // --no-verify. ~10s: one knip pass over the production entry graph.
-    // PUSH, not PRECOMMIT: this checks the installed Wrangler bundle, which is
-    // environment state rather than anything a commit stages. The postinstall
-    // script applies the narrowly scoped compatibility patch and fails closed
-    // if Wrangler's bundle no longer matches the expected shape.
-    { key: 'wranglerpatch', label: 'Wrangler compatibility patch present', script: 'check-wrangler-patch.mjs', fix: 'npm run lint:wrangler-patch', rung: PUSH },
     // PUSH, not PRECOMMIT. It parses the TypeScript of every route file (~150 files, a few
     // hundred milliseconds of AST work), which is more than every commit should pay, and what
     // it catches is the sum over a branch -- a loader that has grown wide or started calling

@@ -30,11 +30,14 @@ type Phase = "idle" | "loading" | "ready" | "settled" | "unavailable";
 export function BookingDepositPanel({
   inspectionId,
   depositCents,
+  fullFee = false,
   currency,
   companyName,
 }: {
   inspectionId: string;
   depositCents: number;
+  /** The amount is the whole fee, not a deposit: the copy must not say it comes off the total. */
+  fullFee?: boolean;
   currency: string;
   companyName: string;
 }) {
@@ -80,11 +83,11 @@ export function BookingDepositPanel({
   return (
     <div className="mt-6 rounded-lg border border-ih-border bg-ih-bg-muted p-4 text-left">
       <div className="flex items-center justify-between gap-3 mb-1">
-        <span className="text-[13px] font-semibold text-ih-fg-1">{m.booking_deposit_pay_heading()}</span>
+        <span className="text-[13px] font-semibold text-ih-fg-1">{fullFee ? m.booking_deposit_pay_heading_full() : m.booking_deposit_pay_heading()}</span>
         <span className="text-[18px] font-semibold text-ih-fg-1 tabular-nums">{amount}</span>
       </div>
       <p className="text-[12px] text-ih-fg-3 leading-relaxed mb-3">
-        {m.booking_deposit_pay_body({ company: companyName })}
+        {(fullFee ? m.booking_deposit_pay_body_full : m.booking_deposit_pay_body)({ company: companyName })}
       </p>
 
       {(phase === "idle" || phase === "loading") && (
@@ -94,11 +97,11 @@ export function BookingDepositPanel({
             {...pendingProps(phase === "loading", () => latch(startPayment))}
             className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-wait ${PENDING_CLASS}`}
           >
-            {phase === "loading" ? m.booking_deposit_starting() : m.booking_deposit_pay_button({ amount })}
+            {phase === "loading" ? m.booking_deposit_starting() : (fullFee ? m.booking_deposit_pay_button_full : m.booking_deposit_pay_button)({ amount })}
           </button>
           {/* The appointment is already made. Say so beside the button, or the
               client reads the deposit as the thing that confirms it. */}
-          <p className="mt-2 text-center text-[11px] text-ih-fg-2">{m.booking_deposit_already_booked()}</p>
+          <p className="mt-2 text-center text-[11px] text-ih-fg-2">{fullFee ? m.booking_deposit_already_booked_full() : m.booking_deposit_already_booked()}</p>
         </>
       )}
 
@@ -107,24 +110,24 @@ export function BookingDepositPanel({
           stripe={stripePromise}
           options={buildStripeElementsOptions({ clientSecret, brandColor: null, displayLocale: locale })}
         >
-          <DepositForm amount={amount} returnUrl={returnUrl} />
+          <DepositForm amount={amount} returnUrl={returnUrl} fullFee={fullFee} />
         </Elements>
       )}
 
       {phase === "settled" && (
-        <p className="text-[12px] text-ih-fg-3 leading-relaxed">{m.booking_deposit_already_paid()}</p>
+        <p className="text-[12px] text-ih-fg-3 leading-relaxed">{fullFee ? m.booking_deposit_already_paid_full() : m.booking_deposit_already_paid()}</p>
       )}
 
       {phase === "unavailable" && (
         <p className="text-[12px] text-ih-fg-3 leading-relaxed">
-          {m.booking_deposit_unavailable({ company: companyName })}
+          {(fullFee ? m.booking_deposit_unavailable_full : m.booking_deposit_unavailable)({ company: companyName })}
         </p>
       )}
     </div>
   );
 }
 
-function DepositForm({ amount, returnUrl }: { amount: string; returnUrl: string }) {
+function DepositForm({ amount, returnUrl, fullFee }: { amount: string; returnUrl: string; fullFee: boolean }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -160,7 +163,7 @@ function DepositForm({ amount, returnUrl }: { amount: string; returnUrl: string 
         disabled={!stripe} {...pendingProps(submitting)}
         className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-wait ${PENDING_CLASS}`}
       >
-        {submitting ? m.booking_deposit_processing() : m.booking_deposit_pay_button({ amount })}
+        {submitting ? m.booking_deposit_processing() : (fullFee ? m.booking_deposit_pay_button_full : m.booking_deposit_pay_button)({ amount })}
       </button>
       {error && (
         <div className="rounded-md bg-ih-bad-bg px-3 py-2">

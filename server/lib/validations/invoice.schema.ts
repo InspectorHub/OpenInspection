@@ -177,6 +177,10 @@ export const PublicInvoiceBodySchema = z.object({
     // stripped it — the pay page could not have shown a balance even though the
     // column was populated. Nullable: "partial, amount unknown" is a real state.
     amountPaidCents: z.number().nullable().optional(),
+    // What the payer is still asked for: the total minus everything the payment ledger has received,
+    // never below zero. The same figure the pay-intent route charges, so the page quotes what is
+    // charged. Optional so an older server's payload (no field) falls back to the total.
+    balanceDueCents: z.number().optional(),
     // Phase B — the invoice's snapshot currency (ISO 4217); the pay page renders
     // this, not the tenant's live setting, so history stays self-describing.
     currency: z.string().optional(),
