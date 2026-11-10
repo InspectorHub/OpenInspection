@@ -28,7 +28,7 @@ import { base64ToBytes, type ImportedSnapshot, type StateExport } from '../../du
 import { collabDocName } from './doc-name';
 import { copiedIdentity, type CollabDocRef, type DocNamespace } from './do-jurisdiction-migrate';
 
-export type KeptReason =
+type KeptReason =
     | 'no-report-id'
     | 'identity-mismatch'
     | 'source-live'
@@ -43,11 +43,11 @@ export type KeptReason =
     | 'source-partial'
     | 'target-snapshots-differ';
 
-export type FailedReason = 'source-export-failed' | 'target-export-failed' | 'purge-failed' | 'malformed-export' | 'error';
+type FailedReason ='source-export-failed' | 'target-export-failed' | 'purge-failed' | 'malformed-export' | 'error';
 
 type PurgeOutcome = 'purged' | 'alreadyPurged' | 'kept' | 'failed' | 'wouldPurge';
 
-export interface PurgeRow { rowId: string; outcome: PurgeOutcome; reason?: KeptReason | FailedReason }
+interface PurgeRow { rowId: string; outcome: PurgeOutcome; reason?: KeptReason | FailedReason }
 
 export interface PurgeReport {
     total:         number;
