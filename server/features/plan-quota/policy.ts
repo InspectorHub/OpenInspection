@@ -1,7 +1,8 @@
-import type { ManagedAiMetric } from '../../lib/usage/period';
+import { currentPeriodKey, nextMonthStartUtcMs, type ManagedAiMetric } from '../../lib/usage/period';
 
 /**
- * Free-tier lifetime caps. Platform/managed sends only — bring-your-own (`*_byo`)
+ * Free-plan monthly allowances: new inspections created, and built-in emails sent, per UTC calendar
+ * month. Platform/managed sends only — bring-your-own (`*_byo`)
  * volume is uncapped and metered separately under the `sms_byo`/`email_byo`
  * metrics. Spec: free-tier usage quotas (2026-07).
  *
@@ -15,6 +16,14 @@ import type { ManagedAiMetric } from '../../lib/usage/period';
  *  no meter. Capping a thing is more machinery than not offering it. An absent
  *  entry here looks like an oversight, so: it is not one. */
 export const FREE_TIER_CAPS = { inspections: 5, email: 50 } as const;
+
+/** The month an allowance is being counted in, and the instant it renews. `period` is the usage-counter
+ *  key ('YYYY-MM', UTC); `resetsAt` is an ISO instant (00:00:00.000Z on the 1st). */
+export interface AllowanceWindow { period: string; resetsAt: string }
+
+export function allowanceWindow(now: Date): AllowanceWindow {
+    return { period: currentPeriodKey(now), resetsAt: new Date(nextMonthStartUtcMs(now)).toISOString() };
+}
 
 /** The AI metrics a cap can be expressed against. Only the managed (platform-
  *  funded) side appears: `*_byo` volume is the tenant's own bill, so there is

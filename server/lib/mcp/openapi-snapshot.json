@@ -5885,7 +5885,7 @@
       "body": null
     },
     "summary": "Bucketed inspections for dashboard",
-    "description": "Returns the inspection dashboard in one response, as buckets of inspections for the whole company (not filtered to the caller), unless the caller's access is limited to the inspections assigned to them, in which case only those: needsAttention, today, thisWeek (after today through 7 days ahead), later (beyond 7 days, capped at the first 50, with laterTotal giving the full count), recentReports (completed with a published report) and cancelled (cancelled in the last 30 days judged by creation time, at most 20). The today, thisWeek and later buckets exclude cancelled inspections. Each row carries defect counts, agent name and status flags. Also returns conciergePending, the number of agent bookings awaiting inspector approval (0 if that lookup fails), and defectAggregate. needsAttention uses the company's attention thresholds (see the attention thresholds route). Dates are compared as UTC calendar days. Read-only. Available to owner, manager and inspector roles."
+    "description": "Returns the inspection dashboard in one response, as buckets of inspections for the whole company (not filtered to the caller), unless the caller's access is limited to the inspections assigned to them, in which case only those: needsAttention, today, thisWeek (after today through 7 days ahead), later (beyond 7 days, capped at the first 50, with laterTotal giving the full count), recentReports (completed inspections, whether or not the report is published yet) and cancelled (cancelled in the last 30 days judged by creation time, at most 20). The today, thisWeek and later buckets exclude cancelled inspections. Each row carries defect counts, agent name and status flags. Also returns conciergePending, the number of agent bookings awaiting inspector approval (0 if that lookup fails), and defectAggregate. needsAttention uses the company's attention thresholds (see the attention thresholds route). Dates are compared as UTC calendar days. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "declineBooking",
@@ -10597,7 +10597,7 @@
       "body": null
     },
     "summary": "Get the current tenant's usage summary (inspections/sms/email/storage/seats + free-tier caps)",
-    "description": "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against. Available to owner, manager and inspector roles."
+    "description": "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against. On a capped plan the inspections and email figures are for the current UTC calendar month, and `period` ({ period: 'YYYY-MM', resetsAt: ISO instant }) names that month and when its allowance renews; `period` is null when nothing is capped. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "getVisibleInspections",

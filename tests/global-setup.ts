@@ -87,6 +87,15 @@ export default function globalSetup() {
         // internal _cf_* bookkeeping tables are preserved so migrations stay applied.
         const listSql = tmp('.gs-list.sql');
         const wipeSql = tmp('.gs-wipe.sql');
+        // The agent terms are published in the SAME batch as the wipe (see the comment below): one wrangler spawn
+        // instead of two. The agent-terms row is not a soft step, so a failure of the batch is fatal, with both causes named.
+        const body = 'E2E agent terms fixture. Not a real agreement.';
+        const hash = createHash('sha256').update(body, 'utf8').digest('hex');
+        const agentTermsInsert =
+            `INSERT OR REPLACE INTO deployment_legal_versions `
+            + `(id, doc, version, body_snapshot, content_hash, published_at) `
+            + `VALUES ('e2e-agent-terms', 'agent_terms', '2026-08-01', `
+            + `'${body}', '${hash}', ${Date.now()});\n`;
         try {
             writeFileSync(
                 listSql,
@@ -97,13 +106,24 @@ export default function globalSetup() {
             const out = execSync(d1File(listSql, '--json'), { cwd: appDir, encoding: 'utf8' });
             const parsed = JSON.parse(out.slice(out.indexOf('['))) as { results: { name: string }[] }[];
             const tables = parsed[0]?.results?.map((r) => r.name) ?? [];
-            if (tables.length > 0) {
-                const wipe =
-                    'PRAGMA defer_foreign_keys = ON;\n' +
-                    tables.map((t) => `DELETE FROM "${t}";`).join('\n') +
-                    '\n';
-                writeFileSync(wipeSql, wipe);
+            try {
+                writeFileSync(
+                    wipeSql,
+                    'PRAGMA defer_foreign_keys = ON;\n'
+                    + tables.map((t) => `DELETE FROM "${t}";`).join('\n')
+                    + '\n'
+                    + agentTermsInsert,
+                );
                 execSync(d1File(wipeSql, '--yes'), { cwd: appDir, stdio: 'pipe' });
+            } catch (err) {
+                // Loud, not swallowed. A silently missing agent-terms row does not look like a
+                // missing row — it looks like agent signup returning 400, which is
+                // indistinguishable from the product being broken.
+                throw new Error(
+                    '[globalSetup] failed to wipe the local D1 and publish agent terms — agent signup will refuse every request\n  '
+                    + (err instanceof Error ? err.message : String(err)),
+                    { cause: err },
+                );
             }
         } finally {
             rmSync(listSql, { force: true });
@@ -121,20 +141,28 @@ export default function globalSetup() {
                     { cwd: appDir, encoding: 'utf8' },
                 );
                 const keys = JSON.parse(listOutput) as { name: string }[];
-                for (const key of keys) {
+                // One `kv bulk delete` for all keys: a spawn per key cost seconds each on Windows.
+                if (keys.length > 0) {
+                    const kvKeysFile = tmp('.gs-kv-keys.json');
                     try {
+                        writeFileSync(kvKeysFile, JSON.stringify(keys.map((k) => k.name)));
                         execSync(
-                            `npx wrangler kv key delete "${key.name}" --namespace-id ${nsId} --local`,
+                            `npx wrangler kv bulk delete "${kvKeysFile}" --namespace-id ${nsId} --local --force`,
                             { cwd: appDir, stdio: 'pipe' },
                         );
-                    } catch { /* ignore */ }
+                    } catch (err) {
+                        // The listing worked, so a failed delete leaves stale keys behind: say so.
+                        console.warn(`[globalSetup] WARNING: could not clear ${keys.length} KV keys (${err instanceof Error ? err.message.split('\n')[0] : String(err)}).`);
+                    } finally {
+                        rmSync(kvKeysFile, { force: true });
+                    }
                 }
             }
         } catch {
             // KV may not be initialized — that's fine
         }
 
-        // Publish agent terms.
+        // Agent terms are published in the wipe batch above (same file, after the DELETEs).
         //
         // NOT part of the opt-in fixture set below, because it is not a fixture:
         // `POST /api/agent-signup` assembles the acceptance server-side from the
@@ -162,29 +190,6 @@ export default function globalSetup() {
         // The hash is DERIVED from the body: the service hashes it with SHA-256 and
         // a verifier re-derives it later, so a hand-written digest would seed a row
         // that fails its own check.
-        try {
-            const body = 'E2E agent terms fixture. Not a real agreement.';
-            const hash = createHash('sha256').update(body, 'utf8').digest('hex');
-            const agentTermsSql = tmp('.gs-agent-terms.sql');
-            writeFileSync(agentTermsSql,
-                `INSERT OR REPLACE INTO deployment_legal_versions `
-                + `(id, doc, version, body_snapshot, content_hash, published_at) `
-                + `VALUES ('e2e-agent-terms', 'agent_terms', '2026-08-01', `
-                + `'${body}', '${hash}', ${Date.now()});\n`);
-            try {
-                execSync(d1File(agentTermsSql, '--yes'), { cwd: appDir, stdio: 'pipe' });
-            } finally {
-                rmSync(agentTermsSql, { force: true });
-            }
-        } catch (err) {
-            // Loud, not swallowed. A silently missing row does not look like a
-            // missing row — it looks like agent signup returning 400, which is
-            // indistinguishable from the product being broken.
-            throw new Error(
-                '[globalSetup] failed to publish agent terms — agent signup will refuse every request\n  '
-                + (err instanceof Error ? err.message : String(err)),
-            );
-        }
 
         // Opt-in: the subsystem-C/D/E E2E specs use the multi-user seed.
         // Default off so the existing standalone-api/browser tests (which

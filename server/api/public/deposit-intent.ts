@@ -36,6 +36,7 @@ import { inspections, tenantConfigs } from '../../lib/db/schema';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { outstandingDepositCents } from '../../services/booking/deposit';
 import { DepositNotPayableError } from '../../lib/stripe-helpers';
+import { companyStripeKeysComplete } from '../../lib/integrations/stripe-keys';
 
 const DepositIntentSchema = z.object({
     clientSecret: z.string().describe('Stripe PaymentIntent client secret for mounting Elements in the browser.'),
@@ -89,7 +90,10 @@ app.openapi(depositIntentRoute, async (c) => {
 
     const secretKey = c.env.STRIPE_SECRET_KEY;
     const publishableKey = c.env.STRIPE_PUBLISHABLE_KEY;
-    if (!secretKey || !publishableKey) {
+    // The same completeness rule the booking page uses to offer a Pay button: without the webhook
+    // secret a payment could be taken and never recorded.
+    if (!secretKey || !publishableKey
+        || !await companyStripeKeysComplete({ env: c.env, profile: c.var.profile, tenantId })) {
         return c.json({ success: false as const, error: { code: 'STRIPE_NOT_CONFIGURED', message: 'Online payment is not set up for this inspector.' } }, 503);
     }
 

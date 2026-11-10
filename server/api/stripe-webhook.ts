@@ -6,6 +6,7 @@ import { appendWebhookLogEntry } from '../lib/stripe-webhook-log';
 import { AppError } from '../lib/errors';
 import { qboPaymentKey } from '../lib/qbo-payment-key';
 import { recordPayment } from '../services/payment-ledger.service';
+import { applyHeldDepositsToInvoice } from '../services/invoice/deposit-application';
 import { getDrizzle } from '../lib/route-helpers';
 
 /**
@@ -113,6 +114,15 @@ api.post('/', async (c) => {
             await appendWebhookLogEntry(c.env.TENANT_CACHE, tenantId, {
                 eventType: event.type, result: 'processed',
             });
+            // A deposit that lands AFTER an invoice was raised (a client with an open pay form while
+            // the owner invoices) would otherwise sit held forever while every pay path asks for
+            // the whole total. Attach it to that invoice the same way invoice creation does.
+            if (appendedDeposit !== null) {
+                const existingInvoice = await c.var.services.invoice.findByInspectionId(tenantId, settled.purpose.inspectionId);
+                if (existingInvoice && !existingInvoice.voidedAt) {
+                    await applyHeldDepositsToInvoice(getDrizzle(c), tenantId, existingInvoice.id, settled.purpose.inspectionId);
+                }
+            }
             // Null is a redelivery of a row we already have — the unique index
             // on (tenant, provider, provider_ref) is the guard, and it is doing
             // its job. Not an error, and not a second deposit.
@@ -134,9 +144,25 @@ api.post('/', async (c) => {
     const invoiceId = settled.purpose.invoiceId;
     let appended: Awaited<ReturnType<typeof c.var.services.invoice.markPaid>>;
     try {
-        appended = await c.var.services.invoice.markPaid(invoiceId, tenantId, 'oi', 'card');
+        // Record what Stripe actually took when the event says so; an event with no
+        // amount or intent id falls back to settling the remainder.
+        appended = settled.amountCents > 0 && settled.providerRef
+            ? await c.var.services.invoice.markPaid(invoiceId, tenantId, 'oi', 'card', { amountCents: settled.amountCents, providerRef: settled.providerRef })
+            : await c.var.services.invoice.markPaid(invoiceId, tenantId, 'oi', 'card');
         if (settled.inspectionId) {
-            await c.var.services.inspection.markPaymentReceived(tenantId, settled.inspectionId);
+            // The report gate opens when the invoice is PAID. A card settlement records only what
+            // Stripe took, which can be less than the total (the total was raised, or part was
+            // refunded after the charge was created), and a redelivery appends nothing and must
+            // not re-open a gate the owner re-locked. The plain remainder call settles in full.
+            const settledInFull = !(settled.amountCents > 0 && settled.providerRef);
+            let releaseGate = settledInFull;
+            if (!settledInFull && appended !== null) {
+                const invoice = await c.var.services.invoice.findById(tenantId, invoiceId);
+                releaseGate = Boolean(invoice?.paidAt) && !invoice?.voidedAt;
+            }
+            if (releaseGate) {
+                await c.var.services.inspection.markPaymentReceived(tenantId, settled.inspectionId);
+            }
         }
     } catch (e) {
         if (e instanceof AppError && e.status === 404) {

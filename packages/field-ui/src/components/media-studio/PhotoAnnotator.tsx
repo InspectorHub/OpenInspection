@@ -320,7 +320,7 @@ export function PhotoAnnotator({
       {/* Top bar                                                   */}
       {/* -------------------------------------------------------- */}
       <div
-        className="flex items-center gap-3 px-4 min-h-14 pt-[env(safe-area-inset-top,0px)] flex-shrink-0"
+        className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pb-1 min-h-14 pt-[env(safe-area-inset-top,0px)] flex-shrink-0"
         style={{ background: "rgba(15,23,42,0.8)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
       >
         <button
@@ -331,8 +331,8 @@ export function PhotoAnnotator({
           <Icon name="x" className="w-5 h-5" />
         </button>
 
-        <div className="flex-1 min-w-0 text-center">
-          <span className="text-[14px] font-bold text-white/90">
+        <div className="flex-1 min-w-[7rem] text-center">
+          <span className="text-[14px] font-bold text-white/90 whitespace-nowrap">
             {photoIndex != null && totalPhotos != null && totalPhotos > 0
               ? m.media_annotate_photo_of({ index: photoIndex, total: totalPhotos })
               : m.media_annotate_title()}
@@ -353,7 +353,7 @@ export function PhotoAnnotator({
           <button
             type="button"
             onClick={onSetCover}
-            className={`h-8 px-3 rounded-md text-[12px] font-bold border transition-colors flex items-center gap-1.5 ${
+            className={`h-8 px-3 rounded-md text-[12px] font-bold border transition-colors flex items-center gap-1.5 whitespace-nowrap ${
               isCover
                 ? "text-amber-300 bg-amber-400/15 border-amber-400/40"
                 : "text-white/60 bg-white/5 border-white/10 hover:bg-white/10"

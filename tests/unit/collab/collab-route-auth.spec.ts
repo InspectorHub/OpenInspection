@@ -11,6 +11,7 @@
  *
  * The DO namespace is fully mocked so no real DO is contacted.
  */
+import { GEN_HEADER } from '../../../server/durable-objects/inspection-doc-generation';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import collabRoutes from '../../../server/api/inspections/collab';
@@ -192,6 +193,20 @@ describe('collab WS route — auth gate', () => {
         const res = await insp.app.request('/api/inspections/insp1/collab/ws', { headers: { Upgrade: 'websocket' } });
         expect(res.status).toBe(200);
         expect(insp.mockDo.idFromName).toHaveBeenCalled();
+    });
+
+    it('forwards the generation the client reports as x-collab-gen, and a malformed one as a mismatch', async () => {
+        const { app, mockDo } = buildApp();
+        const header = async (query: string, extra: Record<string, string> = {}): Promise<string | null> => {
+            mockDo.stubFetch.mockClear();
+            await app.request(`/api/inspections/insp1/collab/ws${query}`, { headers: { Upgrade: 'websocket', ...extra } });
+            const sent = mockDo.stubFetch.mock.calls[0]?.[0] as Request;
+            return sent.headers.get(GEN_HEADER);
+        };
+        expect(await header('?gen=gen-abcdef-01')).toBe('gen-abcdef-01');
+        expect(await header('?gen=bad%20value!')).toBe('invalid'); // literal on purpose: pins the wire value the object treats as a mismatch
+        expect(await header('')).toBeNull();
+        expect(await header('', { [GEN_HEADER]: 'gen-abcdef-01' })).toBeNull(); // never copied from the client's own headers
     });
 
     // ── (a) No auth ──────────────────────────────────────────────────────────

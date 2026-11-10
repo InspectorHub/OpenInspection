@@ -15,6 +15,11 @@ export interface InvoiceData {
   inspectorName: string;
   lineItems: { description: string; amount: number }[];
   total: number;
+  /**
+   * What the payer is still asked for, in dollars: the total minus what the payment ledger has
+   * received. Absent from an older server, where the whole total is the amount due.
+   */
+  balanceDue?: number | undefined;
   // Phase B — the invoice's snapshot currency (ISO 4217). Optional so callers that
   // predate the snapshot (or build a bare estimate) fall back to USD in `money()`.
   currency?: string;

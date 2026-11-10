@@ -2940,7 +2940,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/usage.ts · 5 columns · primary key `tenant_id, metric, period_key`</sub>
 
-> Per-tenant usage meter (Phase 1, SaaS-only — inert in standalone). Flows (sms/email/sms_byo/email_byo/inspections): period_key = 'YYYY-MM', except 'inspections' which uses the STOCK_PERIOD sentinel ('lifetime') since it is a running lifetime total, not a monthly flow.
+> Per-tenant usage meter (Phase 1, SaaS-only — inert in standalone). On a capped plan the 'inspections' row (period_key 'lifetime') holds this UTC month's count, not a lifetime total.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|

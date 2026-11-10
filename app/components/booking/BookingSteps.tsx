@@ -1,4 +1,4 @@
-import type { CompanyProfile } from "./booking-constants";
+import { isFullFeeDeposit, type CompanyProfile } from "./booking-constants";
 import { PublicAddressAutocomplete, type PublicAddressSuggestion } from "./PublicAddressAutocomplete";
 import { BookingDepositPanel } from "./BookingDepositPanel";
 import { BookingSummaryCard } from "./BookingSummaryCard";
@@ -59,6 +59,11 @@ export function ServicesStep({
         <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">{m.booking_step_services_heading()}</h2>
         <p className="text-[13px] text-ih-fg-3">{m.booking_step_services_subtitle()}</p>
       </div>
+      {profile.services.length === 0 && (
+        <p role="status" className="px-4 py-3 rounded-md border border-ih-border bg-ih-bg-muted text-[13px] text-ih-fg-2 leading-relaxed">
+          {m.booking_step_services_none({ company: profile.company })}
+        </p>
+      )}
       <div className="space-y-2">
         {profile.services.map((svc) => {
           const selected = selectedServices.has(svc.id);
@@ -106,7 +111,7 @@ export function ServicesStep({
       )}
       {selectedServices.size > 0 && depositQuoteCents > 0 && (
         <p className="px-4 text-[12px] text-ih-fg-3 leading-relaxed">
-          {m.booking_deposit_quote_note({
+          {(isFullFeeDeposit(depositQuoteCents, totalPrice) ? m.booking_deposit_quote_note_full : m.booking_deposit_quote_note)({
             amount: formatCurrency(depositQuoteCents, { locale, currency }),
           })}
         </p>
@@ -131,6 +136,7 @@ export function ConfirmStep({
   clientEmail,
   depositQuoteCents,
   depositDueCents,
+  paymentsAvailable,
   bookedInspectionId,
   currency,
   companyName,
@@ -152,11 +158,16 @@ export function ConfirmStep({
   depositQuoteCents: number;
   /** What the SERVER froze, once the booking exists. Null before then. */
   depositDueCents: number | null;
+  /** Whether a card can be taken. False: an owed deposit is stated, not offered for payment. */
+  paymentsAvailable: boolean;
   bookedInspectionId: string | null;
   currency: string;
   companyName: string;
 }) {
   const locale = useDisplayLocale();
+  // The amount frozen on the order is what is charged; whole-fee wording keys
+  // off that, falling back to the quote before the booking exists.
+  const fullFee = isFullFeeDeposit(depositDueCents ?? depositQuoteCents, totalPrice);
   const summary = (
     <BookingSummaryCard
       address={address}
@@ -201,12 +212,21 @@ export function ConfirmStep({
           {/* Only once the server has said what it froze, and only if it froze
               anything. A workspace with no deposit sees no payment step. */}
           {bookedInspectionId && depositDueCents != null && depositDueCents > 0 && (
-            <BookingDepositPanel
-              inspectionId={bookedInspectionId}
-              depositCents={depositDueCents}
-              currency={currency}
-              companyName={companyName}
-            />
+            paymentsAvailable ? (
+              <BookingDepositPanel
+                inspectionId={bookedInspectionId}
+                depositCents={depositDueCents}
+                fullFee={fullFee}
+                currency={currency}
+                companyName={companyName}
+              />
+            ) : (
+              // The booking is saved and the amount is recorded as owed. There is
+              // nothing to press, so there is nothing to fail: the company follows up.
+              <p className="text-[13px] text-ih-fg-2 text-center" data-testid="booking-deposit-contact">
+                {(fullFee ? m.booking_deposit_contact_note_full : m.booking_deposit_contact_note)({ company: companyName })}
+              </p>
+            )
           )}
         </div>
       ) : (
@@ -218,7 +238,7 @@ export function ConfirmStep({
           {summary}
           {depositQuoteCents > 0 && (
             <p className="text-[12px] text-ih-fg-3 leading-relaxed">
-              {m.booking_deposit_confirm_note({
+              {(isFullFeeDeposit(depositQuoteCents, totalPrice) ? m.booking_deposit_confirm_note_full : m.booking_deposit_confirm_note)({
                 amount: formatCurrency(depositQuoteCents, { locale, currency }),
               })}
             </p>

@@ -85,6 +85,7 @@ export function useFindings(
     cloneLast: () => false,
     batchSetRating: () => 0,
     addPhotoToItem: noop,
+    addVideoToItem: () => false,
     addPhotoToDefect: noop,
     orderPhotoBatch: noop,
     getPhotoCount: (itemId: string) => {

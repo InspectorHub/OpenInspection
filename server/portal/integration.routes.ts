@@ -22,17 +22,13 @@ import { migrationSourceDownloadHandler } from './migration-source-download';
 import { tenantsByEmailHandler } from './tenants-by-email';
 import { fileDiscoveryObjectionHandler, withdrawDiscoveryObjectionHandler } from './discovery-objection';
 import { getSeatUsage } from '../features/seat-quota/usage';
+import { purgeDurableObjectsFromEnv } from '../lib/collab/collab-namespaces';
 
 const api = new Hono<HonoConfig>();
 
 /** Body for POST /sync-redrive. Empty/omitted `ids` re-drives every failed row. */
 const SyncRedriveSchema = z.object({
     ids: z.array(z.string()).optional(),
-});
-
-/** Body for the one-object cleanup used when a report row is already gone. */
-const InspectionDocPurgeSchema = z.object({
-    durableObjectId: z.string().regex(/^[0-9a-f]{64}$/i),
 });
 
 /**
@@ -122,61 +118,13 @@ api.post('/tenants/:slug/purge', requireServiceBinding, async (c) => {
     const { TenantPurgeService } = await import('../services/tenant-purge.service');
     // Platform sender (`undefined` tenant): the tenant's own email config is one
     // of the things being destroyed, and this is our message about our failure.
-    const svc = new TenantPurgeService(c.env.DB, c.env.PHOTOS, c.env.TENANT_CACHE, { INSPECTION_DOC: c.env.INSPECTION_DOC, TENANT_PRESENCE: c.env.TENANT_PRESENCE }, await buildTenantEmailService(c.env, undefined));
+    const svc = new TenantPurgeService(c.env.DB, c.env.PHOTOS, c.env.TENANT_CACHE, purgeDurableObjectsFromEnv(c.env), await buildTenantEmailService(c.env, undefined));
     try {
         const result = await svc.purge(t.id as string);
         return c.json({ success: true, data: result });
     } catch (error: unknown) {
         logger.error('Tenant purge failed', { slug }, error instanceof Error ? error : undefined);
         return c.json({ success: false, error: { message: 'Purge failed' } }, 500);
-    }
-});
-
-/**
- * POST /api/platform/tenants/:slug/inspection-doc/purge
- * Clear one orphaned InspectionDocDO by its Cloudflare durable object id.
- *
- * This is deliberately narrower than tenant purge: it does not touch D1, R2,
- * KV, or any other Durable Object. The tenant check confirms the caller named
- * a real tenant; the exact DO id comes from Workers Logs because an id cannot
- * be reversed into the report name after that report has been deleted.
- */
-api.post('/tenants/:slug/inspection-doc/purge', requireServiceBinding, async (c) => {
-    const slug = c.req.param('slug');
-    if (!slug) return c.json({ success: false, error: { message: 'Tenant slug is required' } }, 400);
-    let body: unknown;
-    try {
-        body = await c.req.json();
-    } catch {
-        return c.json({ success: false, error: { message: 'Invalid input' } }, 400);
-    }
-    const parsed = InspectionDocPurgeSchema.safeParse(body);
-    if (!parsed.success) {
-        return c.json({ success: false, error: { message: 'Invalid input' } }, 400);
-    }
-
-    const d = drizzle(c.env.DB);
-    const t = await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).get();
-    if (!t) return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
-
-    const ns = c.env.INSPECTION_DOC;
-    if (!ns) return c.json({ success: false, error: { message: 'Inspection documents are not enabled' } }, 503);
-
-    try {
-        const stub = ns.get(ns.idFromString(parsed.data.durableObjectId));
-        const response = await stub.fetch('https://do/purge', { method: 'POST' });
-        if (!response.ok) throw new Error(`purge returned ${response.status}`);
-        return c.json({
-            success: true,
-            data: { purged: true, durableObjectId: parsed.data.durableObjectId },
-        });
-    } catch (error: unknown) {
-        logger.error(
-            'Inspection document purge failed',
-            { slug, durableObjectId: parsed.data.durableObjectId },
-            error instanceof Error ? error : undefined,
-        );
-        return c.json({ success: false, error: { message: 'Purge failed' } }, 502);
     }
 });
 

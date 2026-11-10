@@ -37,7 +37,8 @@ const DESCRIPTIONS: Record<keyof DeploymentProfile, string> = {
         'The single tenant every request resolves to. Standalone has exactly one; saas resolves a tenant per request.',
     hasBilling: 'Subscription billing surfaces exist (Settings → Billing).',
     hasSeatQuota: 'The number of team members is capped by a plan.',
-    hasUsageQuota: 'Metered usage is capped by a plan.',
+    hasUsageQuota:
+        'Metered usage is capped by a plan. On a capped plan, new inspections and built-in emails are counted per calendar month in UTC: the allowance renews at 00:00 UTC on the 1st, an inspection counts for the month it was created in (deleting one created this month returns its place, deleting an older one does not), and an email counts for the month it was sent in. Sending from your own email account is not counted. A standalone deployment has no such limits.',
     billingPortalUrl: 'Where the browser is sent to manage a subscription.',
     loginRedirectBase:
         'Where the browser is sent to sign in. Standalone serves its own login form; saas bounces to the portal and `POST /api/auth/login` returns 410.',

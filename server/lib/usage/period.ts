@@ -5,6 +5,22 @@ export type UsageMetric =
     | 'ai_assist'    | 'ai_assist_byo';
 /** Calendar-month bucket key, UTC. Flows (sms/email) use this. */
 export function currentPeriodKey(now: Date): string { return now.toISOString().slice(0, 7); }
+
+/** 00:00:00.000 UTC on the first day of `now`'s calendar month, in epoch ms. The Free plan's monthly
+ *  allowance counts inspections created at or after this instant. */
+export function monthStartUtcMs(now: Date): number {
+    const year = now.getUTCFullYear();
+    const month = now.getUTCMonth();
+    return Date.UTC(year, month, 1);
+}
+
+/** 00:00:00.000 UTC on the first day of the month AFTER `now`'s: when the monthly allowance renews.
+ *  `Date.UTC` rolls month 12 into January of the next year. */
+export function nextMonthStartUtcMs(now: Date): number {
+    const year = now.getUTCFullYear();
+    const month = now.getUTCMonth();
+    return Date.UTC(year, month + 1, 1);
+}
 /** Sentinel period for stock metrics (r2_bytes), overwritten rather than summed. */
 export const STOCK_PERIOD = 'lifetime';
 

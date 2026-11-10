@@ -697,22 +697,28 @@ Fetches the inspector's Google Calendar events for the next 30 days and inserts 
 ### Admin
 
 #### `GET /api/admin/export`
-Export all tenant data as JSON for backup or migration.
+Export a company's inspections, templates, agreement templates, inspection results, agreement signing requests and per-signer records as JSON. This is a data download. It does not include photos, report PDFs, settings, invoices or team members, and the JSON export is not re-imported. Contacts, members and inspections are also available as CSV (`GET /api/data/export/contacts`, `/members`, `/inspections`). The CSV downloads are for your own records; the import wizard reads its own templates.
 
 **Roles:** `owner`, `manager`
 
 **Response:**
 ```json
 {
-  "exportedAt": "2025-06-15T12:00:00.000Z",
-  "tenantId": "tenant-id",
-  "inspections": [...],
-  "inspectionResults": [...],
-  "templates": [...],
-  "agreements": [...],
-  "inspectionAgreements": [...]
+  "success": true,
+  "data": {
+    "exportedAt": "2025-06-15T12:00:00.000Z",
+    "tenantId": "tenant-id",
+    "inspections": [...],
+    "templates": [...],
+    "agreements": [...],
+    "inspectionResults": [...],
+    "agreementRequests": [...],
+    "agreementSigners": [...]
+  }
 }
 ```
+
+Signing-request and signer rows leave out their access-token columns.
 
 ---
 

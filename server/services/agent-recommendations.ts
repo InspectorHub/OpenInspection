@@ -74,7 +74,7 @@ function flattenPhotos(photos: DefectState['photos']): string[] {
     const out: string[] = [];
     for (const p of photos) {
         if (typeof p === 'string') out.push(p);
-        else if (p && typeof p === 'object' && typeof p.key === 'string') out.push(p.key);
+        else if (p && typeof p === 'object' && typeof p.key === 'string' && p.mediaType !== 'video') out.push(p.key); // a video has no file key
     }
     return out;
 }

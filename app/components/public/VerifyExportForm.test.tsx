@@ -240,7 +240,7 @@ describe("VerifyExportForm", () => {
       document.head.querySelectorAll("script").forEach((el) => el.remove());
       const second = mountWithKey();
       const script = document.head.querySelector<HTMLScriptElement>('script[src*="turnstile"]')!;
-      await act(async () => { script.onerror?.(new Event("error")); });
+      await act(async () => { script.dispatchEvent(new Event("error")); });
       expect(second.container.textContent).toContain("The verification check could not load.");
       expect(fetchMock).not.toHaveBeenCalled();
     });

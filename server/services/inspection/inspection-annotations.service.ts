@@ -8,22 +8,11 @@ import type { ScopedDB } from '../../lib/db/scoped';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
 import { InspectionSubService } from './base';
 import type { InspectionService } from '../inspection.service';
-import { r2Keys } from '../../lib/r2-keys';
+import { r2Keys, photoMediaId as mediaIdFromKey } from '../../lib/r2-keys';
 import { assertPhotoSize } from '../../lib/media/store-photo';
 
-/**
- * Extract the mediaId from a new-convention R2 photo key
- * (`{t}/inspections/{i}/photos/{mediaId}.{ext}`). Returns null when the key
- * follows the old ad-hoc shape so callers can fall back gracefully.
- */
-function mediaIdFromKey(key: string): string | null {
-    // New convention: …/photos/{mediaId}.{ext}
-    // Stem capture disallows dots so that derivative keys (e.g. MED.annotated.png)
-    // return null rather than a corrupted stem like "MED.annotated".
-    const m = /\/photos\/([^/.]+)\.[^/.]+$/.exec(key);
-    if (m) return m[1];
-    return null;
-}
+/** A short unique suffix for a baked derivative's key: every bake is a new object (see `r2Keys.inspectionPhotoAnnotated`). */
+const newRevision = (): string => crypto.randomUUID().slice(0, 8);
 
 /**
  * Media annotation + crop derivative writes: PhotoStudio annotation save,
@@ -125,7 +114,7 @@ export class InspectionAnnotationsService extends InspectionSubService {
         interface ResultEntry {
             rating?: string;
             notes?: string;
-            photos?: Array<{ key: string; annotatedKey?: string; annotationsJson?: string }>;
+            photos?: Array<{ key: string; croppedKey?: string; annotatedKey?: string; annotationsJson?: string }>;
         }
         const data: Record<string, ResultEntry> = (typeof row?.data === 'string'
             ? JSON.parse(row.data)
@@ -138,10 +127,11 @@ export class InspectionAnnotationsService extends InspectionSubService {
         // Co-locate the annotated derivative with its source photo by reusing
         // the same mediaId. Fall back to a new UUID only for old-shape keys.
         const sourceMediaId = mediaIdFromKey(photos[photoIndex].key) ?? crypto.randomUUID();
-        const annotatedKey = r2Keys.inspectionPhotoAnnotated(tenantId, inspectionId, sourceMediaId);
+        const annotatedKey = r2Keys.inspectionPhotoAnnotated(tenantId, inspectionId, sourceMediaId, newRevision());
         await this.r2.put(annotatedKey, compositeBytes, {
             httpMetadata: { contentType: 'image/png' }
         });
+        await this.followCover(inspectionId, tenantId, photos[photoIndex], annotatedKey, false);
 
         // #181 — collab ON: the R2 object is the authoritative binary; the doc
         // owns the JSON metadata. Skip the results.data write entirely.
@@ -190,10 +180,45 @@ export class InspectionAnnotationsService extends InspectionSubService {
         const coverImageKey = r2Keys.inspectionCover(tenantId, inspectionId, crypto.randomUUID());
         await this.r2.put(coverImageKey, bakedBytes, { httpMetadata: { contentType: 'image/jpeg' } });
         const db = this.getDrizzle();
+        // Unconditional on purpose: choosing a cover replaces whatever the cover was. The only race is the photo being
+        // removed between the check above and this write, which leaves the same dangling cover a delete leaves anyway.
         await db.update(inspections)
             .set({ coverPhotoId: sourceKey, coverImageKey, coverCrop: crop })
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
         return { coverImageKey };
+    }
+
+    /**
+     * The report cover names a photo by the key it shows. A derivative baked again gets a new key, so a cover that
+     * belonged to this photo moves to the new one (it used to follow by being overwritten). A cover that names any
+     * other photo is left alone.
+     *
+     * "Belongs to this photo" is any key of the photo: its original, the cropped and annotated files its entry names,
+     * or any other derivative in its family (`{mediaId}.annotated.*` / `{mediaId}.cropped.*`). The entry can lag behind
+     * under collaborative editing (the results row is written late), so two quick bakes would otherwise leave the second
+     * one looking for a key the first had already replaced.
+     *
+     * The baked cover file (`coverImageKey`) is cleared either way: it is made on the client from the old image and the
+     * report prefers it (`resolveCoverUrl`), so it would keep showing the old frame or the photo without the new strokes;
+     * with it gone the report cover is the photo as the editor shows it. `frameChanged` (a crop) also clears the stored cover
+     * crop, a rectangle in the old frame. An annotation keeps the frame, so the rectangle stays and "Adjust cover" reopens on
+     * it; saving there bakes the cover again, with the strokes. (The server cannot re-bake: the crop is rendered on the client.)
+     */
+    private async followCover(inspectionId: string, tenantId: string, entry: PhotoEntry, to: string, frameChanged: boolean): Promise<void> {
+        const db = this.getDrizzle();
+        const row = await db.select({ cover: inspections.coverPhotoId }).from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId))).get();
+        const cover = row?.cover;
+        if (!cover || cover === to) return;
+        const mediaId = mediaIdFromKey(entry.key);
+        const family = mediaId ? r2Keys.inspectionPhotosPrefix(tenantId, inspectionId) + mediaId : null;
+        const belongs = [entry.key, entry.croppedKey, entry.annotatedKey].includes(cover)
+            || (family !== null && (cover.startsWith(`${family}.annotated.`) || cover.startsWith(`${family}.cropped.`)));
+        if (!belongs) return;
+        // Compare-and-set: a cover changed meanwhile by someone else is left as they set it.
+        await db.update(inspections)
+            .set({ coverPhotoId: to, coverImageKey: null, ...(frameChanged ? { coverCrop: null } : {}) })
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId), eq(inspections.coverPhotoId, cover)));
     }
 
     /**
@@ -239,8 +264,9 @@ export class InspectionAnnotationsService extends InspectionSubService {
         // Co-locate the cropped derivative with its source photo by reusing
         // the same mediaId. Fall back to a new UUID only for old-shape keys.
         const sourceMediaId = mediaIdFromKey(photos[photoIndex].key) ?? crypto.randomUUID();
-        const croppedKey = r2Keys.inspectionPhotoCropped(tenantId, inspectionId, sourceMediaId);
+        const croppedKey = r2Keys.inspectionPhotoCropped(tenantId, inspectionId, sourceMediaId, newRevision());
         await this.r2.put(croppedKey, bakedBytes, { httpMetadata: { contentType: 'image/jpeg' } });
+        await this.followCover(inspectionId, tenantId, photos[photoIndex], croppedKey, true);
 
         // #181 — collab ON: the R2 object is the authoritative binary; the doc
         // owns the JSON metadata. Skip the results.data write entirely.

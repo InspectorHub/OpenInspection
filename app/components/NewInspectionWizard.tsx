@@ -80,6 +80,7 @@ export function NewInspectionWizard({
   services: serviceCatalog = [],
   teamMembers = [],
   quotaExceededAtOpen,
+  quotaAllowance,
 }: {
   open: boolean;
   onClose: () => void;
@@ -88,19 +89,15 @@ export function NewInspectionWizard({
   /** B-21 — when empty (solo workspace) the Team step is skipped entirely. */
   teamMembers?: WizardTeamMember[];
   /**
-   * Optional at-open free-tier quota gate. Callers that already load usage
-   * data (the `/inspections` route, which mounts the QuotaBanner from the
-   * same loader payload) pass this so a tenant already at the inspection cap
-   * sees the upgrade panel the instant the wizard opens, instead of walking
-   * all four steps and hitting the 402 QUOTA_EXHAUSTED on Create. Mirrors the
-   * tri-state shape of the internal 402-driven `quotaExceeded` state below:
-   * `undefined` = no gate (under cap, standalone/paid-saas caps==null, or a
-   * mount with no quota context, e.g. a future command-palette-only entry
-   * point) → normal wizard, server 402 remains the authoritative backstop;
-   * `null` = at cap with no configured billing portal (CTA hidden); a string
-   * is the billingPortalUrl for the "Subscribe" CTA.
+   * Optional at-open free-tier quota gate: a tenant already at the monthly
+   * inspection cap sees the panel the instant the wizard opens, instead of
+   * walking all four steps and hitting the 402 QUOTA_EXHAUSTED on Create.
+   * Tri-state, like the internal 402-driven `quotaExceeded` state below:
+   * `undefined` = no gate (the server 402 stays the backstop); `null` = at cap
+   * with no billing portal (CTA hidden); a string is the billingPortalUrl.
    */
   quotaExceededAtOpen?: string | null;
+  quotaAllowance?: { cap: number; resetsAt: string | null }; // month cap + ISO renewal, for the cap panel
 }) {
   // portal #105 — the create submit is guarded, not bare: one in-flight submit
   // at a time, carrying an idempotency key the server dedupes on. A tenant
@@ -175,6 +172,7 @@ export function NewInspectionWizard({
   // of silently closing. `undefined` = not exceeded; `null` = exceeded with no
   // configured billing portal (CTA hidden); a string is the billingPortalUrl.
   const [quotaExceeded, setQuotaExceeded] = useState<string | null | undefined>(undefined);
+  const [quotaWindow, setQuotaWindow] = useState(quotaAllowance);
 
   // Drop a service's price override (used when unselecting, clearing the input,
   // or when the entered price matches the catalog price = "no override").
@@ -262,6 +260,7 @@ export function NewInspectionWizard({
     // background loader revalidation stomp on a 402 that just set
     // quotaExceeded to a different value via the submit-fetcher effect below.
     setQuotaExceeded(quotaExceededAtOpen);
+    setQuotaWindow(quotaAllowance);
   }, [open]);
 
   // Watch the create-submit fetcher for a QUOTA_EXHAUSTED (402) rejection.
@@ -275,11 +274,12 @@ export function NewInspectionWizard({
     const data = fetcher.data as {
       intent?: string;
       ok?: boolean;
-      error?: { code?: string; details?: { billingPortalUrl?: string | null } };
+      error?: { code?: string; details?: { billingPortalUrl?: string | null; cap?: number; resetsAt?: string } };
     };
     if (data.intent !== "create") return;
     if (data.ok === false && data.error?.code === "QUOTA_EXHAUSTED") {
       setQuotaExceeded(data.error.details?.billingPortalUrl ?? null);
+      setQuotaWindow({ cap: data.error.details?.cap ?? 0, resetsAt: data.error.details?.resetsAt ?? null });
       return;
     }
     onClose();
@@ -449,7 +449,7 @@ export function NewInspectionWizard({
         <Breadcrumb items={[{ label: m.nav_item_inspections(), href: "/inspections" }, { label: m.new_inspection_title() }]} />
         <div className="mt-1"><PageHeader title={m.new_inspection_title()} /></div>
         <div className="mt-ih-list max-w-[720px] bg-ih-bg-card rounded-xl border border-ih-border">
-          <QuotaExceededPanel billingPortalUrl={quotaExceeded} onClose={onClose} />
+          <QuotaExceededPanel billingPortalUrl={quotaExceeded} cap={quotaWindow?.cap ?? 0} resetsAt={quotaWindow?.resetsAt ?? null} onClose={onClose} />
         </div>
       </div>
     );

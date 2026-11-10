@@ -1,8 +1,11 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type * as Y from "yjs";
+import { photoStudioTargetAt, resolvePhotoIndex, type PhotoStudioItem } from "../components/media-studio/photo-studio-target";
+import { useFollowCover } from "./useFollowCover";
 import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "../components/media-studio/photo-display-key";
 import type { MediaAction } from "../components/media-studio/MediaViewer";
 import { streamThumbUrl } from "../components/media-studio/PosterPicker";
+import type { StripVideoRef } from "../components/media-studio/ItemPhotoStrip";
 import type { GalleryPhoto } from "../shared/inspection-media";
 import { findingKey } from "./findings/shared";
 import type { PhotoCrop } from "../components/media-studio/PhotoCropper";
@@ -22,6 +25,7 @@ import { useFieldDataSource, usePhotoUrlVersion } from "../context";
 import { freeVideoMedia, videoEntryIdentity } from "../lib/video-media-delete";
 import { removeMediaBy as bindingRemoveMediaBy } from "../shared/results-doc-media";
 import { m } from "../i18n";
+import { mediaRef } from "../shared/media-ref";
 import { enqueueMedia } from "../collab/media-upload-queue";
 import type { PendingMediaRecord } from "../media-types";
 import type { PhotoEntry } from "../shared/results-doc.types";
@@ -63,6 +67,7 @@ export function usePhotoOps(ctx: {
   setPhotoStudioIndex: (v: number) => void;
   setPhotoStudioTotal: (v: number) => void;
   setPhotoStudioOpen: (v: boolean) => void;
+  setPhotoStudioItem?: (v: PhotoStudioItem | null) => void;
 }) {
   const {
     state,
@@ -75,6 +80,7 @@ export function usePhotoOps(ctx: {
     setPhotoStudioIndex,
     setPhotoStudioTotal,
     setPhotoStudioOpen,
+    setPhotoStudioItem,
   } = ctx;
   const dataSource = useFieldDataSource();
   const { urls } = dataSource, photoUrlVersion = usePhotoUrlVersion();
@@ -86,16 +92,15 @@ export function usePhotoOps(ctx: {
 
   // Media Studio — gallery "Set as cover" opens an editor-level CoverCropper.
   const [galleryCropSource, setGalleryCropSource] = useState<{ key: string; url: string } | null>(null);
-  // The cover crop saved during THIS editor session, which the cropper re-opens
-  // on in preference to the row. `useInspectionState` freezes `inspection` at
-  // mount and the route skips revalidation, so the row's `coverCrop` describes
-  // the inspection as it was when the page loaded — recropping twice without a
-  // reload would otherwise re-open on the frame the reader already replaced.
+  // The cover crop saved during THIS editor session, which the cropper re-opens on in preference to the row: the
+  // route skips revalidation, so the row's `coverCrop` is the one from page load and a second recrop would reopen on
+  // the frame the reader already replaced.
   const [sessionCoverCrop, setSessionCoverCrop] = useState<{ key: string; crop: StoredCoverCrop } | null>(null);
+  const followCover = useFollowCover(state.setInspection, setSessionCoverCrop);
   // Plan 4 (Task 8) — per-photo crop. `photoCropTarget` opens the PhotoCropper for
   // an item/defect photo (cropping ALWAYS re-derives from the ORIGINAL key).
   const [photoCropTarget, setPhotoCropTarget] = useState<{
-    itemId: string; photoIndex: number; sourceUrl: string; hasAnnotation: boolean; sectionId?: string;
+    itemId: string; photoIndex: number; sourceUrl: string; hasAnnotation: boolean; sectionId?: string; expectOriginalKey?: string | undefined;
   } | null>(null);
   // Plan 4 — re-crop warning modal: a crop that would discard an existing
   // annotation defers behind a confirm (no native window.confirm).
@@ -110,8 +115,13 @@ export function usePhotoOps(ctx: {
 
   /* Plan 7 — resolve a Stream poster thumbnail URL for a video strip thumb. */
   const videoPosterUrl = useCallback(
-    (streamUid: string, posterPct?: number): string | null => {
-      if (!streamCustomerSubdomain) return null;
+    ({ provider, streamUid, mediaId, posterPct }: StripVideoRef): string | null => {
+      if (provider === "r2" || (!streamUid && mediaId)) {
+        // The same derivation the player uses: the host's address for the clip, plus /poster. Null on a host with no such route.
+        const object = mediaId ? urls.videoObject(state.inspection.id, mediaId) : null;
+        return object ? `${object}/poster` : null;
+      }
+      if (!streamCustomerSubdomain || !streamUid) return null;
       // poster sec is unknown without duration here; the thumbnail endpoint accepts
       // a pct-derived time only when we know duration — fall back to time=0s, which
       // Stream maps to the configured thumbnailTimestampPct poster anyway.
@@ -119,7 +129,7 @@ export function usePhotoOps(ctx: {
       void posterPct;
       return streamThumbUrl(streamCustomerSubdomain, streamUid, sec);
     },
-    [streamCustomerSubdomain],
+    [streamCustomerSubdomain, urls, state.inspection.id],
   );
 
   /* Plan 7 — PosterPicker target (a video entry being re-postered). */
@@ -136,8 +146,8 @@ export function usePhotoOps(ctx: {
   type ItemCrop = { aspect: string; orientation: "landscape" | "portrait"; x: number; y: number; width: number; height: number };
   type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string; mediaType?: "photo" | "video"; provider?: "stream" | "r2"; streamUid?: string; mediaId?: string; posterPct?: number; durationSec?: number; pendingUpload?: boolean; pendingId?: string; pendingKind?: "photo" | "crop" | "annotate" };
   const getItemPhotos = useCallback(
-    (itemId: string): ItemPhoto[] => {
-      const r = findings.getResult(itemId, state.sectionIdForItem(itemId) ?? undefined);
+    (itemId: string, sectionId?: string): ItemPhoto[] => {
+      const r = findings.getResult(itemId, sectionId || state.sectionIdForItem(itemId) || undefined);
       return ((r.photos as ItemPhoto[] | undefined) ?? []);
     },
     [findings, state.sectionIdForItem],
@@ -322,7 +332,7 @@ export function usePhotoOps(ctx: {
    * resolvable section (defensive — should not happen for a real template item). */
   const docFindingKey = useCallback(
     (itemId: string, sectionIdOverride?: string): string | null => {
-      const sid = sectionIdOverride ?? state.sectionIdForItem(itemId);
+      const sid = sectionIdOverride || state.sectionIdForItem(itemId);
       return sid ? findingKey(activeUnitId, sid, itemId) : null;
     },
     [state.sectionIdForItem, activeUnitId],
@@ -334,9 +344,9 @@ export function usePhotoOps(ctx: {
   const onReorderPhotos = useCallback(
     (itemId: string, order: string[]) => {
       patchItemPhotos(itemId, (photos) => {
-        const byKey = new Map(photos.map((p) => [p.key, p] as const));
+        const byKey = new Map(photos.map((p) => [mediaRef(p), p] as const));
         const reordered = order.map((k) => byKey.get(k)).filter((p): p is ItemPhoto => !!p);
-        return reordered.length === photos.length ? reordered : photos;
+        return reordered.length === photos.length && photos.every((p) => mediaRef(p)) ? reordered : photos;
       });
       if (collabDoc) {
         const fk = docFindingKey(itemId, state.currentSection?.id);
@@ -350,10 +360,11 @@ export function usePhotoOps(ctx: {
    * (indices drift as elements are removed), so resolve each index→key from the
    * PRE-mutation snapshot and remove from the doc. */
   const onBulkDetachPhotos = useCallback(
-    (itemId: string, indices: number[]) => {
+    (itemId: string, selected: number[]) => {
       const sectionId = state.currentSection?.id;
       const fk = docFindingKey(itemId, sectionId);
       const snapshot = getItemPhotos(itemId);
+      const indices = selected.filter((i) => snapshot[i]?.mediaType !== "video"); // clips are not bulk-detached
       const keys = indices
         .map((i) => snapshot[i]?.key)
         .filter((k): k is string => !!k);
@@ -382,11 +393,12 @@ export function usePhotoOps(ctx: {
    * `key`, not index, so resolve index→key from the PRE-mutation snapshot and
    * move each in the doc. The source section is the current one. */
   const onBulkMovePhotos = useCallback(
-    (fromItemId: string, indices: number[], to: { itemId: string; sectionId?: string }) => {
+    (fromItemId: string, selected: number[], to: { itemId: string; sectionId?: string }) => {
       const fromSectionId = state.currentSection?.id;
       const fromFk = docFindingKey(fromItemId, fromSectionId);
       const toFk = docFindingKey(to.itemId, to.sectionId);
       const snapshot = getItemPhotos(fromItemId);
+      const indices = selected.filter((i) => snapshot[i]?.mediaType !== "video"); // clips are not bulk-moved
       const keys = indices
         .map((i) => snapshot[i]?.key)
         .filter((k): k is string => !!k);
@@ -401,11 +413,11 @@ export function usePhotoOps(ctx: {
     (action: MediaAction, photo: GalleryPhoto) => {
       const itemId = photo.itemId;
       const idx = photo.photoIndex;
-      const sectionId = state.currentSection?.id;
+      const sectionId = photo.sectionId || state.currentSection?.id;
       if (!itemId || idx == null) return;
       // Plan 7 — video branch. A video entry exposes only poster · cover · caption
       // · delete (the MediaViewer toolbar enforces this). Poster opens the picker;
-      // delete removes the Stream video + detaches the entry; cover/caption fall
+      // delete removes the Stream video + detaches the entry; cover falls
       // through to the shared handlers (cover stores the poster image reference).
       if (photo.mediaType === "video") {
         if (action === "poster" && photo.streamUid) {
@@ -433,7 +445,7 @@ export function usePhotoOps(ctx: {
           }
           return;
         }
-        // cover / caption fall through to the photo handlers below (they address by
+        // cover falls through to the photo handler below (it addresses by
         // itemId + photoIndex, which is valid for video entries too).
       }
       if (action === "cover") {
@@ -442,15 +454,11 @@ export function usePhotoOps(ctx: {
         return;
       }
       if (action === "annotate") {
-        // Plan 4 sequential layering: annotate ON TOP of the crop. The annotate
-        // base is croppedKey || originalKey — NEVER annotatedKey (that would
-        // double-bake the existing annotation).
-        const annotateBaseKey = photo.croppedKey || photo.originalKey || photo.key;
-        setPhotoStudioUrl(urls.photo(state.inspection.id, annotateBaseKey, "original"));
-        setPhotoStudioKey(photo.key);
-        setPhotoStudioIndex(idx);
-        setPhotoStudioTotal(0);
-        setPhotoStudioOpen(true);
+        const target = photoStudioTargetAt(getItemPhotos(itemId, sectionId), idx, String(state.inspection.id), (id, key, size) => urls.photo(id, key, size), photo.originalKey);
+        if (!target.url) { dataSource.notify(m.editor_photo_annotate_unavailable(), "error"); return; }
+        setPhotoStudioUrl(target.url); setPhotoStudioKey(target.key);
+        setPhotoStudioIndex(target.index); setPhotoStudioTotal(target.total);
+        setPhotoStudioItem?.({ itemId, sectionId, originalKey: target.originalKey ?? undefined }); setPhotoStudioOpen(true);
         return;
       }
       if (action === "crop") {
@@ -465,6 +473,7 @@ export function usePhotoOps(ctx: {
           sourceUrl: urls.photo(state.inspection.id, originalKey, "original"),
           hasAnnotation: !!photo.annotated,
           sectionId,
+          expectOriginalKey: photo.originalKey || undefined,
         });
         return;
       }
@@ -478,18 +487,14 @@ export function usePhotoOps(ctx: {
         return;
       }
       if (action === "delete") {
-        patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
-        if (collabDoc) {
-          const fk = docFindingKey(itemId, sectionId);
-          const docKey = photo.originalKey || photo.key;
-          if (fk && docKey) bindingRemovePhoto(collabDoc, fk, docKey);
-        }
+        // Confirmed later, the strip may have changed: address the photo by key like the doc; gone = no-op.
+        const docKey = photo.originalKey || photo.key, fk = collabDoc ? docFindingKey(itemId, sectionId) : null;
+        patchItemPhotos(itemId, (photos) => { const at = photos.findIndex((p) => p.key === docKey); return at < 0 ? photos : photos.filter((_, i) => i !== at); });
+        if (collabDoc && fk && docKey) bindingRemovePhoto(collabDoc, fk, docKey);
         return;
       }
-      // rotate / caption — routed here but not yet implemented (not Plan 4).
-      // TODO rotate/caption on item photos.
     },
-    [patchItemPhotos, state.inspection.id, state.currentSection, collabDoc, docFindingKey, dataSource, urls],
+    [patchItemPhotos, getItemPhotos, state.inspection.id, state.currentSection, collabDoc, docFindingKey, dataSource, urls],
   );
 
   /* Plan 4 (Task 8/9) — persist a baked crop for the targeted photo. When online,
@@ -498,17 +503,17 @@ export function usePhotoOps(ctx: {
    * the strip immediately reflects the new crop with any annotation cleared.
    * `onChecked` runs once the image has been checked: the caller closes its dialog only when told it may. */
   const performPhotoCropSave = useCallback(
-    (target: { itemId: string; photoIndex: number; sectionId?: string }, blob: Blob, crop: PhotoCrop, onChecked?: OnChecked) => {
-      const { itemId, photoIndex, sectionId } = target;
+    (target: { itemId: string; photoIndex: number; sectionId?: string; expectOriginalKey?: string | undefined }, blob: Blob, crop: PhotoCrop, onChecked?: OnChecked) => {
+      const { itemId, sectionId } = target, photoIndex = resolvePhotoIndex(getItemPhotos(itemId, sectionId), { photoIndex: target.photoIndex, originalKey: target.expectOriginalKey }); // feeds meta.photoIndex only: bindingSet* addresses by key
       const cropTransform = { aspect: crop.aspect, orientation: crop.orientation, ...crop.pixels };
 
       // The original key, read BEFORE any mutation: the doc write and the offline enqueue address by key.
-      const originalKey = getItemPhotos(itemId)[photoIndex]?.key;
+      const originalKey = getItemPhotos(itemId, sectionId)[photoIndex]?.key;
       const fk = docFindingKey(itemId, sectionId);
 
       // A repeat in flight, an unaddressable photo or no live document: dropped before anything, with a message.
       const saveKey = `crop|${fk ?? itemId}|${originalKey ?? photoIndex}`;
-      if (dropMediaSave(dataSource, mediaSavesInFlight.current, saveKey, { fk, originalKey, doc: collabDoc }, onChecked)) return;
+      if (dropMediaSave(dataSource, mediaSavesInFlight.current, saveKey, { fk, originalKey, doc: collabDoc, keepOpen: !!target.expectOriginalKey && !!onChecked }, onChecked)) return;
       if (!fk || !originalKey || !collabDoc) return; // narrowing only: the guard above already said why
 
       const rec: PendingMediaRecord = {
@@ -527,8 +532,8 @@ export function usePhotoOps(ctx: {
         // Refused: the dialog stays open with the person's crop, so they can adjust it or cancel.
         if (await refuseInadmissibleImage(dataSource, blob, onChecked)) return;
         // The check read the whole blob; find the photo again BY KEY. Gone (removed meanwhile): nothing is written.
-        const current = photosNow.current(itemId).find((p) => p?.key === originalKey);
-        if (!current) return;
+        const current = photosNow.current(itemId, sectionId).find((p) => p?.key === originalKey);
+        if (!current) return void dataSource.notify(m.editor_photo_save_no_photo(), "error");
         patchItemPhotos(itemId, (photos) => {
           const at = photos.findIndex((p) => p?.key === originalKey);
           return photos.map((p, i) => (i === at ? clearAnnotationOnRecrop(p, p.croppedKey ?? p.key, cropTransform) : p));
@@ -546,10 +551,10 @@ export function usePhotoOps(ctx: {
         // Online: the data source's uploader bakes the crop. A save that returns no key changes
         // nothing further: no toast, no revalidate — the doc drives the UI.
         const res = await dataSource.media.uploader(String(state.inspection.id), collabDoc).upload(rec);
-        if (res.ok) bindingSetPhotoCrop(collabDoc, fk, originalKey, res.key, cropTransform, current as PhotoEntry);
+        if (res.ok) { followCover(resolvePhotoDisplayKey(current), res.key, true); bindingSetPhotoCrop(collabDoc, fk, originalKey, res.key, cropTransform, current as PhotoEntry); }
       });
     },
-    [patchItemPhotos, state.inspection.id, collabDoc, docFindingKey, getItemPhotos, dataSource],
+    [patchItemPhotos, followCover, state.inspection.id, collabDoc, docFindingKey, getItemPhotos, dataSource],
   );
 
   /* #181 — collab-aware annotation save. Returns true when it HANDLED the save (collab is ON); the caller then skips
@@ -557,17 +562,17 @@ export function usePhotoOps(ctx: {
    * mirrored into the doc (additive merge, annotation never clears the crop). Offline it is queued, as for a crop.
    * `onChecked` runs once the image has been checked: the caller closes its studio only when told it may. */
   const performPhotoAnnotationSave = useCallback(
-    (target: { itemId: string; photoIndex: number; sectionId?: string }, blob: Blob, nodesJson: string, onChecked?: OnChecked): boolean => {
+    (target: { itemId: string; photoIndex: number; sectionId?: string; expectOriginalKey?: string | undefined }, blob: Blob, nodesJson: string, onChecked?: OnChecked): boolean => {
       if (!collabDoc) return false;
-      const { itemId, photoIndex, sectionId } = target;
+      const { itemId, sectionId } = target, photoIndex = resolvePhotoIndex(getItemPhotos(itemId, sectionId), { photoIndex: target.photoIndex, originalKey: target.expectOriginalKey }); // feeds meta.photoIndex only: bindingSet* addresses by key
 
       // The doc is keyed by the photo's ORIGINAL key; resolve from the snapshot.
-      const originalKey = getItemPhotos(itemId)[photoIndex]?.key;
+      const originalKey = getItemPhotos(itemId, sectionId)[photoIndex]?.key;
       const fk = docFindingKey(itemId, sectionId);
 
       // A repeat of a save still in flight, or a photo that cannot be addressed, is dropped with a message (and counts as handled).
       const saveKey = `annotate|${fk ?? itemId}|${originalKey ?? photoIndex}`;
-      if (dropMediaSave(dataSource, mediaSavesInFlight.current, saveKey, { fk, originalKey, doc: collabDoc }, onChecked)) return true;
+      if (dropMediaSave(dataSource, mediaSavesInFlight.current, saveKey, { fk, originalKey, doc: collabDoc, keepOpen: !!target.expectOriginalKey && !!onChecked }, onChecked)) return true;
       if (!fk || !originalKey) return true; // narrowing only: the guard above already said why
       const rec: PendingMediaRecord = {
         pendingId: crypto.randomUUID(),
@@ -583,7 +588,7 @@ export function usePhotoOps(ctx: {
       guardedSave(dataSource, mediaSavesInFlight.current, saveKey, async () => {
         // Refused: the dialog stays open with the person's strokes, so they can adjust them or cancel.
         if (await refuseInadmissibleImage(dataSource, blob, onChecked)) return;
-        if (!photosNow.current(itemId).some((p) => p?.key === originalKey)) return;
+        if (!photosNow.current(itemId, sectionId).some((p) => p?.key === originalKey)) return void dataSource.notify(m.editor_photo_save_no_photo(), "error");
 
         // #181 PR-G — offline: persist the baked annotation PNG locally + mark the
         // doc photo pending-annotate (KEEP base/cropped key — annotation layers on
@@ -597,11 +602,11 @@ export function usePhotoOps(ctx: {
         // Online: the data source's uploader bakes the annotation; no key back changes nothing
         // further. No revalidate — the doc drives the UI under collab.
         const res = await dataSource.media.uploader(String(state.inspection.id), collabDoc).upload(rec);
-        if (res.ok) bindingSetPhotoAnnotation(collabDoc, fk, originalKey, res.key, nodesJson);
+        if (res.ok) { followCover(resolvePhotoDisplayKey(photosNow.current(itemId, sectionId).find((p) => p?.key === originalKey) ?? { key: originalKey }), res.key, false); bindingSetPhotoAnnotation(collabDoc, fk, originalKey, res.key, nodesJson); }
       });
       return true;
     },
-    [collabDoc, docFindingKey, getItemPhotos, state.inspection.id, dataSource],
+    [collabDoc, followCover, docFindingKey, getItemPhotos, state.inspection.id, dataSource],
   );
 
   /* #181 PR-G — resolve a pending entry's local blob URL for the strip/viewer.

@@ -1,11 +1,11 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { count, eq } from 'drizzle-orm';
+import { and, count, eq, gte } from 'drizzle-orm';
 import { inspections, tenants } from '../../lib/db/schema';
 import { MeteringService } from '../../services/metering.service';
-import { STOCK_PERIOD } from '../../lib/usage/period';
+import { STOCK_PERIOD, currentPeriodKey, monthStartUtcMs } from '../../lib/usage/period';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
-import { FREE_TIER_CAPS, type AiCappedMetric, type AiTierCaps, type TenantPlan } from './policy';
+import { FREE_TIER_CAPS, allowanceWindow, type AiCappedMetric, type AiTierCaps, type TenantPlan } from './policy';
 
 /**
  * Free-tier usage-quota guard. Two calling shapes:
@@ -18,11 +18,15 @@ import { FREE_TIER_CAPS, type AiCappedMetric, type AiTierCaps, type TenantPlan }
  *    MeteringService.record in the sms/email pipelines) so a provider failure
  *    never consumes quota it didn't actually spend.
  *
+ * The Free-plan allowances renew monthly, in UTC: inspections are counted by the
+ * month each row was CREATED in, built-in emails by the month they were sent in.
+ *
  * IMPORTANT — `usage_counters.value` for the `inspections` metric is a CACHE,
- * not the gate. The cap counts the inspection rows a tenant has; the counter is
+ * not the gate. The cap counts the inspection rows a tenant created this month;
+ * the counter (period_key 'lifetime', now holding that same this-month count) is
  * written alongside it and heals itself on the next create. A value that looks
- * wrong (higher than the row count, e.g. after a delete) is therefore not a
- * defect and must NOT be "corrected" by hand — that is what the 2026-08-05
+ * wrong (higher than the row count, e.g. after a delete, or last month's figure
+ * on the 1st) is therefore not a defect and must NOT be "corrected" by hand — that is what the 2026-08-05
  * production hand-fix did, and it is exactly what this design makes
  * unnecessary. Deleting the row is worse than leaving it: see the INSERT-branch
  * gating below. `sms`/`email` are the opposite — consumed events with nothing
@@ -79,9 +83,10 @@ export class PlanQuotaGuard {
   ) {}
 
   /** Atomic consume for inspection creation. Free+enforced: allow-if-the-rows-a-
-   *  tenant-has-plus-`count`-fit-under-the-cap (throws QuotaExhausted otherwise).
-   *  Other tiers / standalone: plain increment (lifetime analytics). The cap
-   *  counts the inspections a tenant HAS, so deleting one returns the allowance.
+   *  tenant-created-this-month-plus-`count`-fit-under-the-cap (throws QuotaExhausted
+   *  otherwise). Other tiers / standalone: plain increment (lifetime analytics).
+   *  The cap counts the inspections created since 00:00 UTC on the 1st, so deleting
+   *  one of THIS month's returns its place and deleting an older one changes nothing.
    *
    *  `count` is the number of inspections the caller is about to create in one
    *  go. It must be passed for a batch rather than looping: because the gate
@@ -98,6 +103,8 @@ export class PlanQuotaGuard {
     }
 
     const cap = FREE_TIER_CAPS.inspections;
+    const now = new Date();
+    const monthStart = monthStartUtcMs(now);
     // THE GATE COUNTS ROWS. `usage_counters.value` is a self-healing display
     // cache for this metric, never the thing enforced — a stale value can no
     // longer refuse a tenant who is genuinely under the cap, and a delete
@@ -124,16 +131,16 @@ export class PlanQuotaGuard {
     const res = await this.db.prepare(
       `INSERT INTO usage_counters (tenant_id, metric, period_key, value, updated_at)
        SELECT ?1, 'inspections', 'lifetime', cnt.n + ?4, ?2
-       FROM (SELECT COUNT(*) AS n FROM inspections WHERE tenant_id = ?1) AS cnt
+       FROM (SELECT COUNT(*) AS n FROM inspections i WHERE i.tenant_id = ?1 AND i.created_at >= ?5) AS cnt
        WHERE cnt.n + ?4 <= ?3
        ON CONFLICT(tenant_id, metric, period_key)
-       DO UPDATE SET value = (SELECT COUNT(*) FROM inspections WHERE tenant_id = excluded.tenant_id) + ?4,
+       DO UPDATE SET value = (SELECT COUNT(*) FROM inspections i WHERE i.tenant_id = excluded.tenant_id AND i.created_at >= ?5) + ?4,
                      updated_at = excluded.updated_at
-       WHERE (SELECT COUNT(*) FROM inspections WHERE tenant_id = excluded.tenant_id) + ?4 <= ?3`,
-    ).bind(tenantId, Date.now(), cap, count).run();
+       WHERE (SELECT COUNT(*) FROM inspections i WHERE i.tenant_id = excluded.tenant_id AND i.created_at >= ?5) + ?4 <= ?3`,
+    ).bind(tenantId, now.getTime(), cap, count, monthStart).run();
 
     if (res.meta.changes === 0) {
-      throw Errors.QuotaExhausted({ metric: 'inspections', used: cap, cap, billingPortalUrl: this.opts.billingPortalUrl });
+      throw Errors.QuotaExhausted({ metric: 'inspections', used: cap, cap, billingPortalUrl: this.opts.billingPortalUrl, ...allowanceWindow(now) });
     }
   }
 
@@ -144,8 +151,10 @@ export class PlanQuotaGuard {
   async assertInspectionRoom(tenantId: string, count = 1): Promise<void> {
     if (!this.opts.enforced || (await readTenantTier(this.db, tenantId)) !== 'free') return;
     const cap = FREE_TIER_CAPS.inspections;
-    const row = await this.db.prepare('SELECT COUNT(*) AS n FROM inspections WHERE tenant_id = ?1').bind(tenantId).first<{ n: number }>();
-    if ((row?.n ?? 0) + count > cap) throw Errors.QuotaExhausted({ metric: 'inspections', used: cap, cap, billingPortalUrl: this.opts.billingPortalUrl });
+    const now = new Date();
+    const row = await this.db.prepare('SELECT COUNT(*) AS n FROM inspections i WHERE i.tenant_id = ?1 AND i.created_at >= ?2')
+      .bind(tenantId, monthStartUtcMs(now)).first<{ n: number }>();
+    if ((row?.n ?? 0) + count > cap) throw Errors.QuotaExhausted({ metric: 'inspections', used: cap, cap, billingPortalUrl: this.opts.billingPortalUrl, ...allowanceWindow(now) });
   }
 
   /** Give back what a `consumeInspection` took when the row it was for was never
@@ -165,7 +174,9 @@ export class PlanQuotaGuard {
         await metering.record(tenantId, 'inspections', STOCK_PERIOD, -quantity);
         return;
       }
-      const row = await drizzle(this.db).select({ n: count() }).from(inspections).where(eq(inspections.tenantId, tenantId)).get();
+      const monthStart = new Date(monthStartUtcMs(new Date()));
+      const row = await drizzle(this.db).select({ n: count() }).from(inspections)
+        .where(and(eq(inspections.tenantId, tenantId), gte(inspections.createdAt, monthStart))).get();
       await metering.setGauge(tenantId, 'inspections', STOCK_PERIOD, row?.n ?? 0);
     } catch (err) {
       logger.warn('Could not give back an inspection allowance', { tenantId, error: err instanceof Error ? err.message : String(err) });
@@ -175,15 +186,19 @@ export class PlanQuotaGuard {
   /** Pre-flight check for a platform-metered messaging send. Read-only — the
    *  actual counter increment happens at the existing send-site meter call,
    *  so a failed provider call never consumes quota. No-op for non-free
-   *  tiers and for standalone (enforced=false) deploys. The Free plan has no
+   *  tiers and for standalone (enforced=false) deploys. The built-in email
+   *  allowance renews monthly: it reads the counter for the current UTC month
+   *  only, so a new month starts at zero. The Free plan has no
    *  platform text-message allowance at all, so a platform-sent text on it is
    *  refused outright, with the way forward in the message. */
   async checkMessagingQuota(tenantId: string, tier: string, metric: 'sms' | 'email'): Promise<void> {
     if (!this.opts.enforced || tier !== 'free') return;
     if (metric === 'sms') throw Errors.PlatformSmsNotInPlan({ billingPortalUrl: this.opts.billingPortalUrl });
-    const used = await new MeteringService(this.db).lifetimeTotal(tenantId, metric);
+    const now = new Date();
+    const periodKey = currentPeriodKey(now);
+    const used = await new MeteringService(this.db).getCount(tenantId, metric, periodKey);
     const cap = FREE_TIER_CAPS[metric];
-    if (used >= cap) throw Errors.QuotaExhausted({ metric, used, cap, billingPortalUrl: this.opts.billingPortalUrl });
+    if (used >= cap) throw Errors.QuotaExhausted({ metric, used, cap, billingPortalUrl: this.opts.billingPortalUrl, ...allowanceWindow(now) });
   }
 
   /** Pre-flight check for a MANAGED (platform-funded) AI call. Same shape as

@@ -23,6 +23,7 @@
  *       deletions on a live client, #181 Task 12b)
  *   3 = ack, sent only to sockets that opted in, after the storage write
  *       (inspection-doc-ack.ts). Unknown inbound framing bytes are dropped.
+ *   4 = generation (lineage id), the FIRST frame of every socket (inspection-doc-generation.ts); the restore frame carries it too
  *
  * Identity: tenantId + inspectionId are passed in request headers by the
  * authorized route (Task 5). The DO reads them for logging only and never
@@ -44,7 +45,6 @@ import {
     loadResultsProjection,
     removeFindingKeys,
 } from '@core/field-ui/shared/results-doc';
-import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 import { followupResponse } from '../lib/collab/followup-patch';
 import { findingKeysFromTemplateSnapshot } from '@core/field-ui/shared/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
@@ -55,8 +55,11 @@ import { writeResultsProjection } from './inspection-doc-d1';
 import { importResponse, newestImportSeq, resolvePendingResponse } from './inspection-doc-import';
 import { isNonEmptyProjection, logDivergence, projectionsEqual } from './results-divergence';
 import { loadTemplateSnapshot, renameLegacyKeysResponse } from './inspection-doc-legacy-keys';
+import { asSnapshotArray, type ResultsSnapshot, type ResultsSnapshotMeta, type SnapshotReason } from './inspection-doc-snapshots';
 import { matchSnapshotBySeqPath } from './inspection-doc-snapshot-path';
 import { ACK_TAG, AckTracker, ackTags, logPersistFailure } from './inspection-doc-ack';
+import { GEN_HEADER, GEN_KEY, MSG_GENERATION, generationFrame, isStaleClaim, isStaleSocket, newGeneration, staleLineageResponse, storedGeneration } from './inspection-doc-generation';
+import { handleStateTransfer, type ParsedStateImport, type TransferHost } from './inspection-doc-state-transfer';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -64,11 +67,8 @@ import { ACK_TAG, AckTracker, ackTags, logPersistFailure } from './inspection-do
 const MSG_SYNC = 0;
 
 /**
- * Framing byte for the restore control frame (a bare signal, no body). The DO
- * broadcasts this after a version restore so live clients drop their local
- * state and resync from scratch. The literal `2` is duplicated client-side in
- * `packages/field-ui/src/collab/results-doc-connection.ts` (MSG_RESTORE) — there is no shared
- * package; keep the two in sync (mirrors the duplicated MSG_SYNC = 0 pattern).
+ * Framing byte for the restore control frame, broadcast after a version restore (it carries the lineage id as a varstring).
+ * Duplicated client-side in `packages/field-ui/src/collab/results-doc-connection.ts`; no shared package, keep the two in sync.
  */
 const MSG_RESTORE = 2;
 
@@ -86,6 +86,14 @@ const IDENTITY_KEY = 'identity';
 
 /** DO storage key for the JSON array of projection snapshots (version history). */
 const SNAPSHOTS_KEY = 'snapshots';
+
+/** Stored `true` while the document was built from the database and no client has changed it since (see the transfer module). */
+const DERIVED_KEY = 'derived-from-d1';
+
+const STATE_KEYS = { ydoc: STORAGE_KEY, identity: IDENTITY_KEY, snapshots: SNAPSHOTS_KEY, derived: DERIVED_KEY, backup: 'replaced-derived-backup', gen: GEN_KEY } as const;
+
+/** Origin of the changes made while building the document from the database: persisted like any other, but not a client edit. */
+const D1_ORIGIN: unique symbol = Symbol('collab-d1-origin');
 
 /** Maximum snapshots retained; oldest are dropped when the cap is exceeded. */
 const SNAPSHOT_CAP = 25;
@@ -123,46 +131,6 @@ const RESTORE_ORIGIN: unique symbol = Symbol('collab-restore-origin');
  * read-back is a no-op by construction.
  */
 const HYDRATE_ORIGIN: unique symbol = Symbol('collab-hydrate-origin');
-
-/**
- * One persisted projection snapshot — a point-in-time copy of the doc projected
- * to the `inspection_results.data` JSON shape. Snapshots are doc-replacement
- * restore points (Condition B): restore rebuilds a fresh Y.Doc from `projection`
- * rather than replaying CRDT updates.
- */
-interface ResultsSnapshot {
-    seq:        number;
-    atMs:       number;
-    byUserId:   string | null;
-    /**
-     * Why the snapshot was taken (see #181 PR-H):
-     *   'periodic' — the auto every-SNAPSHOT_EVERY capture in onDocUpdate.
-     *   'manual'   — an on-demand POST capture or restore's pre-restore capture.
-     *   'connect'  — the pre-merge boundary capture taken when a client reconnects,
-     *                BEFORE its buffered offline edits merge (preserves the
-     *                about-to-be-overwritten value for the H2 compare/recover UI).
-     *   'import'   — the mandatory capture before an offline client's update is applied.
-     *   'pre-rename' — the capture before legacy finding keys are renamed inside the document.
-     * Optional so legacy snapshots persisted before this field stay readable.
-     */
-    reason?:    SnapshotReason;
-    projection: ResultsProjection;
-}
-
-/** Discriminator for why a snapshot was captured. */
-type SnapshotReason = 'periodic' | 'manual' | 'connect' | 'import' | 'pre-rename';
-
-/** Snapshot metadata (the list view omits the heavy `projection` payload). */
-type ResultsSnapshotMeta = Omit<ResultsSnapshot, 'projection'>;
-
-/**
- * Narrow an `unknown` value loaded from DO storage to a snapshot array. DO
- * storage round-trips structured-clone, so the shape is trusted, but a defensive
- * guard keeps the no-`any` rule and tolerates a missing/legacy key.
- */
-function asSnapshotArray(value: unknown): ResultsSnapshot[] {
-    return Array.isArray(value) ? (value as ResultsSnapshot[]) : [];
-}
 
 /** Shape of the persisted identity stored across hibernation. */
 interface PersistedIdentity {
@@ -217,10 +185,12 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      * D1 blob is imported ONLY when this is false (no prior collab state).
      */
     private hadStoredState: boolean = false;
-    /**
-     * Memoizes the one-time D1 hydration so concurrent first connects await the
-     * same load (one D1 read per DO lifetime). Lazily created in hydrateFromD1Once.
-     */
+    /** Mirrors the stored `derived-from-d1` marker: nothing but the database has shaped this document yet. */
+    private derivedFromD1: boolean = false;
+    /** Lineage id of the history this document holds (see inspection-doc-generation.ts); minted in hydrate() when none is stored. */
+    private gen = '';
+    private readonly refusedSockets = new WeakSet<WebSocket>(); // upgrades answered with the generation frame only (inspection-doc-generation.ts)
+    /** Memoizes the one-time D1 hydration so concurrent first connects await the same load (one D1 read per DO lifetime). Lazily created in hydrateFromD1Once. */
     private d1HydrationPromise: Promise<void> | null = null;
 
     constructor(ctx: DurableObjectState, env: AppEnv) {
@@ -257,6 +227,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         // survived hibernation already applied these updates, and one
         // reconnecting gets them through sync — there is nobody to tell.
         if (origin === HYDRATE_ORIGIN) return;
+        if (this.derivedFromD1 && origin !== D1_ORIGIN) { this.derivedFromD1 = false; this.ctx.storage.put(DERIVED_KEY, false).catch((err: Error) => logger.error('collab: could not clear the database-built marker', { tenantId: this.tenantId, inspectionId: this.inspectionId }, err)); }
 
         this.broadcastDocUpdate(update, origin);
         this.schedulePersist();
@@ -312,7 +283,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             // memoized promise guarantees a single D1 load; concurrent connects
             // await the same promise.
             await this.hydrateFromD1Once();
-
+            if (isStaleClaim(req.headers.get(GEN_HEADER), this.gen)) return staleLineageResponse(this.ctx, this.gen, this.refusedSockets); // another history: refused, see inspection-doc-generation.ts
             // PR-H pre-merge boundary snapshot (#181): capture the CURRENT doc
             // state attributed to the connecting user BEFORE accepting the socket
             // and BEFORE this client's buffered offline edits arrive (those come
@@ -334,6 +305,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             this.ctx.acceptWebSocket(server, ackTags(req));
 
             // Send sync step 1 (our current state vector) to the new client.
+            server.send(generationFrame(MSG_GENERATION, this.gen)); // first: a client judges its offline store before replying to step 1
             const syncEncoder = encoding.createEncoder();
             encoding.writeVarUint(syncEncoder, MSG_SYNC);
             syncProtocol.writeSyncStep1(syncEncoder, this.doc);
@@ -370,6 +342,10 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                 ? Response.json(snap)
                 : new Response('snapshot not found', { status: 404 });
         }
+
+        // One-off copy into an object in another jurisdiction (see do-jurisdiction.ts and ./inspection-doc-state-transfer.ts).
+        const transfer = await handleStateTransfer(req, url.pathname, this.transferHost());
+        if (transfer) return transfer;
 
         // Stores what the open sockets have sent, without locking: a caller about to decide something from the database (is the
         // report unchanged since its last version?) asks for this first, because the debounce may not have run yet.
@@ -483,7 +459,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
     async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
         // Only binary frames carry y-protocols messages.
-        if (typeof raw === 'string') return;
+        if (typeof raw === 'string' || isStaleSocket(this.refusedSockets, this.ctx, ws)) return; // a refused-lineage socket takes no writes
         // A socket that was open when the report was published: its update is not applied, and the close code says why.
         if (await isDocLocked(this.ctx)) { ws.close(CLOSE_REPORT_PUBLISHED, CLOSE_REASON); return; }
 
@@ -515,12 +491,12 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
     async webSocketClose(ws: WebSocket): Promise<void> {
         try { ws.close(); } catch { /* already closed */ }
-        await this.flushOnLastDisconnect();
+        if (!isStaleSocket(this.refusedSockets, this.ctx, ws)) await this.flushOnLastDisconnect(); // a refused socket never held the document: no write
     }
 
     async webSocketError(ws: WebSocket): Promise<void> {
         try { ws.close(1011, 'error'); } catch { /* already closed */ }
-        await this.flushOnLastDisconnect();
+        if (!isStaleSocket(this.refusedSockets, this.ctx, ws)) await this.flushOnLastDisconnect(); // a refused socket never held the document: no write
     }
 
     /**
@@ -754,12 +730,10 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         // Re-baseline the auto-snapshot cadence to the restored state so the next
         // periodic capture is measured from here (not the pre-restore counter).
         this.updatesSinceSnapshot = 0;
+        this.gen = newGeneration();
+        await this.ctx.storage.put({ [STORAGE_KEY]: Y.encodeStateAsUpdate(this.doc), [GEN_KEY]: this.gen }); // one write: the id names these bytes
 
-        // (5) Tell every connected client to drop its local state and resync.
-        // A plain additive update broadcast (Yjs union semantics) cannot revert
-        // deletions on a client that already holds the post-restore edits, so a
-        // dedicated MSG_RESTORE control frame drives true convergence: the client
-        // clears its IndexedDB + Y.Doc and re-pulls the authoritative state.
+        // (5) MSG_RESTORE: every client drops its local state and re-pulls (a plain update cannot revert deletions).
         this.broadcastRestore();
 
         // (6) Persist the restored projection to D1 + DO storage.
@@ -840,10 +814,17 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      * webSocketMessage fires or alarm() runs.
      */
     private async hydrate(): Promise<void> {
-        const [stored, identity] = await Promise.all([
+        const [stored, identity, derived, gen] = await Promise.all([
             this.ctx.storage.get<Uint8Array>(STORAGE_KEY),
             this.ctx.storage.get<PersistedIdentity>(IDENTITY_KEY),
+            this.ctx.storage.get<boolean>(DERIVED_KEY),
+            this.ctx.storage.get<string>(GEN_KEY),
         ]);
+        this.derivedFromD1 = derived === true;
+        // A history starts here when none is stored: a new document, one from before ids, or one lost before its first save
+        // (an id without a document names nothing: it is rebuilt from the database, a new history).
+        this.gen = (stored instanceof Uint8Array && stored.length > 0 ? storedGeneration(gen) : null) ?? newGeneration();
+        if (this.gen !== gen) await this.ctx.storage.put(GEN_KEY, this.gen);
 
         if (stored instanceof Uint8Array && stored.length > 0) {
             // HYDRATE_ORIGIN, not a bare apply — see the symbol.
@@ -861,6 +842,32 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             this.reportId          = identity.reportId ?? null;
             this.identityPersisted = true; // already in storage — WS repairs legacy identities
         }
+    }
+
+    /** What the state-transfer verbs need from this object. */
+    private transferHost(): TransferHost {
+        return {
+            storage: this.ctx.storage, keys: STATE_KEYS,
+            // Live: sockets are open, or changes are waiting to be stored. What is already stored is judged from storage itself.
+            live:  () => this.ctx.getWebSockets().length > 0 || this.persistTimer !== null,
+            flush: async () => { if (this.ctx.getWebSockets().length > 0) await this.persist(); },
+            adopt: (imported, derived) => this.adoptImported(imported, derived),
+        };
+    }
+
+    /** The imported document replaces whatever the in-memory one was (it is empty or still only database-derived: no sockets). */
+    private adoptImported({ bytes, identity, gen }: ParsedStateImport, derived: boolean): void {
+        this.gen = gen;
+        this.doc.off('update', this.onDocUpdate);
+        this.doc = new Y.Doc();
+        this.doc.on('update', this.onDocUpdate);
+        Y.applyUpdate(this.doc, bytes, HYDRATE_ORIGIN);
+        this.hadStoredState = true;
+        this.derivedFromD1 = derived;
+        this.tenantId = identity.tenantId;
+        this.inspectionId = identity.inspectionId;
+        this.reportId = identity.reportId ?? null;
+        this.identityPersisted = true;
     }
 
     /**
@@ -920,21 +927,23 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         const findingKeys = findingKeysFromTemplateSnapshot(
             inspectionRow?.templateSnapshot ?? null,
         );
-        if (findingKeys.length > 0) {
-            seedResultsDoc(
-                this.doc,
-                findingKeys.map((key) => ({ findingKey: key })),
-            );
-        }
-
-        // ── NO-WIPE import: only when there is NO prior collab state. When prior
-        // collab state existed (hadStoredState), the doc is authoritative and
-        // ahead of D1 — importing the stale blob would clobber unflushed edits.
-        if (!this.hadStoredState) {
-            const blob = resultsRow?.data;
-            if (isNonEmptyProjection(blob)) {
-                loadResultsProjection(this.doc, blob);
+        // D1_ORIGIN: everything below is derived from the database, so it must not read as a client edit (see DERIVED_KEY).
+        this.doc.transact(() => {
+            if (findingKeys.length > 0) {
+                seedResultsDoc(
+                    this.doc,
+                    findingKeys.map((key) => ({ findingKey: key })),
+                );
             }
+            // ── NO-WIPE import: only when there is NO prior collab state. When prior
+            // collab state existed (hadStoredState), the doc is authoritative and
+            // ahead of D1 — importing the stale blob would clobber unflushed edits.
+            const blob = resultsRow?.data;
+            if (!this.hadStoredState && isNonEmptyProjection(blob)) loadResultsProjection(this.doc, blob);
+        }, D1_ORIGIN);
+        if (!this.hadStoredState) {
+            this.derivedFromD1 = true;
+            await this.ctx.storage.put(DERIVED_KEY, true);
         } else {
             // The blob is deliberately not imported here; say so when it disagrees with the document.
             await logDivergence(this.env.DB, { tenantId, inspectionId, reportId: this.reportId }, resultsRow?.data, this.doc);
@@ -989,17 +998,9 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         }
     }
 
-    /**
-     * Broadcast a bare MSG_RESTORE control frame (one varint byte, no body) to
-     * EVERY connected socket — no origin skip, because every client (including
-     * whoever triggered the restore) must drop its local state and resync. The
-     * client handles this by clearing its IndexedDB + Y.Doc and re-pulling the
-     * authoritative restored state via a fresh sync step1 (#181 Task 12b).
-     */
+    /** MSG_RESTORE to EVERY socket (no origin skip), carrying the lineage id: clients clear their store and re-pull (#181 Task 12b). */
     private broadcastRestore(): void {
-        const encoder = encoding.createEncoder();
-        encoding.writeVarUint(encoder, MSG_RESTORE);
-        const msg = encoding.toUint8Array(encoder);
+        const msg = generationFrame(MSG_RESTORE, this.gen);
         for (const sock of this.ctx.getWebSockets()) {
             try { sock.send(msg); } catch { /* already closed */ }
         }

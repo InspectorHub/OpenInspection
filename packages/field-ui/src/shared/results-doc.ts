@@ -26,6 +26,7 @@ import type {
 } from './results-doc.types';
 import { withoutRepairPriceRows } from './repair-price-keys';
 import { isMetaKey } from './finding-key';
+import { mediaIdentity, mediaRef } from './media-ref';
 
 type CannedTab = 'information' | 'limitations' | 'defects';
 
@@ -301,6 +302,44 @@ export function pushPendingPhoto(
     });
 }
 
+/**
+ * A finished video clip on an item. Videos carry no R2 `key` (`key` is `''`): their identity is `mediaId`
+ * (R2: the id of the media-pool row finalize created, which every serve and delete route looks up) or
+ * `streamUid` (Stream).
+ */
+export type VideoEntry = PhotoEntry & { mediaType: 'video' } & (
+    | { provider: 'r2'; mediaId: string }
+    // A legacy Stream entry carries a `streamUid` and no `provider`.
+    | { provider?: 'stream'; streamUid: string }
+);
+
+/** The field and value that name a clip: its `mediaId`, else its `streamUid` (the order `mediaIdentity` fixes for every caller). Decided by the data, not by `provider`, which legacy entries lack. */
+function videoIdentity(video: { streamUid?: string; mediaId?: string }): ['streamUid' | 'mediaId', string] | null {
+    const id = mediaIdentity({ mediaId: video.mediaId, streamUid: video.streamUid });
+    return id && (id.field === 'mediaId' || id.field === 'streamUid') ? [id.field, id.value] : null;
+}
+
+/**
+ * Add a video clip to the item's `photos`, upserted by its own identity (`mediaId` or `streamUid`), never by `key`.
+ *
+ * `appendPhoto` upserts by `key`, and every video's key is `''`, so a second clip would merge into the first.
+ * Here a retry of the same clip updates its entry and two different clips are two entries.
+ */
+export function appendVideo(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    video: VideoEntry,
+): void {
+    // An entry with no identity would match every element that also lacks one (every photo) and merge into it.
+    const identity = videoIdentity(video);
+    if (!identity) throw new Error('appendVideo: a video entry needs a streamUid or a mediaId (no clip identity)');
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        upsertElement(getOrCreateArray(item, 'photos'), identity[0], { ...video });
+    });
+}
+
 /** Apply a partial patch to the photo Y.Map matching `key`. */
 export function updatePhoto(
     doc: Y.Doc,
@@ -450,15 +489,19 @@ export function reorderPhotos(
         const item = getOrSeedItem(results, findingKey);
         const arr = getOrCreateArray(item, 'photos');
 
-        // Snapshot current photos into a key → PhotoEntry map.
+        // Snapshot current photos into a name → PhotoEntry map (a clip or pending photo has no key; see mediaRef).
+        // An entry with no name at all cannot be placed by an order, and rebuilding would drop it: refuse the reorder.
         const byKey = new Map<string, PhotoEntry>();
         for (let i = 0; i < arr.length; i++) {
             const el = arr.get(i);
             if (el instanceof Y.Map) {
                 const entry = el.toJSON() as PhotoEntry;
-                if (typeof entry.key === 'string') byKey.set(entry.key, entry);
+                const ref = mediaRef(entry);
+                if (!ref) return;
+                byKey.set(ref, entry);
             }
         }
+        if (byKey.size !== arr.length) return;
 
         // Guard: orderedKeys must be a 1:1 permutation of the existing keys.
         if (orderedKeys.length !== byKey.size) return;
@@ -656,7 +699,10 @@ export function loadResultsProjection(doc: Y.Doc, projection: ResultsProjection)
             // ── photos ─────────────────────────────────────────────────────────
             if (entry.photos) {
                 for (const photo of entry.photos) {
-                    appendPhoto(doc, findingKey, photo);
+                    // A video's `key` is empty, so keyed upsert would merge every clip into the first; it has its own identity.
+                    if (photo.mediaType === 'video' && videoIdentity(photo)) appendVideo(doc, findingKey, photo as VideoEntry);
+                    // A video with no identity cannot be told from any other: by key if it has one, otherwise skipped.
+                    else if (photo.mediaType !== 'video' || photo.key) appendPhoto(doc, findingKey, photo);
                 }
             }
 

@@ -1,4 +1,5 @@
-import { Outlet, NavLink, useRouteLoaderData } from "react-router";
+import { useEffect, useRef } from "react";
+import { Outlet, NavLink, useLocation, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/agent-layout";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -111,12 +112,24 @@ const NAV_ITEMS: { to: string; label: () => string }[] = [
 
 export default function AgentLayout({ loaderData }: Route.ComponentProps) {
   const { notices, account } = loaderData;
+  const navRef = useRef<HTMLElement>(null);
+  const { pathname } = useLocation();
+  // On a phone the nav scrolls inside its own row; keep the current page in view
+  // (the last item, Settings, would otherwise sit past the right edge on arrival).
+  useEffect(() => {
+    navRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [pathname]);
   return (
     <div className="min-h-screen bg-ih-bg-app">
       {/* Top bar */}
       <header className="border-b border-ih-border bg-ih-bg-card">
-        <div className="max-w-[1080px] mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        {/* Phone: brand + bell + account menu share row one; the nav drops to its
+            own full-width row (`order-last w-full`) and scrolls horizontally
+            INSIDE itself, so the bell and the menu can never be pushed off
+            screen. From `md` up it is one row again. This used to be one
+            non-wrapping flex line, 606px wide in a 375px viewport. */}
+        <div className="max-w-[1080px] mx-auto px-4 md:px-6 min-h-14 flex flex-wrap items-center gap-x-2">
+          <div className="flex items-center gap-3 mr-auto min-w-0 h-14">
             <img src="/logo.svg" alt="" className="w-7 h-7 shrink-0" width={28} height={28} />
             <span className="text-sm font-bold text-ih-fg-1">
               OpenInspection
@@ -125,13 +138,17 @@ export default function AgentLayout({ loaderData }: Route.ComponentProps) {
               {m.agent_portal_layout_badge()}
             </span>
           </div>
-          <nav className="flex items-center gap-1">
+          <nav
+            ref={navRef}
+            aria-label={m.agent_portal_nav_label()}
+            className="order-last w-full md:order-none md:w-auto flex items-center gap-1 overflow-x-auto pb-1.5 md:pb-0"
+          >
             {NAV_ITEMS.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
+                  `shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
                     isActive
                       ? "bg-ih-primary-tint text-ih-primary-text"
                       : "text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-fg-1"
@@ -141,10 +158,13 @@ export default function AgentLayout({ loaderData }: Route.ComponentProps) {
                 {item.label()}
               </NavLink>
             ))}
+          </nav>
+          {/* Outside the nav on purpose: the scroll container must never hold them. */}
+          <div className="flex items-center gap-1 h-14 md:ml-2">
             {/* Notices — a bell in the header is always "sent to me"
                 (design §3.15). Sits before the account menu so the two header
                 affordances read left-to-right as inbox then account. */}
-            <span className="ml-2">
+            <span>
               <AgentNoticeBell notices={notices.notices} unread={notices.unread} />
             </span>
             {/* The account menu absorbs what used to be a bare `Log out` link and
@@ -153,7 +173,7 @@ export default function AgentLayout({ loaderData }: Route.ComponentProps) {
                 live behind one trigger at every width, next to the identity that
                 was not shown anywhere in this portal. */}
             <AgentUserMenu account={account} />
-          </nav>
+          </div>
         </div>
       </header>
 

@@ -38,6 +38,7 @@ import { isFieldRole } from '../../lib/auth/roles';
 import { resolveInspectionScope } from '../../lib/inspection/visibility';
 import { resolvePrimaryReportId } from '../../lib/inspection/reports';
 import { loadPublishedStateWithLock } from '../../lib/inspection/published-state';
+import { collabNamespaces } from '../../lib/collab/collab-namespaces';
 
 /**
  * GET /api/inspections/:id
@@ -213,9 +214,8 @@ const coreRoutes = createApiRouter()
         // Read before the cascade: the audit record describes what was deleted.
         const facts = await deleteFacts(c, inspection, id);
 
-        // Cascade-delete every inspection-scoped row + R2 asset (D1 does not honor
-        // FK cascades at runtime). Ownership verified by getInspection above.
-        const collabPurge = await deleteInspectionCascade(getDrizzle(c), c.env.PHOTOS, tenantId, id, c.env.INSPECTION_DOC);
+        // Cascade-delete every inspection-scoped row, R2 asset and collab object (D1 does not honor FK cascades). Ownership verified above.
+        const collabPurge = await deleteInspectionCascade(getDrizzle(c), c.env.PHOTOS, tenantId, id, collabNamespaces(c.env));
 
         auditFromContext(c, 'inspection.delete', 'inspection', {
             entityId: id,

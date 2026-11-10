@@ -10,7 +10,8 @@ const FAILED_MS = 8000;
 
 export interface ReportCoverWrites {
   /** Set the report cover to this photo key; an empty string clears it. The newest request wins. */
-  setCover(coverPhotoId: string): void;
+  /** `onResult(true)` once the host accepted it, `(false)` once refused (said to the person), `(null)` when a newer request replaced it. */
+  setCover(coverPhotoId: string, onResult?: (ok: boolean | null) => void): void;
   /** Bake a crop of `sourceKey` as the cover. Latest wins; a repeat of the save already in flight sends nothing more. */
   cropCover(input: { sourceKey: string; crop: string; image: Blob }): void;
   /**
@@ -55,8 +56,8 @@ export function useReportCoverWrites(inspectionId: string): ReportCoverWrites {
   }, []);
 
   const setCover = useCallback(
-    (coverPhotoId: string) => {
-      void submitCover({ type: 'set-cover', coverPhotoId }).then(report);
+    (coverPhotoId: string, onResult?: (ok: boolean | null) => void) => {
+      void submitCover({ type: 'set-cover', coverPhotoId }).then((res) => { report(res); onResult?.(isIgnored(res) ? null : res.ok); });
     },
     [submitCover, report],
   );

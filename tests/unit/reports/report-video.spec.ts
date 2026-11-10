@@ -134,7 +134,7 @@ describe('selectReportMedia — graceful fail-closed (no subdomain)', () => {
 
 describe('selectReportMedia — proof on the R2 serve URLs', () => {
     const r2 = { ...ctx, r2BaseUrl: '/api/public/report/acme/insp1/video' };
-    const entry = { key: 'k', mediaType: 'video' as const, provider: 'r2' as const, mediaId: 'm 1', url: '' };
+    const entry = { key: 'k', mediaType: 'video' as const, provider: 'r2' as const, mediaId: 'm 1', posterKey: 'p/k', url: '' };
 
     it('appends the proof to the clip and the poster URL, and leaves them bare when there is none', () => {
         const withProof = selectReportMedia(entry, { ...r2, r2Query: 'token=abc' });
@@ -152,5 +152,31 @@ describe('selectReportMedia — proof on the R2 serve URLs', () => {
         expect(selectReportMedia(entry, { ...r2, isPdf: true, r2Query: 'render=t' })).toMatchObject({
             kind: 'r2-video-poster', posterUrl: '/api/public/report/acme/insp1/video/r2-object/m%201/poster?render=t',
         });
+    });
+});
+
+describe('selectReportMedia - R2 video without a poster', () => {
+    const r2ctx = { ...ctx, r2BaseUrl: '/api/inspections/insp1/media/video' };
+    const noPoster = { key: 'v', mediaType: 'video' as const, provider: 'r2' as const, mediaId: 'm1', durationSec: 8, url: '' };
+
+    it('web: still a player, but names no poster (the poster route would answer 404)', () => {
+        const r = selectReportMedia(noPoster, r2ctx);
+        expect(r).toEqual({
+            kind: 'r2-video-player',
+            mediaId: 'm1',
+            playerSrc: '/api/inspections/insp1/media/video/r2-object/m1',
+            durationSec: 8,
+        });
+        expect('posterUrl' in r).toBe(false);
+    });
+
+    it('pdf: nothing to print without a poster, so it falls back to the image branch instead of a poster URL that 404s', () => {
+        const r = selectReportMedia(noPoster, { ...r2ctx, isPdf: true });
+        expect(r.kind).toBe('image');
+    });
+
+    it('control: with a poster key both paths still name the poster', () => {
+        expect(selectReportMedia({ ...noPoster, posterKey: 'p/k' }, r2ctx)).toMatchObject({ kind: 'r2-video-player', posterUrl: expect.stringContaining('/poster') });
+        expect(selectReportMedia({ ...noPoster, posterKey: 'p/k' }, { ...r2ctx, isPdf: true }).kind).toBe('r2-video-poster');
     });
 });

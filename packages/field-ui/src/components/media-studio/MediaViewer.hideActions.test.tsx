@@ -7,11 +7,12 @@
  * out; the editor's own viewer, which wires them all, is unchanged.
  */
 import { describe, it, expect } from "vitest";
+import { m } from "../../i18n";
 import { render, screen } from "@testing-library/react";
 import { MediaViewerToolbar, type MediaAction } from "./MediaViewer";
 import { GALLERY_UNHANDLED_ACTIONS } from "./PhotoGallery";
 
-const names = () => screen.getAllByRole("button").map((b) => b.textContent);
+const names = () => screen.queryAllByRole("button").map((b) => b.textContent);
 
 describe("MediaViewerToolbar hidden actions", () => {
   it("CONTROL: with nothing hidden a photo shows Delete, Crop and Annotate", () => {
@@ -28,12 +29,25 @@ describe("MediaViewerToolbar hidden actions", () => {
 
   it("hides video actions too", () => {
     render(<MediaViewerToolbar kind="video" edited={false} hide={["delete", "poster", "caption"]} on={() => {}} />);
-    expect(names()).toEqual(["Set cover"]);
+    expect(names()).toEqual([]);
   });
 
   it("the photo drawer hides every action it does not wire, and only those", () => {
     const wired: MediaAction[] = ["cover", "annotate"];
     const all: MediaAction[] = ["crop", "annotate", "rotate", "cover", "caption", "revert", "delete", "poster"];
     expect([...GALLERY_UNHANDLED_ACTIONS].sort()).toEqual(all.filter((a) => !wired.includes(a)).sort());
+  });
+
+  // The toolbar used to say "Set cover" on the photo that IS the cover. The action still opens the cover cropper (which
+  // reopens on the saved crop), so on the cover it is offered as an adjustment.
+  it("says so when the photo on screen is the report cover", () => {
+    render(<MediaViewerToolbar kind="photo" edited={false} isCover on={() => {}} />);
+    expect(screen.getByRole("button", { name: m.media_viewer_cover_adjust() })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: m.media_viewer_cover() })).toBeNull();
+  });
+
+  it("keeps \"Set cover\" on any other photo", () => {
+    render(<MediaViewerToolbar kind="photo" edited={false} on={() => {}} />);
+    expect(screen.getByRole("button", { name: m.media_viewer_cover() })).toBeTruthy();
   });
 });

@@ -30,6 +30,8 @@ vi.mock('react-router', async () => {
 
 vi.mock('~/hooks/useSessionContext', () => ({
     useSessionContext: vi.fn(),
+    useDisplayLocale: () => 'en-US',
+    useDisplayTimeZone: () => 'UTC',
 }));
 
 import SettingsUsagePage from '~/routes/settings-usage';
@@ -83,5 +85,33 @@ describe('SettingsUsagePage — Inspections meter visibility (Fix 4)', () => {
         const html = renderToStaticMarkup(createElement(SettingsUsagePage));
         expect(html).toContain('Inspections');
         expect(html).toContain('42');
+    });
+});
+
+describe('SettingsUsagePage — monthly allowance', () => {
+    it('shows the month counts, when they renew, and the own-email path for a free SaaS tenant', () => {
+        vi.mocked(useLoaderData).mockReturnValue({
+            usage: {
+                tier: 'free', caps: { inspections: 5, email: 50 },
+                period: { period: '2026-11', resetsAt: '2026-12-01T00:00:00.000Z' },
+                usage: { inspections: 3, sms: 0, email: 12, emailByo: 4, r2Bytes: 1024 },
+            },
+        } as never);
+        vi.mocked(useSessionContext).mockReturnValue(sessionCtx(true) as never);
+
+        const html = renderToStaticMarkup(createElement(SettingsUsagePage));
+        expect(html).toContain('3 of 5 new inspections this month');
+        expect(html).toContain('12 of 50 built-in emails this month');
+        expect(html).toContain('Resets Dec 1, 2026 (UTC)');
+        expect(html).toContain('href="/settings/integrations/email"');
+    });
+
+    it('shows no monthly wording for a paid tenant', () => {
+        vi.mocked(useLoaderData).mockReturnValue({
+            usage: { tier: 'pro', caps: null, period: null, usage: { inspections: 42, sms: 3, email: 1, r2Bytes: 1024 } },
+        } as never);
+        vi.mocked(useSessionContext).mockReturnValue(sessionCtx(true) as never);
+
+        expect(renderToStaticMarkup(createElement(SettingsUsagePage))).not.toContain('this month');
     });
 });

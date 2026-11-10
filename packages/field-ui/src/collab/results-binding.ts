@@ -13,6 +13,8 @@ import {
     applyItemPatch,
     setItemAttribute as docSetItemAttribute,
     appendPhoto as docAppendPhoto,
+    appendVideo as docAppendVideo,
+    type VideoEntry,
     pushPendingPhoto as docPushPendingPhoto,
     updatePhoto as docUpdatePhoto,
     removePhoto as docRemovePhoto,
@@ -176,6 +178,17 @@ export function setDefectFields(
     unitId: string | null = null,
 ): void {
     upsertCanned(doc, findingKey(unitId, sectionId, itemId), 'defects', { cannedId, ...patch });
+}
+
+/** Add a finished video clip to the finding's photo array, by the clip's own identity (not by `key`). */
+export function appendVideo(
+    doc: Y.Doc,
+    sectionId: string,
+    itemId: string,
+    video: VideoEntry,
+    unitId: string | null = null,
+): void {
+    docAppendVideo(doc, findingKey(unitId, sectionId, itemId), video);
 }
 
 /** Append (or merge) a photo attachment to the finding's photo array. */

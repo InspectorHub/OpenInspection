@@ -97,9 +97,10 @@ export function ServicesCatalogPanel({
                 {svc.description && (
                   <p className="text-[11px] text-ih-fg-3 mt-0.5 line-clamp-1">{svc.description}</p>
                 )}
-                {/* A service with no template takes down any booking that picks
-                    it (BadRequest from the multi-service branch, shown to the
-                    customer). Say so here, where it can be fixed. */}
+                {/* A service with no template is hidden from the public booking page
+                    (the profile endpoint filters it out), so the owner sees an
+                    empty list there and nothing says why. Say so here, where it
+                    can be fixed. */}
                 {serviceIsBookable(svc) ? (
                   <p className="text-[11px] text-ih-fg-3 mt-0.5">
                     {m.settings_services_template_prefix()}{" "}

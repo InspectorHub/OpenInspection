@@ -10,6 +10,7 @@ import {
   updatePhoto,
   removePhoto,
   pushPendingPhoto,
+  appendVideo,
   revertPhoto,
   replacePhoto,
   reorderPhotos,
@@ -492,6 +493,110 @@ describe('results-doc', () => {
     expect((projectResults(doc)[FK].photos ?? []).map((p) => p.key + '|' + (p.streamUid ?? ''))).toEqual(['p1|', '|u3']);
   });
 
+  it('appendVideo keeps two clips on one item apart, even though both are keyless', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'p1' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1', posterKey: 'poster-1' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-2' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'stream', streamUid: 'uid-1', durationSec: 12 });
+
+    const photos = projectResults(doc)[FK].photos ?? [];
+    expect(photos.map((p) => p.mediaId ?? p.streamUid ?? p.key)).toEqual(['p1', 'pool-1', 'pool-2', 'uid-1']);
+    expect(photos[1]).toMatchObject({ mediaType: 'video', provider: 'r2', posterKey: 'poster-1' });
+  });
+
+  it('appendVideo is idempotent per clip: a retry of the same pool id updates, never duplicates', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1', posterKey: 'late-poster' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'stream', streamUid: 'uid-1' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'stream', streamUid: 'uid-1', durationSec: 9 });
+
+    const photos = projectResults(doc)[FK].photos ?? [];
+    expect(photos).toHaveLength(2);
+    expect(photos[0]).toMatchObject({ mediaId: 'pool-1', posterKey: 'late-poster' });
+    expect(photos[1]).toMatchObject({ streamUid: 'uid-1', durationSec: 9 });
+  });
+
+  it('loadResultsProjection keeps keyless clips apart: loading into an empty document, or over one that already holds them, neither merges nor duplicates', () => {
+    const projection: ResultsProjection = {
+      [FK]: { photos: [
+        { key: 'p1' },
+        { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1', posterKey: 'poster-1' },
+        { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-2' },
+        { key: '', mediaType: 'video', provider: 'stream', streamUid: 'uid-1' },
+      ] },
+    };
+    const ids = (doc: Y.Doc) => (projectResults(doc)[FK].photos ?? []).map((p) => p.mediaId ?? p.streamUid ?? p.key);
+    const fresh = new Y.Doc();
+    loadResultsProjection(fresh, projection);
+    expect(ids(fresh)).toEqual(['p1', 'pool-1', 'pool-2', 'uid-1']);
+    loadResultsProjection(fresh, projection); // the same load again changes nothing
+    expect(ids(fresh)).toEqual(['p1', 'pool-1', 'pool-2', 'uid-1']);
+
+    // Control: a document the clips were added to one by one, then loaded over.
+    const live = new Y.Doc();
+    seedResultsDoc(live, [{ findingKey: FK }]);
+    appendPhoto(live, FK, { key: 'p1' });
+    appendVideo(live, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1', posterKey: 'poster-1' });
+    appendVideo(live, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-2' });
+    appendVideo(live, FK, { key: '', mediaType: 'video', provider: 'stream', streamUid: 'uid-1' });
+    loadResultsProjection(live, projection);
+    expect(ids(live)).toEqual(['p1', 'pool-1', 'pool-2', 'uid-1']);
+  });
+
+  describe('legacy Stream clips: a streamUid and no provider', () => {
+    const legacy = (streamUid: string) => ({ key: '', mediaType: 'video', streamUid, durationSec: 5 }) as never;
+    const photo = { key: 'p1', caption: 'cap' };
+    const check = (doc: Y.Doc) => {
+      const photos = projectResults(doc)[FK].photos ?? [];
+      expect(photos.map((p) => p.streamUid ?? p.key)).toEqual(['p1', 'u1', 'u2']);
+      expect(photos[0]).toEqual(photo); // the photo's own fields are untouched
+    };
+
+    it('appendVideo keeps two provider-less clips and the photo apart', () => {
+      const doc = new Y.Doc();
+      seedResultsDoc(doc, [{ findingKey: FK }]);
+      appendPhoto(doc, FK, photo);
+      appendVideo(doc, FK, legacy('u1'));
+      appendVideo(doc, FK, legacy('u2'));
+      appendVideo(doc, FK, legacy('u1')); // a retry
+      check(doc);
+    });
+
+    it('loadResultsProjection does the same, into an empty document and over a loaded one', () => {
+      const projection: ResultsProjection = { [FK]: { photos: [photo, legacy('u1'), legacy('u2')] } };
+      const doc = new Y.Doc();
+      loadResultsProjection(doc, projection);
+      check(doc);
+      loadResultsProjection(doc, projection);
+      check(doc);
+    });
+
+    it('a clip with no identity at all is refused by appendVideo, and skipped (never merged into a photo) by the load', () => {
+      const doc = new Y.Doc();
+      seedResultsDoc(doc, [{ findingKey: FK }]);
+      appendPhoto(doc, FK, photo);
+      expect(() => appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2' } as never)).toThrow(/identity/i);
+      loadResultsProjection(doc, { [FK]: { photos: [photo, { key: '', mediaType: 'video' }] } });
+      expect(projectResults(doc)[FK].photos).toEqual([photo]);
+      // A video entry with no identity but a real key is kept as a photo-shaped entry, by key.
+      loadResultsProjection(doc, { [FK]: { photos: [{ key: 'k2', mediaType: 'video' }] } });
+      expect((projectResults(doc)[FK].photos ?? []).map((p) => p.key)).toEqual(['p1', 'k2']);
+    });
+  });
+
+  it('a clip added with appendVideo can be removed again by its identity', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1' });
+    appendVideo(doc, FK, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-2' });
+    removeMediaBy(doc, FK, 'mediaId', 'pool-1');
+    expect((projectResults(doc)[FK].photos ?? []).map((p) => p.mediaId)).toEqual(['pool-2']);
+  });
+
   it('#181 PR-G a pending PhotoEntry round-trips through projectResults/loadResultsProjection', () => {
     // A pending upload carries an empty `key` + pendingUpload + pendingId, no
     // R2 derivative. It must survive the projection round-trip untouched so the
@@ -556,5 +661,42 @@ describe('results-doc', () => {
     removeFindingKeys(doc, ['_default:s1:nonexistent']);
 
     expect(projectResults(doc)[FK]?.rating).toBe('IN');
+  });
+});
+
+describe('reorderPhotos with keyless entries (clips and pending photos)', () => {
+  const clip = (mediaId: string) => ({ key: '', mediaType: 'video' as const, provider: 'r2' as const, mediaId });
+  const names = (doc: Y.Doc) => (projectResults(doc)[FK].photos ?? []).map((p) => p.mediaId ?? p.pendingId ?? p.key);
+
+  it('reorders two clips and a photo by identity, keeping every entry', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendVideo(doc, FK, clip('a'));
+    appendPhoto(doc, FK, { key: 'p.jpg' });
+    appendVideo(doc, FK, clip('b'));
+    reorderPhotos(doc, FK, ['m:b', 'm:a', 'p.jpg']);
+    expect(names(doc)).toEqual(['b', 'a', 'p.jpg']);
+    expect((projectResults(doc)[FK].photos ?? [])[0]).toMatchObject({ mediaType: 'video', provider: 'r2' });
+  });
+
+  it('reorders a pending photo and a clip', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    pushPendingPhoto(doc, FK, { key: '', pendingUpload: true, pendingId: 'pend1' });
+    appendVideo(doc, FK, clip('a'));
+    reorderPhotos(doc, FK, ['m:a', 'p:pend1']);
+    expect(names(doc)).toEqual(['a', 'pend1']);
+  });
+
+  it('a legacy Stream clip is named s:<uid>; an unknown or repeated name is still a no-op', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendVideo(doc, FK, { key: '', mediaType: 'video', streamUid: 'u1' } as never);
+    appendVideo(doc, FK, { key: '', mediaType: 'video', streamUid: 'u2' } as never);
+    reorderPhotos(doc, FK, ['s:u2', 's:u1']);
+    expect((projectResults(doc)[FK].photos ?? []).map((p) => p.streamUid)).toEqual(['u2', 'u1']);
+    reorderPhotos(doc, FK, ['s:u2', 's:u2']);
+    reorderPhotos(doc, FK, ['s:u2', 's:nope']);
+    expect((projectResults(doc)[FK].photos ?? []).map((p) => p.streamUid)).toEqual(['u2', 'u1']);
   });
 });

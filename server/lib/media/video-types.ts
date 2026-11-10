@@ -13,6 +13,12 @@ export const ALLOWED_VIDEO_MIMES = new Set(Object.keys(MIME_TO_EXT));
 export const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MiB
 /** The cap on the single-request (multipart form) video route, which buffers the whole clip; larger clips use the chunked route. */
 export const MAX_FORM_VIDEO_BYTES = 64 * 1024 * 1024; // 64 MiB
+/** The answer when a single-request upload is over the cap, shared by every single-request video route. */
+export const VIDEO_TOO_LARGE_FOR_FORM = {
+    error: 'Video is too large for a single request; use the chunked upload.',
+    code: 'VIDEO_TOO_LARGE_FOR_FORM',
+    limits: { maxBytes: MAX_FORM_VIDEO_BYTES, chunkedPath: '/api/public/uploads/video/chunked' },
+} as const;
 /** Every part of a chunked upload but the last has exactly this many bytes. Above storage's 5 MiB minimum, small enough to buffer. */
 export const VIDEO_PART_BYTES = 8 * 1024 * 1024;
 /** Chunked uploads one member may have in flight at once. */

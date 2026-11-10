@@ -15,24 +15,28 @@
  * - a collection (attributes, canned comments, recommendations, custom comments) that holds something replaces
  *   the loader's; an empty one is the seeded default and changes nothing;
  * - photos: the document's photos are added to the loader's (a document photo wins over the loader's entry
- *   with the same key; a local pending entry that no longer exists in the document is dropped).
+ *   with the same key, or for a clip the same media id or stream uid; a local pending entry that no longer exists in the document is dropped).
  * After the first sync the document is authoritative again and its projection is adopted whole, which is what
  * lets another collaborator's deletion of a finding arrive.
  */
 import * as Y from 'yjs';
 import { projectResults } from '../shared/results-doc';
 import { parseFindingKey } from '../shared/finding-key';
+import { mediaRef } from '../shared/media-ref';
 import type { ResultMap } from '../hooks/useInspection';
 
 const SCALARS = ['rating', 'notes', 'value', 'recommendation'] as const;
 const COLLECTIONS = ['attributes', 'tabs', 'recommendations', 'customComments'] as const;
 
 type Entry = Record<string, unknown>;
-type Photo = { key?: string; pendingId?: string } & Entry;
+type Photo = { key?: string; pendingId?: string; mediaId?: string; streamUid?: string } & Entry;
+
+/** What names an entry: the same name the reorder uses (key, media id, stream uid), but never a pending id (those are dropped below). */
+const identityOf = (p: Photo): string | undefined => mediaRef({ key: p.key, mediaId: p.mediaId, streamUid: p.streamUid }) || undefined;
 
 function mergePhotos(before: Photo[], docPhotos: Photo[]): Photo[] {
-  const docKeys = new Set(docPhotos.flatMap((p) => (p.key ? [p.key] : [])));
-  const kept = before.filter((p) => !p.pendingId && !(p.key && docKeys.has(p.key)));
+  const docKeys = new Set(docPhotos.flatMap((p) => { const id = identityOf(p); return id ? [id] : []; }));
+  const kept = before.filter((p) => { const id = identityOf(p); return !p.pendingId && !(id && docKeys.has(id)); });
   return [...kept, ...docPhotos];
 }
 

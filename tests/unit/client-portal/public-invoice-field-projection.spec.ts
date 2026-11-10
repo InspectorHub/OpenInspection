@@ -50,7 +50,7 @@ const FULL_ROW = {
 };
 
 const WITHHELD = ['tenantId', 'contactId', 'notes', 'qboSyncStatus', 'paymentMethod', 'partialPaidAt', 'voidedAt', 'clientEmail', 'sentAt'] as const;
-const KEPT = ['id', 'amountCents', 'amountPaidCents', 'currency', 'status', 'createdAt', 'dueDate', 'clientName', 'lineItems', 'brand', 'tenantSlug'] as const;
+const KEPT = ['id', 'amountCents', 'amountPaidCents', 'currency', 'status', 'createdAt', 'dueDate', 'clientName', 'lineItems', 'brand', 'tenantSlug', 'balanceDueCents'] as const;
 
 describe('IA-86 — public invoice response carries only declared fields', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
@@ -119,6 +119,12 @@ describe('IA-86 — public invoice response carries only declared fields', () =>
     it('states the amount already received, which the schema declares', async () => {
         const { data } = await fetchInvoice();
         expect(data.amountPaidCents).toBe(2000);
+    });
+
+    it('states the balance still owed, the figure the pay page asks for', async () => {
+        const { data } = await fetchInvoice();
+        expect(typeof data.balanceDueCents).toBe('number');
+        expect(data.balanceDueCents).toBeGreaterThanOrEqual(0);
     });
 
     it('carries exactly the declared keys, and the brand states the legal entity and the display format of the company', async () => {

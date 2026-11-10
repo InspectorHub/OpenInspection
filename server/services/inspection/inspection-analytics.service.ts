@@ -10,6 +10,7 @@ import { REPORT_STATUS, isReportPublished } from '../../lib/status/report-status
 import { visibleInspectionsCondition, type InspectionScope } from '../../lib/inspection/visibility';
 import { chunkIds } from '../../lib/id-chunks';
 import { readDashboardInputs } from './dashboard-reads';
+import { withUnplacedActive } from './dashboard-unplaced';
 import { InspectionSubService } from './base';
 import { loadPublishedStates, NOT_PUBLISHED } from '../../lib/inspection/published-state';
 import { loadPinnedSnapshot } from '../../lib/report-snapshot';
@@ -459,8 +460,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
         const startOfToday  = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
         const endOfToday    = new Date(); endOfToday.setUTCHours(23, 59, 59, 999);
         const in48h         = new Date(now + 48 * 3600 * 1000);
-        const in7days       = new Date(now + 7 * 86400 * 1000);
-        const minus30days   = new Date(now - 30 * 86400 * 1000);
+        const in7days = new Date(now + 7 * 86400 * 1000), minus30days = new Date(now - 30 * 86400 * 1000);
         const reportStaleAt    = new Date(now - reportUnpublishedH * 3600 * 1000);
         const agreementStaleAt = new Date(now - agreementUnsignedH * 3600 * 1000);
         const invoiceStaleAt   = new Date(now - invoiceOverdueH    * 3600 * 1000);
@@ -491,7 +491,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
         //  - in_progress past the report-unpublished threshold, OR
         //  - active inspection with no signed agreement past the agreement threshold, OR
         //  - active inspection with an overdue invoice past the invoice threshold.
-        const needsAttention = all.filter(i => {
+        const needsAttentionRules = all.filter(i => {
             const d = insDate(i);
             if (i.status === INSPECTION_STATUS.SCHEDULED && d && d <= in48h) return true;
             // Report not yet published past threshold (completed but reportStatus still in_progress/submitted)
@@ -514,10 +514,9 @@ export class InspectionAnalyticsService extends InspectionSubService {
             const d = insDate(i);
             return d !== null && d > in7days && i.status !== INSPECTION_STATUS.CANCELLED;
         });
-        const later      = laterAll.slice(0, 50);
-        const laterTotal = laterAll.length;
+        const later = laterAll.slice(0, 50), laterTotal = laterAll.length;
 
-        const recentReports = all.filter(i =>
+        const publishedReports = all.filter(i =>
             i.status === INSPECTION_STATUS.COMPLETED && isReportPublished(i.reportStatus)
         );
 
@@ -526,6 +525,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
             i.status === INSPECTION_STATUS.CANCELLED && new Date(i.createdAt) >= minus30days
         ).slice(0, 20);
 
+        const { needsAttention, recentReports } = withUnplacedActive(all, needsAttentionRules, publishedReports, [today, thisWeek, laterAll]);
         // Spec 5B P2B — annotate every surfaced inspection with defect counts
         // so the dashboard cards can render colored chips. Only fetch stats
         // for the IDs that actually appear in the rendered buckets to keep

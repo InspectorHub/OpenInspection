@@ -52,9 +52,13 @@ const BASE_PROFILE = {
   conciergeReviewRequired: false,
   currency: "USD",
   depositPolicy: null as DepositPolicy,
+  paymentsAvailable: true,
 };
 
-function renderBooking(profile: Partial<typeof BASE_PROFILE> = {}) {
+/** `| undefined` so a test can model a server that never sends a field. */
+type ProfileOverrides = { [K in keyof typeof BASE_PROFILE]?: (typeof BASE_PROFILE)[K] | undefined };
+
+function renderBooking(profile: ProfileOverrides = {}) {
   const Stub = createRoutesStub([
     {
       path: "/book/:tenant",
@@ -149,5 +153,87 @@ describe("the payment step appears only after the booking exists", () => {
     await submitBooking({ success: true, data: { success: true, inspectionId: "insp-a", depositRequiredCents: 5000 } });
     expect(await screen.findByText("Pay $50.00 deposit")).toBeTruthy();
     expect(screen.queryByText("Pay $90.00 deposit")).toBeNull();
+  });
+});
+
+describe("a deposit is only quoted or offered for payment when a card can be taken", () => {
+  const submit = async (profile: ProfileOverrides) => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: { success: true, inspectionId: "insp-a", depositRequiredCents: 9000 } }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }),
+    );
+    renderBooking({ depositPolicy: { type: "percent", percent: 20 }, ...profile });
+    await walkTo("confirm");
+  };
+
+  it("quotes nothing before booking when payments are unavailable", async () => {
+    renderBooking({ depositPolicy: { type: "percent", percent: 20 }, paymentsAvailable: false });
+    await walkTo("services");
+    expect(screen.queryByText(/is collected when you book/)).toBeNull();
+  });
+
+  it("shows no deposit row or hold-the-slot note on the review step when payments are unavailable", async () => {
+    renderBooking({ depositPolicy: { type: "percent", percent: 20 }, paymentsAvailable: false });
+    await walkTo("confirm");
+    expect(await screen.findByText("Request Inspection")).toBeTruthy();
+    expect(screen.queryByText("Deposit due today")).toBeNull();
+    expect(screen.queryByText(/deposit to hold this slot/)).toBeNull();
+  });
+
+  it("after booking, says the company will be in touch instead of offering a Pay button", async () => {
+    await submit({ paymentsAvailable: false });
+    fireEvent.click(await screen.findByText("Request Inspection"));
+    expect(await screen.findByTestId("booking-deposit-contact")).toBeTruthy();
+    expect(screen.getByTestId("booking-deposit-contact").textContent).toContain("Acme Inspections will contact you about the deposit");
+    expect(screen.queryByText("Deposit to hold your slot")).toBeNull();
+    expect(screen.queryByText(/Pay \$90\.00 deposit/)).toBeNull();
+  });
+
+  it("an older server that never sends the field is treated as unavailable, not as ready", async () => {
+    renderBooking({ depositPolicy: { type: "percent", percent: 20 }, paymentsAvailable: undefined });
+    await walkTo("services");
+    expect(screen.queryByText(/is collected when you book/)).toBeNull();
+  });
+
+  it("keeps the Pay flow when payments are available", async () => {
+    await submit({ paymentsAvailable: true });
+    fireEvent.click(await screen.findByText("Request Inspection"));
+    expect(await screen.findByText("Pay $90.00 deposit")).toBeTruthy();
+    expect(screen.queryByTestId("booking-deposit-contact")).toBeNull();
+  });
+});
+
+describe("when the up-front amount is the whole fee, the wording does not call it a deposit", () => {
+  const FULL = { type: "percent" as const, percent: 100 };
+
+  it("quotes the full fee on the services step and the summary", async () => {
+    renderBooking({ depositPolicy: FULL });
+    await walkTo("services");
+    expect(await screen.findByText(/The full fee of \$450\.00 is collected when you book/)).toBeTruthy();
+    expect(screen.queryByText(/comes off the total/)).toBeNull();
+  });
+
+  it("labels the confirm row and note as an amount due, not a deposit", async () => {
+    renderBooking({ depositPolicy: FULL });
+    await walkTo("confirm");
+    expect(await screen.findByText("Amount due today")).toBeTruthy();
+    expect(screen.getByText(/pay the full fee of \$450\.00 to hold this slot/)).toBeTruthy();
+    expect(screen.queryByText("Deposit due today")).toBeNull();
+    expect(screen.queryByText(/deducted from your total/)).toBeNull();
+  });
+
+  it("offers a plain Pay button after booking", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: { success: true, inspectionId: "insp-a", depositRequiredCents: 45000 } }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }),
+    );
+    renderBooking({ depositPolicy: FULL });
+    await walkTo("confirm");
+    fireEvent.click(await screen.findByText("Request Inspection"));
+    expect(await screen.findByText("Pay the full fee to hold your slot")).toBeTruthy();
+    expect(await screen.findByText("Pay $450.00")).toBeTruthy();
+    expect(screen.queryByText(/deposit/i)).toBeNull();
   });
 });

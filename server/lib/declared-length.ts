@@ -9,10 +9,15 @@ const MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
  * is 411 rather than zero: a chunked body has no declared size to check. Call it before `parseBody()`, `formData()` or any other read
  * that buffers a multipart request, on every route a stranger or a link holder can reach.
  */
-export function declaredLengthRefusal(c: Context<HonoConfig>, maxBytes: number, tooLarge: Record<string, unknown>): Response | null {
+export function declaredLengthRefusal(
+    c: Context<HonoConfig>, maxBytes: number, tooLarge: Record<string, unknown>,
+    // `requireLength: false` is for a route behind a session and a signed token, whose caller is not a stranger: a request that
+    // declares no length is let through to the check made after the body is read, instead of answered 411.
+    opts: { requireLength?: boolean } = {},
+): Response | null {
     const header = c.req.header('content-length');
     if (header === undefined || !/^\d+$/.test(header.trim())) {
-        return c.json({ error: 'Content-Length is required.' }, 411);
+        return opts.requireLength === false ? null : c.json({ error: 'Content-Length is required.' }, 411);
     }
     return Number(header) > maxBytes + MULTIPART_OVERHEAD_BYTES ? c.json(tooLarge, 413) : null; // projection-allow: a refusal body the caller built from literals (error code and limits)
 }

@@ -2,6 +2,7 @@
  * Fixtures for `FieldEditor.capabilities.test.tsx`: the inspections it opens, the fully provided host, and the
  * mount that leaves one capability out. Not a test file.
  */
+import { m } from "../i18n";
 import { act, render } from "@testing-library/react";
 import { vi } from "vitest";
 import { FieldDataSourceProvider } from "../context";
@@ -144,6 +145,13 @@ export const NO_ITEMS_DATA: EditorData = createEmptyEditorData({ ...DATA, schema
 
 /** An inspection with no sections yet: the editor then offers to choose a template. */
 export const EMPTY_TEMPLATE_DATA: EditorData = createEmptyEditorData({ ...DATA, schema: { sections: [] } });
+/**
+ * A toolbar action the media viewer always has on the fixture's first thumbnail, used as the control that the viewer itself opened.
+ * That thumbnail is a clip, and a clip's toolbar is poster frame, caption and delete: it never offers a cover action (the report
+ * cover is a still), so the photo toolbar's "Set cover" / "Adjust cover" cannot serve as the control here.
+ */
+export const VIEWER_CONTROL_ACTION = () => m.common_delete();
+
 /** The item carries one video clip, so its viewer has a toolbar with a poster-frame action. */
 export const VIDEO_DATA: EditorData = createEmptyEditorData({
   ...DATA,

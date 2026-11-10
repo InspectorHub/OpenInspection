@@ -40,6 +40,7 @@ import { interpolate } from '../../services/automation/shared';
 import { resolveReportTier } from '../../lib/report-tier';
 import { hubPayLink } from '../../lib/inspection/hub-pay-url';
 import { moneyView } from '../../lib/auth/money-access';
+import { getHeldDepositSummary, getNetReceivedCents } from '../../services/payment-ledger.service';
 import { toInspectionRecord } from '../../lib/response-projection';
 
 const sendReportPdfRoute = createRoute(withMcpMetadata({
@@ -529,7 +530,14 @@ reportDeliveryRoutes.openapi(hubRoute, async (c) => {
     const hub = { ...data, invoice: data.invoice ? { ...data.invoice, payUrl: payLink.url, payUrlUnavailable: payLink.unavailable } : null };
     const { invoice, ...rest } = hub;
     const lifecycle = await hubLifecycleFor(c, tenantId, data.inspection, caps); // yes/no and a status, never an amount
-    return c.json({ success: true, data: { ...redactMoney(rest, caps, 'inspectionFees'), invoice: redactMoney(invoice, caps, 'companyFinance'), lifecycle } }, 200);
+    // A paid booking deposit has no invoice to live on yet; show it so the owner can see it landed. Finance-gated like the invoice block.
+    const held = caps.companyFinance ? await getHeldDepositSummary(getDrizzle(c), tenantId, id) : null;
+    const heldDeposit = held ? { amountCents: held.cents, paidAt: held.paidAt.toISOString() } : null;
+    // What the request-payment dialog and button need: the billed total minus this is what is still owed (same ledger the endpoint uses).
+    const receivedCents = caps.companyFinance
+        ? (data.invoice ? await getNetReceivedCents(getDrizzle(c), tenantId, data.invoice.id) : (held?.cents ?? 0))
+        : undefined;
+    return c.json({ success: true, data: { ...redactMoney(rest, caps, 'inspectionFees'), invoice: redactMoney(invoice, caps, 'companyFinance'), ...(caps.companyFinance ? { heldDeposit, receivedCents } : {}), lifecycle } }, 200);
 });
 reportDeliveryRoutes.openapi(agentTokenRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;

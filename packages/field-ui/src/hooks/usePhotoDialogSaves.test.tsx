@@ -22,7 +22,7 @@ const jpeg = () => new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], { type: 
 const huge = () => new Blob([new Uint8Array(MAX_PHOTO_BYTES + 1)]);
 const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 10)); });
 
-function setup(opts: { annotateChecked?: (input: unknown, onChecked?: OnChecked) => Promise<boolean>; performCrop?: (t: unknown, b: Blob, c: unknown, cb?: OnChecked) => void; performAnnotation?: (...a: unknown[]) => boolean } = {}) {
+function setup(opts: { annotateChecked?: (input: { photoIndex: number }, onChecked?: OnChecked) => Promise<boolean>; performCrop?: (t: unknown, b: Blob, c: unknown, cb?: OnChecked) => void; performAnnotation?: (...a: unknown[]) => boolean; photos?: Array<{ key: string }> } = {}) {
   const ds = createFakeDataSource({ data: createEmptyEditorData() });
   const performPhotoCropSave = vi.fn(opts.performCrop ?? (() => undefined));
   const performPhotoAnnotationSave = vi.fn(opts.performAnnotation ?? (() => true));
@@ -33,7 +33,7 @@ function setup(opts: { annotateChecked?: (input: unknown, onChecked?: OnChecked)
   const hook = renderHook((p: { cropTarget: unknown; studioOpen: boolean }) => usePhotoDialogSaves({
     performPhotoCropSave: performPhotoCropSave as never, performPhotoAnnotationSave: performPhotoAnnotationSave as never,
     setPhotoCropTarget: setPhotoCropTarget as never, setRecropWarn: setRecropWarn as never, setStudioOpen,
-    annotateChecked: (opts.annotateChecked ?? (async () => true)) as never, photoCropTarget: p.cropTarget as never, studioOpen: p.studioOpen,
+    annotateChecked: (opts.annotateChecked ?? (async () => true)) as never, getItemPhotos: () => opts.photos ?? [], photoCropTarget: p.cropTarget as never, studioOpen: p.studioOpen,
   }), { wrapper, initialProps: { cropTarget: target as unknown, studioOpen: true } });
   return { ds, hook, performPhotoCropSave, performPhotoAnnotationSave, setPhotoCropTarget, setStudioOpen };
 }
@@ -135,6 +135,33 @@ describe('the pre-connect relay', () => {
     expect(listener?.(false)).toBe(false); // cancelled: the check must stay silent
     setStudioOpen.mockClear();
     await flush();
+    expect(setStudioOpen).not.toHaveBeenCalled();
+  });
+
+  // The relay sends the photo's index to the server, so it must follow the photo, not the slot it was opened at.
+  it('addresses the photo by its key: the list changed since the studio opened', async () => {
+    const sent: Array<{ photoIndex: number }> = [];
+    const { hook } = setup({
+      performAnnotation: () => false,
+      photos: [{ key: 'A' }, { key: 'B' }], // B is now at 1; the studio was opened when it was at 0
+      annotateChecked: (input) => { sent.push(input); return Promise.resolve(true); },
+    });
+    act(() => hook.result.current.saveAnnotation({ itemId: 'i1', photoIndex: 0, expectOriginalKey: 'B' }, jpeg(), '[]'));
+    await flush();
+    expect(sent.map((s) => s.photoIndex)).toEqual([1]);
+  });
+
+  it('a photo that is gone is not sent: the person is told and the studio stays open', async () => {
+    const sent: Array<{ photoIndex: number }> = [];
+    const { ds, hook, setStudioOpen } = setup({
+      performAnnotation: () => false,
+      photos: [{ key: 'A' }],
+      annotateChecked: (input) => { sent.push(input); return Promise.resolve(true); },
+    });
+    act(() => hook.result.current.saveAnnotation({ itemId: 'i1', photoIndex: 1, expectOriginalKey: 'B' }, jpeg(), '[]'));
+    await flush();
+    expect(sent).toEqual([]);
+    expect(ds.notifications.map((n) => n.message)).toEqual([m.editor_photo_save_gone_keep_open()]);
     expect(setStudioOpen).not.toHaveBeenCalled();
   });
 

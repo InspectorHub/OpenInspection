@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { PhotoLightbox } from "./PhotoLightbox";
 import { useMaxWidth } from "../../hooks/useBreakpoint";
 import { VideoPlayer } from "./VideoPlayer";
@@ -14,14 +15,20 @@ export const ALL_MEDIA_ACTIONS: readonly MediaAction[] = ["crop", "annotate", "r
 /** Bottom toolbar — single place all per-media actions live (field-tablet: bottom, 44px). */
 export function MediaViewerToolbar({
   kind,
+  provider,
   edited,
   on,
   hide,
   compact = false,
+  isCover = false,
 }: {
   kind: "photo" | "video";
+  /** Video backend. An R2 clip has no poster picker (its poster is the frame captured at upload); absent means Stream. */
+  provider?: "stream" | "r2";
   edited: boolean;
   on: (a: MediaAction) => void;
+  /** The photo on screen is the report cover: the cover action reads as an adjustment, not as setting it. */
+  isCover?: boolean;
   /** A narrow screen: 44px targets that keep their label on one line and never shrink (the bar wraps instead). */
   compact?: boolean;
   /** Actions the parent does not handle; they are left out rather than shown dead. */
@@ -38,13 +45,13 @@ export function MediaViewerToolbar({
       {label}
     </button>
   );
-  // Plan 7 — video gets a LOCKED minimal toolbar: poster · cover · caption ·
-  // delete. NO crop / annotate / rotate / revert (out of v1). Photo unchanged.
+  const cover = isCover ? m.media_viewer_cover_adjust() : m.media_viewer_cover();
+  // A video gets a LOCKED minimal toolbar: poster frame (Stream only) · caption · delete. No crop / annotate / rotate / revert,
+  // and never "cover": the report cover is a still image. Photo unchanged.
   if (kind === "video") {
     return (
       <>
-        {btn("poster", m.media_viewer_poster())}
-        {btn("cover", m.media_viewer_cover())}
+        {provider === "r2" ? null : btn("poster", m.media_viewer_poster())}
         {btn("caption", m.media_viewer_caption())}
         {btn("delete", m.common_delete())}
       </>
@@ -54,7 +61,7 @@ export function MediaViewerToolbar({
     btn("crop", m.media_viewer_crop()),
     btn("annotate", m.media_viewer_annotate()),
     btn("rotate", m.media_viewer_rotate()),
-    btn("cover", m.media_viewer_cover()),
+    btn("cover", cover),
     btn("caption", m.media_viewer_caption()),
   ];
   if (edited) items.push(btn("revert", m.media_viewer_revert()));
@@ -72,10 +79,31 @@ export interface MediaViewerProps {
   /** Plan 7 — inspection id, used to build r2-object URLs for R2 videos. */
   inspectionId?: string;
   /** Toolbar actions the parent does not handle; they are not offered. */
-  hideActions?: readonly MediaAction[];
+  hideActions?: readonly MediaAction[] | ((shown: GalleryPhoto) => readonly MediaAction[] | undefined);
+  /** The inspection's report cover (the key a photo shows): the photo that is it offers "Adjust cover" instead of "Set cover". */
+  coverKey?: string | null;
 }
-export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSubdomain, inspectionId, hideActions }: MediaViewerProps) {
-  const viewed = index !== null ? photos[index] : undefined;
+export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSubdomain, inspectionId, hideActions, coverKey }: MediaViewerProps) {
+  // The slide ON SCREEN. `index` only says where the viewer was opened; the lightbox then moves on its own (Next/Prev,
+  // arrow keys, swipe), so the toolbar must follow what it reports, or an action (Delete included) would act on the
+  // photo the viewer was opened on while another is shown.
+  // A clip has no file key (it is ''), so identify a slide by its media id when the key is empty.
+  const idOf = (p: GalleryPhoto | undefined) => (p ? p.key || p.mediaId || p.streamUid || undefined : undefined);
+  const [view, setView] = useState<{ index: number | null; key?: string | undefined }>({ index, key: index === null ? undefined : idOf(photos[index]) });
+  const [openedAt, setOpenedAt] = useState(index);
+  if (index !== openedAt) { setOpenedAt(index); setView({ index, key: index === null ? undefined : idOf(photos[index]) }); }
+  // The list can change while open (a photo deleted, or moved): stay on the same photo by its key, or on its neighbour.
+  let shown: number | null = null;
+  if (view.index !== null && photos.length > 0) {
+    const moved = view.key !== undefined && idOf(photos[view.index]) !== view.key ? photos.findIndex((p) => idOf(p) === view.key) : -1;
+    shown = Math.min(moved >= 0 ? moved : view.index, photos.length - 1);
+  }
+  const shownKey = shown === null ? undefined : idOf(photos[shown]);
+  useEffect(() => {
+    if (shown !== null && (view.index !== shown || view.key !== shownKey)) setView({ index: shown, key: shownKey });
+    if (index !== null && photos.length === 0) onClose();
+  });
+  const viewed = shown !== null ? photos[shown] : undefined;
   // Seven controls do not fit one line at phone width: wrap them, with 44px targets (the wide toolbar is untouched).
   const compact = useMaxWidth(480);
   const kind = viewed ? resolveMediaType(viewed) : "photo";
@@ -85,8 +113,10 @@ export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSu
         <MediaViewerToolbar
           key="tb"
           kind={kind}
+          provider={viewed.provider}
           edited={!!viewed.annotated}
-          hide={hideActions}
+          hide={typeof hideActions === "function" ? hideActions(viewed) : hideActions}
+          isCover={!!coverKey && viewed.key === coverKey}
           compact={compact}
           on={(a) => {
             onClose();
@@ -135,9 +165,10 @@ export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSu
   return (
     <PhotoLightbox
       slides={slides}
-      index={index ?? 0}
-      open={index !== null}
+      index={shown ?? 0}
+      open={shown !== null}
       onClose={onClose}
+      onView={(next) => setView({ index: next, key: photos[next]?.key })}
       toolbarButtons={toolbar}
       toolbarWrap={compact}
       renderSlide={(slide) => {

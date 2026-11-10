@@ -13,7 +13,8 @@ import { logger } from '../../lib/logger';
  * - daily quota    — heals at the next UTC midnight. Same shape: PENDING,
  *                    `send_at` moved to that instant.
  * - monthly quota  — does not heal in any useful time. A real failure, with a
- *                    reason a person can act on.
+ *                    reason a person can act on. The Free plan's own monthly email
+ *                    allowance (a refusal that names its `period`) reads the same way.
  *
  * The first two reuse the "stay pending and push send_at" mechanism the
  * outbound cooling window already established (./cooling-window): flush() needs
@@ -35,6 +36,11 @@ export const DAILY_QUOTA_DEFER_REASON =
     'waiting — daily email sending limit reached, retrying after the next UTC midnight';
 export const MONTHLY_QUOTA_FAIL_REASON =
     'monthly email sending limit reached at the email provider; this message was not sent';
+/** The Free plan's own monthly built-in email allowance (`PlanQuotaGuard.checkMessagingQuota`) is spent. Failed rather than
+ *  deferred to the renewal: a message held for weeks (a reminder, a confirmation) would arrive stale, and a monthly
+ *  provider quota is treated the same way above. The reason is what the log shows a person. */
+export const PLAN_EMAIL_ALLOWANCE_FAIL_REASON =
+    'monthly built-in email allowance reached; this message was not sent (it renews at the start of the next UTC month)';
 
 /** Pause used when the provider rate-limited us without saying for how long. */
 const DEFAULT_RATE_LIMIT_PAUSE_MS = 60_000;
@@ -76,6 +82,10 @@ export function providerOutcomeFor(err: unknown, nowMs: number): ProviderOutcome
             return { action: 'defer', sendAtMs: nextUtcMidnightMs(nowMs), reason: DAILY_QUOTA_DEFER_REASON };
         }
         if (details.quotaWindow === 'monthly') return { action: 'fail', reason: MONTHLY_QUOTA_FAIL_REASON };
+        // No provider window, but a named month: the plan allowance, which is monthly by definition.
+        if (details.quotaWindow === undefined && typeof details.period === 'string') {
+            return { action: 'fail', reason: PLAN_EMAIL_ALLOWANCE_FAIL_REASON };
+        }
     }
     return null;
 }

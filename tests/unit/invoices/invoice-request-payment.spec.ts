@@ -10,6 +10,7 @@ const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import invoiceRoutes from '../../../server/api/invoices';
 import { InvoiceService } from '../../../server/services/invoice.service';
+import { recordPayment } from '../../../server/services/payment-ledger.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { PortalAccessService } from '../../../server/services/portal-access.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -270,5 +271,27 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
         const res = await post({ inspectionId: OTHER_INSP_ID });
         expect(res.status).toBe(404);
         expect(sendInvoiceRequest).not.toHaveBeenCalled();
+    });
+
+    it('a held deposit comes off the amount the client is asked for', async () => {
+        await recordPayment(db as never, TENANT, {
+            inspectionId: INSP_ID, invoiceId: null, kind: 'deposit', amountCents: 20000,
+            method: 'card', provider: 'stripe', providerRef: 'pi_dep',
+        });
+        const res = await post({ inspectionId: INSP_ID });
+        expect(res.status).toBe(200);
+        expect(sendInvoiceRequest.mock.calls[0][2]).toBe('$300.00');
+    });
+
+    it('a deposit that covers the whole amount: 409, nothing is marked sent and no email goes out', async () => {
+        await recordPayment(db as never, TENANT, {
+            inspectionId: INSP_ID, invoiceId: null, kind: 'deposit', amountCents: 50000,
+            method: 'card', provider: 'stripe', providerRef: 'pi_dep',
+        });
+        const res = await post({ inspectionId: INSP_ID });
+        expect(res.status).toBe(409);
+        expect(sendInvoiceRequest).not.toHaveBeenCalled();
+        const row = await db.select().from(schema.invoices).where(eq(schema.invoices.inspectionId, INSP_ID)).get();
+        expect(row!.sentAt).toBeNull();
     });
 });

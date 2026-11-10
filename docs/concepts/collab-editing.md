@@ -280,10 +280,14 @@ authoritative, and its next persist overwrites the blob.
   deterministically (last-writer-by-clientID). No operation is "lost" in the CRDT,
   but one value wins — the **version history** surfaces the overwritten value so it
   is recoverable.
-- **Network-only operations**: photo/video binary upload and crop/annotate image
-  baking require a connection (they write to R2). Offline, the editor declines these
-  with a "needs a connection" notice; all field data and photo array operations
-  (reorder/detach/move/revert) work offline.
+- **Offline media**: photos, crops and annotations made offline are stored in
+  IndexedDB (`app/lib/field/web-media-store.ts`) and uploaded to R2 by the media
+  drain when the connection returns (`packages/field-ui/src/hooks/useMediaDrain.ts`);
+  the document entry carries `pendingUpload` until then. All field data and photo
+  array operations (reorder/detach/move/revert) also work offline.
+- **Network-only operations**: video upload in the web app needs a connection
+  (clips are not queued; the add-video control is disabled while offline), and
+  so do photos attached to a defect (the web queue stores item photos only).
 
 ## Version history & restore
 
@@ -299,6 +303,59 @@ on-demand JSON-projection snapshots in DO storage (capped at 25, `{seq, atMs, by
   client drops its local Y.Doc + IndexedDB and resyncs from scratch — so a restore
   converges all live clients (a plain additive update could not revert deletions).
 - UI: the **Version history** panel in the editor (`packages/field-ui/src/components/collab/VersionHistoryPanel.tsx`).
+
+## Lineage guard (generation id)
+
+A Yjs document is a history, and two histories of the same inspection that were built independently do not merge: for each
+finding the whole item of ONE history wins, chosen by client id, not by time. A browser that kept an old history in its
+offline store could therefore resurrect deleted photos and drop newer ones. A new history begins whenever the server
+document is rebuilt rather than carried forward: a version restore (for a browser that was closed or offline during it), a
+document rebuilt from the database after its storage was emptied, and a copy between Durable Object namespaces that replaced
+a document built from the database (see `docs/operate/durable-object-jurisdiction.md`).
+
+- The object keeps a random **generation id** in its storage (`gen`). It is created with the document, kept through
+  hibernation, minted again on a version restore and when the document is rebuilt, and unchanged by a restructure. A state
+  transfer carries it with the document bytes. An object whose storage predates the id mints one on its next start.
+- **Wire protocol.** The server sends `MSG_GENERATION` (4) followed by the id as a varstring as the **first frame of every
+  socket**, before its sync step 1. The restore frame (`MSG_RESTORE`, 2) carries the same varstring after its type byte.
+  Clients that do not know the frame ignore it: the browser editor of an earlier build and the native client both drop
+  frame types they do not handle, and both read only the type byte of a restore frame.
+- **Client.** The web host records the id per inspection in its own small IndexedDB database (`results-gen-<id>`). Until
+  the first frame is judged the connection neither forwards local edits nor sends its own step 1 nor answers the server's. Same id: carry on.
+  Different id: the local copy is discarded (as on a restore) and re-pulled, and nothing from it is sent. No id recorded
+  (a store written before the guard existed): the server's id is adopted and the store is trusted once, so **the first
+  deploy cannot protect stores that already exist**. A server that sends no generation frame (an older deploy) is
+  recognised by its first frame being a sync frame, and the connection behaves as it did before.
+- **Offline edits on a discarded store.** They live in the same IndexedDB store and are dropped with it. The connection first
+  saves the full Yjs state of what it discards into ONE backup slot (`results-discarded-<id>`: the update, both ids, the
+  time), overwritten by the next discard, never read automatically, and removed with the inspection's other offline data.
+  Support can recover edits by applying that update to a scratch document. Photos waiting in the offline media queue are
+  separate and are not touched.
+- **A backup that cannot be written** (storage full or blocked) abandons the discard: the store is kept, no new id is
+  recorded, nothing is sent (the handle reports `lineageHold`), and the socket is reopened with the usual backoff to retry.
+  The offline copy is never cleared without its backup.
+- **The server checks too.** A client that holds a recorded id reports it on the socket upgrade (`?gen=<id>`). If it is not the
+  id the object holds, the object sends the generation frame only (no step 1), then closes the socket with code 4410, and any
+  frame still arriving on it is dropped, so that socket can never write. A client that follows the protocol treats the frame as a
+  mismatch (backup, discard, record the new id) and reconnects reporting the new id, which is accepted. A malformed value counts as
+  a mismatch. A client that sends no `gen` is served as before: see the residual window below.
+- **A connection reports the history of its in-memory document, not the shared record.** The first read of the record names the
+  history the loaded document belongs to; later socket opens in the same tab keep using that, even if another tab has since discarded
+  and recorded a newer id. A tab still holding the old history therefore reports (and is judged by) the old id and discards it with
+  a backup instead of handing it to the new history. A document that belongs to no recorded history while the record now holds one
+  is discarded too, not trusted.
+  With two tabs open the single backup slot can be overwritten by the second tab's discard; both copies are the same old history, the second possibly a superset.
+- **Residual window.** A client that sends no `gen` cannot be told apart from a current one that has nothing recorded, and refusing
+  it would lock out every legitimate older client. That covers a cached bundle that predates the parameter, including bundles that
+  predate the guard and ignore the generation frame, and the native client. For those, the generation frame is the only protection
+  and a bundle that ignores it can still merge its old history until the cached bundle is replaced (a reload fetches the new one).
+- While a discard is held, the editor's save indicator reads "Not syncing" (with the full reason on hover), the connection reports itself as not synced, and the unsaved-changes warning stays armed.
+- **Rolling back the engine** to a build without the guard leaves everything done during the rollback invisible to it: a version
+  restore or a state import in that window creates a new history but no new id. Browsers that synced before the rollback keep
+  their old id and match again after the roll-forward, so a stale store can slip through exactly as it did before the guard.
+  After a rollback, treat restores and imports made meanwhile as unprotected and ask users with offline copies to reopen
+  the inspection online.
+- The native client keeps its own connector and does not act on the frame yet, so it is not protected by this guard.
 
 ## Configuration
 

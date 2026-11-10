@@ -18,6 +18,7 @@ import type { OfflinePurgeHost } from "@core/field-ui/collab/offline-purge";
 import type { CollabConnector } from "@core/field-ui/data-source";
 import type { ResultsDocHost } from "@core/field-ui/collab/use-results-doc";
 import { webMediaStore } from "./web-media-store";
+import { discardedDbName, lineageDbName, webLineageStore } from "./web-lineage-store";
 
 /**
  * Delete an IndexedDB database by name, resolving once the delete settles.
@@ -58,23 +59,24 @@ export function webPersistence(name: string, doc: Y.Doc): ResultsDocPersistence 
  *
  * Converts `https:` -> `wss:` and `http:` -> `ws:`. The inspection id is
  * percent-encoded so ids containing slashes or other special characters route
- * correctly.
+ * correctly. `gen` (the generation the open document belongs to) rides as `?gen=`: the server refuses a socket naming another history.
  */
 export function buildCollabWsUrl(
     inspectionId: string,
     loc: { protocol: string; host: string },
+    gen?: string | null,
 ): string {
     const wsProtocol = loc.protocol === "https:" ? "wss:" : "ws:";
     const path = `/api/inspections/${encodeURIComponent(inspectionId)}/collab/ws`;
-    return `${wsProtocol}//${loc.host}${path}`;
+    return `${wsProtocol}//${loc.host}${path}${gen ? `?gen=${encodeURIComponent(gen)}` : ""}`;
 }
 
 /** The collab URL on the page's own origin (https/localhost when there is no window). */
-export function webCollabWsUrl(inspectionId: string): string {
+export function webCollabWsUrl(inspectionId: string, gen?: string | null): string {
     const loc = typeof window !== "undefined"
         ? window.location
         : { protocol: "https:", host: "localhost" };
-    return buildCollabWsUrl(inspectionId, loc);
+    return buildCollabWsUrl(inspectionId, loc, gen);
 }
 
 /** Subscribe to the browser's `online` event; returns the unsubscribe. */
@@ -84,16 +86,18 @@ export function webSubscribeOnline(onOnline: () => void): () => void {
     return () => window.removeEventListener("online", onOnline);
 }
 
-/** The three host pieces `useResultsDoc` needs, as one stable reference. */
+/** The host pieces `useResultsDoc` needs (persistence, socket URL, online signal, lineage store), as one stable reference. */
 export const webCollabHost: ResultsDocHost = {
     persistence: webPersistence,
     wsUrl: webCollabWsUrl,
     subscribeOnline: webSubscribeOnline,
+    lineage: webLineageStore,
 };
 
 /** Erase one inspection's persisted results doc from this browser profile. */
-export function webClearResultsData(inspectionId: string): Promise<void> {
-    return deleteDatabase(resultsDocName(inspectionId));
+export async function webClearResultsData(inspectionId: string): Promise<void> {
+    // The lineage record and the discarded-store backup belong to the same inspection: they go with it.
+    await Promise.all([resultsDocName(inspectionId), lineageDbName(inspectionId), discardedDbName(inspectionId)].map(deleteDatabase));
 }
 
 /** What `purgeInspectionOfflineData` needs from the web host. */
@@ -131,6 +135,7 @@ export const webCollabConnector: CollabConnector = {
             persistenceSynced,
             synced: () => handle.synced,
             locked: () => handle.locked === true,
+            held: () => handle.lineageHold === true,
             destroy,
         };
     },

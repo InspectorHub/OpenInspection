@@ -183,6 +183,7 @@ export interface ResultsDocHandle {
   doc: Y.Doc;
   persistenceSynced: Promise<void>;
   synced: () => boolean;
+  held?: () => boolean; // true while a stale offline copy could not be backed up: not syncing, retrying (lineage guard)
   locked?: () => boolean; // true once the server closed the socket because the report is published (no reconnect follows)
   destroy(): void;
 }
@@ -293,6 +294,12 @@ export interface FieldResources {
    * without the video flow leaves the member out, and the capture entry point is not offered.
    */
   video?: {
+    /**
+     * Optional, per backend: the most bytes one clip may be on this host. Absent (or absent for a backend), the editor applies the
+     * large default (200 MB). A host whose upload takes the clip in one buffered request sets a lower one for that backend; a
+     * host that uploads in parts (the native client) sets none.
+     */
+    maxUploadBytes?: { r2?: number; stream?: number };
     createUpload(inspectionId: string, input: { itemId?: string }): Promise<CommandResult<VideoUploadTicket>>;
     /**
      * Send the clip to the ticket's `uploadURL`, reporting `0..100` progress. For r2 the answer carries the real

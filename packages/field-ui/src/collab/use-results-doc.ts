@@ -22,7 +22,7 @@ export type { ResultsDocHandle };
  * `app/lib/field/web-data-source.ts`, from `webCollabHost` in `app/lib/field/web-collab.ts`).
  * Pass a stable reference (a module constant).
  */
-export type ResultsDocHost = Pick<ConnectOptions, 'persistence' | 'wsUrl' | 'subscribeOnline'>;
+export type ResultsDocHost = Pick<ConnectOptions, 'persistence' | 'wsUrl' | 'subscribeOnline' | 'lineage'>;
 
 /**
  * Returns the live ResultsDocHandle once the client connection is established,
@@ -66,7 +66,7 @@ export function useResultsDoc(inspectionId: string | null, onSynced?: () => void
         let live: ReturnType<typeof collab.connect> | null = null;
         let closed = false;
         const snapshot = (): ResultsDocHandle | null =>
-            live === null ? null : { doc: live.doc, persistenceSynced: persisted, synced: live.synced(), locked: live.locked?.() ?? false };
+            live === null ? null : { doc: live.doc, persistenceSynced: persisted, synced: live.synced(), locked: live.locked?.() ?? false, lineageHold: live.held?.() ?? false };
         const publish = (): void => {
             if (closed) return;
             const next = snapshot();

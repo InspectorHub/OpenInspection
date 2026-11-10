@@ -18,6 +18,12 @@ vi.mock('../../../server/lib/inspection/hub-lifecycle', () => ({
     hubLifecycleFor: async () => ({ moneyCollected: false, statusBeforeCancel: null, mayDelete: true }),
 }));
 
+// The held-deposit read has its own spec (held-deposit-summary.spec.ts); this one stubs the database away.
+vi.mock('../../../server/services/payment-ledger.service', () => ({
+    getHeldDepositSummary: async () => ({ cents: 9000, paidAt: new Date('2026-11-05T15:00:00.000Z') }),
+    getNetReceivedCents: async (_db: unknown, _tenant: string, invoiceId: string) => (invoiceId === 'inv-1' ? 45000 : 12345),
+}));
+
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INSP_ID = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -31,6 +37,8 @@ const HUB = {
     publishReadiness: { ready: true, blockingCount: 0 },
 };
 
+let hubOverride: Partial<typeof HUB> | null = null;
+
 function buildApp(role: UserRole, overrides: Record<string, boolean> | null) {
     const app = new OpenAPIHono<HonoConfig>();
     app.use('*', async (c, next) => {
@@ -40,7 +48,7 @@ function buildApp(role: UserRole, overrides: Record<string, boolean> | null) {
         c.set('requestedTenantSlug', 'acme' as never);
         c.set('sdb', { getById: async () => ({ permissionOverrides: overrides }) } as never);
         c.set('services', {
-            inspection: { getInspectionHub: async () => structuredClone(HUB) },
+            inspection: { getInspectionHub: async () => structuredClone({ ...HUB, ...(hubOverride ?? {}) }) },
             people: { getPrimaryClient: async () => null },
             portalAccess: { issueToken: async () => 'tok' },
         } as never);
@@ -59,7 +67,7 @@ const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET: 'tes
 async function hub(role: UserRole, overrides: Record<string, boolean> | null) {
     const res = await buildApp(role, overrides).request(`/api/inspections/${INSP_ID}/hub`, {}, ENV);
     expect(res.status).toBe(200);
-    return (await res.json() as { data: { inspection: Record<string, unknown>; services: Array<Record<string, unknown>>; invoice: Record<string, unknown> } }).data;
+    return (await res.json() as { data: { inspection: Record<string, unknown>; services: Array<Record<string, unknown>>; invoice: Record<string, unknown>; heldDeposit?: Record<string, unknown> | null; receivedCents?: number } }).data;
 }
 
 describe('hub money, field by field', () => {
@@ -68,6 +76,17 @@ describe('hub money, field by field', () => {
         expect(d.inspection.price).toBe(45000);
         expect(d.services[0]).toHaveProperty('priceCents');
         expect(d.invoice.amountCents).toBe(45000);
+        // A paid booking deposit is shown to the finance viewer: amount and date, as data.
+        expect(d.heldDeposit).toEqual({ amountCents: 9000, paidAt: '2026-11-05T15:00:00.000Z' });
+        // This invoice exists, so the received figure is its ledger's, not the held deposit's.
+        expect(d.receivedCents).toBe(45000);
+    });
+    it('with no invoice yet, received is the held booking deposit, not an invoice ledger figure', async () => {
+        hubOverride = { invoice: null as never };
+        try {
+            const d = await hub('manager', null);
+            expect(d.receivedCents).toBe(9000);
+        } finally { hubOverride = null; }
     });
     it('inspectionFees on, companyFinance off: price lines but no invoice amounts', async () => {
         const d = await hub('manager', { inspectionFees: true, companyFinance: false });
@@ -75,6 +94,8 @@ describe('hub money, field by field', () => {
         expect(d.services[0]).toHaveProperty('priceCents');
         expect(d.invoice).not.toHaveProperty('amountCents');
         expect(d.invoice).not.toHaveProperty('amountPaidCents');
+        expect(d).not.toHaveProperty('heldDeposit');
+        expect(d).not.toHaveProperty('receivedCents');
         expect(d.invoice.status).toBe('paid');
     });
     it('the default inspector is that case', async () => {

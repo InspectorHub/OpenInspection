@@ -68,7 +68,10 @@ describe('ReportView image robustness (Plan 1 / N1)', () => {
     // image branch wires onError → the failed-photo marker. Post-split the marker
     // is threaded as the onPhotoFailed prop into <ReportMediaTile> (which calls
     // markPhotoFailed), so the wiring is verified across the two ends.
-    expect(text).toMatch(/onError=\{\(\)\s*=>\s*onPhotoFailed\(/);
+    // The tile retries once (behaviour: ReportMediaTile.retry.test.tsx) and only then reports the photo.
+    expect(text).toMatch(/onError=\{fail\}/);
+    expect(text).toMatch(/onPhotoFailed\(photo\.key\)/);
+    expect(text).toContain('naturalWidth === 0');
     expect(text).toContain('onPhotoFailed={markPhotoFailed}');
     expect(text).toContain('renderMediaTile');
     // The collapse filter (mediaVisible) is applied at BOTH grid call sites.

@@ -8,6 +8,7 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { eq } from 'drizzle-orm';
 import { tenants } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
+import { refuseVisitorOnSpentAllowance } from '../inspections/create-support';
 import { checkRateLimit } from '../../lib/rate-limit';
 import {
     PublicBookingSchema,
@@ -75,7 +76,15 @@ app.openapi(createBookingRoute, async (c) => {
     if (!tenantRow) throw Errors.NotFound('Tenant not found.');
     const tenantId = tenantRow.id;
 
-    return c.var.services.booking.fulfillBooking(c, tenantId, body);
+    try {
+        return await c.var.services.booking.fulfillBooking(c, tenantId, body);
+    } catch (err) {
+        // The company's own monthly allowance is spent. The visitor is not the one who set it up and has nothing
+        // to act on, so they get a neutral answer that names no plan; the owner is told once per month through
+        // the existing threshold notice (deduped there per month).
+        // projection-allow: the helper returns `never` and builds no response; it throws a fixed neutral refusal (no row, no plan name) or rethrows the error as it is
+        return refuseVisitorOnSpentAllowance(c, tenantId, err);
+    }
 });
 
 /** Registration order. Drives the typed client; a test pins it to what `app` really registered. */

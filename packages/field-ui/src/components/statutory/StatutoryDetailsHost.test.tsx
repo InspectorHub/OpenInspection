@@ -14,7 +14,10 @@ import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-
 import type { FakeDataSource } from "../../testing/fake-data-source";
 import { StatutoryDetailsHost } from "./StatutoryDetailsHost";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const DETAILS: StatutoryDetailsValues = {
     inspectorSignatureDate: null,

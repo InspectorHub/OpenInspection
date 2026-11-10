@@ -357,7 +357,7 @@ describe('POST /book consumes the free-tier quota (public self-serve booking)', 
         };
     }
 
-    it('blocks the 6th booking for a free tenant with 402/QUOTA_EXHAUSTED and leaves no orphaned rows', async () => {
+    it('blocks the 6th booking for a free tenant with a NEUTRAL 409 (no plan wording) and leaves no orphaned rows', async () => {
         const { app } = buildApp(testDb, svc);
 
         for (let i = 0; i < 5; i++) {
@@ -366,9 +366,12 @@ describe('POST /book consumes the free-tier quota (public self-serve booking)', 
         }
 
         const res = await app.request('/book', morningBody(), FAKE_ENV, FAKE_EXEC_CTX);
-        expect(res.status).toBe(402);
-        const body = await res.json() as { error: { code: string } };
-        expect(body.error.code).toBe('QUOTA_EXHAUSTED');
+        // The visitor is not told about plans, limits or subscriptions: a conflict with a neutral message.
+        expect(res.status).toBe(409);
+        const body = await res.json() as { error: { code: string; message: string } };
+        expect(body.error.code).not.toBe('QUOTA_EXHAUSTED');
+        expect(body.error.message).toMatch(/not taking new online bookings right now/);
+        expect(body.error.message).not.toMatch(/plan|free|subscribe|limit|quota/i);
 
         // Graceful failure — the request row inserted BEFORE the inspection row
         // in the legacy single-service branch must never be left orphaned:

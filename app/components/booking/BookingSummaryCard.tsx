@@ -11,7 +11,7 @@
  * Rows only. The deposit note, the payment panel and the headings stay with the
  * step, which is the thing that differs between the two moments.
  */
-import { timeWindows } from "./booking-constants";
+import { isFullFeeDeposit, timeWindows } from "./booking-constants";
 import { formatBookingDate } from "./booking-date-rules";
 import { formatCurrency } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
@@ -94,7 +94,7 @@ export function BookingSummaryCard({
       </div>
       {depositQuoteCents > 0 && (
         <div className="flex justify-between gap-4">
-          <span className="text-ih-fg-3">{m.booking_confirm_row_deposit()}</span>
+          <span className="text-ih-fg-3">{isFullFeeDeposit(depositQuoteCents, totalPrice) ? m.booking_confirm_row_deposit_full() : m.booking_confirm_row_deposit()}</span>
           <span className="font-medium text-ih-fg-1 tabular-nums">
             {formatCurrency(depositQuoteCents, { locale, currency })}
           </span>

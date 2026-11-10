@@ -34,6 +34,7 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
     const r2Mock = {
         put:    vi.fn().mockResolvedValue(undefined),
         delete: vi.fn().mockResolvedValue(undefined),
+        head:   vi.fn().mockResolvedValue(null),
     };
 
     beforeEach(async () => {
@@ -48,6 +49,7 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
         svc = new InspectionService(testD1.binding, r2Mock as unknown as R2Bucket, sdb);
         r2Mock.put.mockClear();
         r2Mock.delete.mockClear();
+        r2Mock.head.mockReset().mockResolvedValue(null);
 
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
@@ -138,6 +140,24 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
         // Panel item lives in a different section.
         const panel = out.attached.find(p => p.key === 'k-panel-1');
         expect(panel?.sectionTitle).toBe('Electrical');
+    });
+
+    it('getMediaCenter says which unit each attached photo belongs to', async () => {
+        await testDb.insert(schema.inspectionResults).values({
+            id:            'res-units',
+            tenantId:      TENANT,
+            inspectionId:  INSPECTION_ID,
+            data:          {
+                'u1:sec-roof:item-cover':       { photos: [{ key: 'k-unit-1' }] },
+                'u2:sec-roof:item-cover':       { photos: [{ key: 'k-unit-2' }] },
+                '_default:sec-roof:item-panel': { photos: [{ key: 'k-common' }] },
+            },
+            lastSyncedAt:  new Date(),
+        });
+        const out = await svc.getMediaCenter(INSPECTION_ID, TENANT);
+        expect(out.attached.find(p => p.key === 'k-unit-1')).toMatchObject({ unitId: 'u1', sectionId: 'sec-roof', itemId: 'item-cover' });
+        expect(out.attached.find(p => p.key === 'k-unit-2')?.unitId).toBe('u2');
+        expect(out.attached.find(p => p.key === 'k-common')?.unitId).toBe('_default');
     });
 
     it('uploadPoolPhoto persists a row + getMediaCenter returns it (newest first)', async () => {
@@ -284,6 +304,46 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
         expect(r2Mock.delete).toHaveBeenCalledWith(other.key);
     });
 
+    describe('a finished video is on its item, not in the loose pool', () => {
+        const insertVideoRow = () => testDb.insert(schema.inspectionMediaPool).values({
+            id: 'vid-pool', inspectionId: INSPECTION_ID, tenantId: TENANT,
+            r2Key: `${TENANT}/inspections/${INSPECTION_ID}/videos/vid-pool.mp4`, url: '',
+            uploadedAt: new Date(), mediaType: 'video', provider: 'r2',
+            posterKey: `${TENANT}/inspections/${INSPECTION_ID}/videos/vid-pool.poster.jpg`,
+        });
+
+        it('does not list a video row in the pool (it would show as a photo with no picture)', async () => {
+            await insertVideoRow();
+            const photo = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, new File([JPEG_BYTES], 'a.jpg', { type: 'image/jpeg' }));
+            const out = await svc.getMediaCenter(INSPECTION_ID, TENANT);
+            // Control: the photo row is listed, so the empty video answer is the filter and not an empty pool.
+            expect(out.pool.map((p) => p.id)).toEqual([photo.id]);
+        });
+
+        it('refuses to attach a video row as a photo, and leaves the row and the results alone', async () => {
+            await insertVideoRow();
+            await expect(svc.attachPoolPhoto(INSPECTION_ID, TENANT, 'vid-pool', 'item-cover')).rejects.toThrow(/video/i);
+            const rows = await testDb.select().from(schema.inspectionMediaPool);
+            expect(rows.map((r) => r.id)).toContain('vid-pool');
+            expect(await testDb.select().from(schema.inspectionResults)).toHaveLength(0);
+        });
+    });
+
+    it('the reorder and revert routes answer 400 (not 500) for an order that names a clip, and a revert of a clip leaves it as it was', async () => {
+        const clip = { key: '', mediaType: 'video', provider: 'r2', mediaId: 'm1' };
+        await testDb.insert(schema.inspectionResults).values({
+            id: 'res-clip', tenantId: TENANT, inspectionId: INSPECTION_ID,
+            data: { 'item-cover': { photos: [{ key: 'a' }, clip, { key: 'b' }] } } as never, lastSyncedAt: new Date(),
+        });
+        await expect(svc.reorderItemPhotos(INSPECTION_ID, TENANT, 'item-cover', ['a', 'm:m1'])).rejects.toMatchObject({ status: 400 });
+        await expect(svc.revertPhotoEdits(INSPECTION_ID, TENANT, 'item-cover', 1)).rejects.toMatchObject({ status: 400 });
+        // Control: a valid reorder of the keyed photos works and the clip keeps its place.
+        await svc.reorderItemPhotos(INSPECTION_ID, TENANT, 'item-cover', ['b', 'a']);
+        const row = await testDb.select().from(schema.inspectionResults).get();
+        const data = typeof row!.data === 'string' ? JSON.parse(row!.data) : row!.data;
+        expect((data['item-cover'].photos as Array<{ key: string; mediaId?: string }>).map(p => p.mediaId ?? p.key)).toEqual(['b', 'm1', 'a']);
+    });
+
     it('tenant isolation — pool rows for another tenant are invisible to attach/list/delete', async () => {
         // Seed a pool row that belongs to a *different* tenant + inspection.
         await testDb.insert(schema.inspectionMediaPool).values({
@@ -348,6 +408,58 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
             // Control: the unsupported-type refusal keeps its own code, so the two stay distinguishable.
             await expect(upload[name](new File([HTML_BYTES], 'a.jpg', { type: 'image/jpeg' }))).rejects.toMatchObject({ status: 400, code: 'UNSUPPORTED_PHOTO_TYPE' });
             expect(r2Mock.put).not.toHaveBeenCalled();
+        });
+    });
+
+    // The cover is chosen by the key a photo SHOWS: its cropped or annotated file once it has one. A freshly baked file may
+    // not be in the results row yet (it is written late under collaborative editing), so a derivative of a KNOWN photo
+    // is accepted when it exists in storage. A key that merely sits under the folder is not enough: the cover must resolve.
+    describe('isInspectionPhotoKey', () => {
+        const folder = `${TENANT}/inspections/${INSPECTION_ID}/photos/`;
+        const exists = () => r2Mock.head.mockResolvedValue({ key: 'present' });
+        beforeEach(async () => {
+            await testDb.insert(schema.inspectionResults).values({
+                id: 'res-guard', tenantId: TENANT, inspectionId: INSPECTION_ID,
+                data: { 'item-cover': { photos: [{ key: `${folder}MED.jpg`, croppedKey: 'k-cropped' }] } },
+                lastSyncedAt: new Date(),
+            });
+        });
+
+        it('accepts a key the results name (original, cropped), without asking storage', async () => {
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.jpg`)).toBe(true);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, 'k-cropped')).toBe(true);
+            expect(r2Mock.head).not.toHaveBeenCalled();
+        });
+
+        it('accepts an existing derivative of a known photo', async () => {
+            exists();
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.annotated.a1b2c3d4.png`)).toBe(true);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.cropped.a1b2c3d4.jpg`)).toBe(true);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.annotated.png`)).toBe(true); // the older unrevised name
+            expect(r2Mock.head).toHaveBeenCalledWith(`${folder}MED.annotated.a1b2c3d4.png`);
+        });
+
+        it('refuses a file that does not exist, and fails closed when storage cannot answer', async () => {
+            r2Mock.head.mockResolvedValue(null);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.annotated.a1b2c3d4.png`)).toBe(false);
+            r2Mock.head.mockRejectedValue(new Error('r2 down'));
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.annotated.a1b2c3d4.png`)).toBe(false);
+        });
+
+        it('refuses a derivative of a photo this inspection does not have, and names outside the derivative family', async () => {
+            exists();
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}OTHER.annotated.a1b2c3d4.png`)).toBe(false);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.png`)).toBe(false);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}MED.annotated.a1b2c3d4.gif`)).toBe(false);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}nested/MED.annotated.a1b2c3d4.png`)).toBe(false);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${folder}../MED.annotated.a1b2c3d4.png`)).toBe(false);
+        });
+
+        it('refuses another inspection\'s or another tenant\'s folder, and an unknown key', async () => {
+            exists();
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `${TENANT}/inspections/OTHER/photos/MED.annotated.a1b2c3d4.png`)).toBe(false);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, `OTHER-TENANT/inspections/${INSPECTION_ID}/photos/MED.annotated.a1b2c3d4.png`)).toBe(false);
+            expect(await svc.isInspectionPhotoKey(INSPECTION_ID, TENANT, 'unknown-key')).toBe(false);
         });
     });
 });

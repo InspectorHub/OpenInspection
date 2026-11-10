@@ -9,6 +9,7 @@ import type { Context } from 'hono';
 import { auditFromContextAwaited } from '../../lib/audit';
 import { logger } from '../../lib/logger';
 import { MeteringService } from '../../services/metering.service';
+import { STOCK_PERIOD, currentPeriodKey } from '../../lib/usage/period';
 import { PlanQuotaGuard, readTenantTier } from '../../features/plan-quota/guard';
 import { inspections, templates } from '../../lib/db/schema';
 import { and, eq } from 'drizzle-orm';
@@ -16,6 +17,8 @@ import { AppError, ErrorCode, Errors } from '../../lib/errors';
 import { isOfflineImportReplay } from '../../lib/request-scope';
 import { findTombstonedIds } from '../../lib/inspection/tombstones';
 import { noticeFor } from '../../features/plan-quota/notice';
+import { FREE_TIER_CAPS } from '../../features/plan-quota/policy';
+import { neutralBookingRefusal } from '../../features/plan-quota/visitor-refusal';
 import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/email/build-email-service';
 import type { CreateInspectionData } from '../../services/inspection/shared';
 import type { HonoConfig } from '../../types/hono';
@@ -27,7 +30,7 @@ import { requireVisibleContact, resolveInspectionScope } from '../../lib/inspect
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
- * create/clone/wizard call, check whether the tenant's lifetime inspection
+ * create/clone/wizard call, check whether the tenant's this-month inspection
  * counter just crossed the 4/5 or 5/5 notice threshold and, if so, fire a
  * best-effort email. Gated on `hasUsageQuota` (SaaS only — standalone has no
  * DB reads added here beyond the one profile-flag check) and on the tenant's
@@ -36,13 +39,14 @@ import { requireVisibleContact, resolveInspectionScope } from '../../lib/inspect
  * `assembleTenantEmailService`) so it can never itself consume or be blocked
  * by the tenant's free-tier email quota.
  */
-async function maybeSendQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: string): Promise<void> {
+async function maybeSendQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: string, reached = false): Promise<void> {
     if (!c.var.profile.hasUsageQuota) return;
     const tier = await readTenantTier(c.env.DB, tenantId);
     if (tier !== 'free') return;
 
-    const count = await new MeteringService(c.env.DB).lifetimeTotal(tenantId, 'inspections');
-    const n = noticeFor(count);
+    // The cache row holds this month's count (see PlanQuotaGuard), so the threshold is measured per month.
+    // `reached`: the caller already knows the month's allowance is spent (a booking was refused), so the cache is not read.
+    const n = reached ? FREE_TIER_CAPS.inspections : noticeFor(await new MeteringService(c.env.DB).getCount(tenantId, 'inspections', STOCK_PERIOD));
     if (!n) return;
 
     const cfg = await loadTenantEmailConfig(c.env, tenantId);
@@ -52,6 +56,7 @@ async function maybeSendQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: s
         kv: c.env.TENANT_CACHE,
         tenantId,
         billingPortalUrl: c.var.profile.billingPortalUrl,
+        period: currentPeriodKey(new Date()),
     });
 }
 
@@ -63,11 +68,23 @@ async function maybeSendQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: s
  * is present (some unit-test harnesses) — degrade to a no-op there, mirroring
  * the guard in server/api/sms.ts.
  */
-export function fireQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: string): void {
-    const run = maybeSendQuotaThresholdNotice(c, tenantId).catch((err) => {
+export function fireQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: string, reached = false): void {
+    const run = maybeSendQuotaThresholdNotice(c, tenantId, reached).catch((err) => {
         logger.error('quota threshold notice failed', { tenantId }, err instanceof Error ? err : new Error(String(err)));
     });
     try { c.executionCtx.waitUntil(run); } catch { /* no execution context available (unit tests) */ }
+}
+
+/**
+ * For a visitor who is not company staff (a booking client, a referring agent): turn a spent monthly inspection
+ * allowance into the neutral refusal and tell the owner through the existing notice (deduped per month there).
+ * Any other error is rethrown as it is. Always throws.
+ */
+export function refuseVisitorOnSpentAllowance(c: Context<HonoConfig>, tenantId: string, err: unknown): never {
+    const neutral = neutralBookingRefusal(err);
+    if (!neutral) throw err;
+    fireQuotaThresholdNotice(c, tenantId, true);
+    throw neutral;
 }
 
 /** The `inspectorId` a new job gets: the one named, else the creator when they hold a field role, else none. */

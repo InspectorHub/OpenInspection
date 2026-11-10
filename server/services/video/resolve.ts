@@ -134,14 +134,30 @@ export async function resolveVideoProvider(
  *   optionally `integrationConfig.streamCustomerSubdomain`.
  *
  * `inspectionId` is the inspection in the request path; the Stream backend refuses videos stamped with another.
+ * `storedProvider` is for a video that already exists: its backend is the one that holds it, whatever the tenant's
+ * plan is now. New uploads leave it out and are chosen by the plan above.
  *
  * Throws `ServiceUnavailable` (503) when provider='stream' but the
  * required STREAM binding or customer subdomain is absent.
  */
-export async function resolveVideoBackend(c: Context<HonoConfig>, inspectionId: string): Promise<ResolvedVideoBackend> {
+export async function resolveVideoBackend(
+    c: Context<HonoConfig>,
+    inspectionId: string,
+    /** The provider a STORED video row records. Managing an existing video follows the row, not the tenant's current plan. */
+    storedProvider?: 'r2' | 'stream' | undefined,
+): Promise<ResolvedVideoBackend> {
     const tenantId = c.get('tenantId');
     const db = drizzle(c.env.DB);
     const baseUrl = getBaseUrl(c);
+
+    if (storedProvider === 'stream') {
+        if (!c.env.STREAM) throw Errors.ServiceUnavailable('Stream video is stored for this video but the STREAM binding is absent.');
+        const backend: VideoBackend = new StreamVideoBackend(c.env.STREAM, tenantId, baseUrl, db, inspectionId);
+        return { backend, provider: 'stream', streamSubdomain: null };
+    }
+    if (storedProvider === 'r2') {
+        return { backend: new R2VideoBackend(c.env.PHOTOS, db, tenantId, c.env.JWT_SECRET, baseUrl), provider: 'r2', streamSubdomain: null };
+    }
 
     const resolved = await resolveVideoProvider(c, tenantId, db);
     const { provider, streamSubdomain } = resolved;

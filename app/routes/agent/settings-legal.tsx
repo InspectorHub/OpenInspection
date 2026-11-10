@@ -3,7 +3,7 @@ import type { Route } from "./+types/settings-legal";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Banner } from "@core/shared-ui";
-import { useDisplayLocale } from "~/hooks/useSessionContext";
+import { useUiLocale } from "~/hooks/useSessionContext";
 import { useAgentTimeZoneOverride } from "~/routes/agent-layout";
 import { formatDateTime } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
@@ -68,11 +68,25 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // false statement about the operator, manufactured by an outage.
   try {
     const res = await api.agentTerms.terms.history.$get();
-    if (!res.ok) return { acceptances: [] as AcceptanceRow[], loadFailed: true };
+    if (!res.ok) return { acceptances: [] as AcceptanceRow[], loadFailed: true, termsPublished: null };
     const body = (await res.json()) as { data?: AcceptanceRow[] };
-    return { acceptances: body.data ?? [], loadFailed: false };
+    const acceptances = body.data ?? [];
+    // Only an EMPTY record needs to know whether a document exists, because only
+    // then does the page have to say which of two different things is true: "no
+    // document is published" or "a document is published and you have no entry".
+    // `null` = could not tell, and the page then claims neither.
+    let termsPublished: boolean | null = null;
+    if (acceptances.length === 0) {
+      try {
+        const inForce = await api.agentSignup.terms.$get();
+        termsPublished = inForce.status === 404 ? false : inForce.ok ? true : null;
+      } catch {
+        termsPublished = null;
+      }
+    }
+    return { acceptances, loadFailed: false, termsPublished };
   } catch {
-    return { acceptances: [] as AcceptanceRow[], loadFailed: true };
+    return { acceptances: [] as AcceptanceRow[], loadFailed: true, termsPublished: null };
   }
 }
 
@@ -82,8 +96,8 @@ function bodyAnchorId(contentHash: string): string {
 }
 
 export default function AgentSettingsLegalPage() {
-  const { acceptances, loadFailed } = useLoaderData<typeof loader>();
-  const locale = useDisplayLocale();
+  const { acceptances, loadFailed, termsPublished } = useLoaderData<typeof loader>();
+  const locale = useUiLocale();
   const timeZone = useAgentTimeZoneOverride();
   const readable = acceptances.filter((a) => a.bodyAvailable && a.body !== null);
 
@@ -104,13 +118,24 @@ export default function AgentSettingsLegalPage() {
         {loadFailed ? (
           <Banner tone="warn">{m.agent_portal_legal_load_failed()}</Banner>
         ) : acceptances.length === 0 ? (
-          // Correct, not broken. A deployment that has published no agent terms
-          // has nothing for anyone to accept, and the gate is not enforcing —
-          // so an empty page here is the honest report of that state, and the
-          // copy says whose action would change it.
+          // Two different facts share an empty list, and the copy must not blur them.
+          // `termsPublished === false`: the deployment has published no agent terms,
+          // so there is nothing for anyone to accept and the gate is not enforcing.
+          // Otherwise (a version is in force, or we could not tell) the only thing
+          // known is that THIS account has no entry: an account created before the
+          // record existed has none, and it is deliberately not backfilled.
           <div className="text-[13px] text-ih-fg-3">
-            <p className="font-semibold text-ih-fg-2">{m.agent_portal_legal_empty_title()}</p>
-            <p className="mt-1">{m.agent_portal_legal_empty_body()}</p>
+            {termsPublished === false ? (
+              <>
+                <p className="font-semibold text-ih-fg-2">{m.agent_portal_legal_empty_title()}</p>
+                <p className="mt-1">{m.agent_portal_legal_empty_body()}</p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold text-ih-fg-2">{m.agent_portal_legal_none_recorded_title()}</p>
+                <p className="mt-1">{m.agent_portal_legal_none_recorded_body()}</p>
+              </>
+            )}
           </div>
         ) : (
           <ul className="space-y-3">

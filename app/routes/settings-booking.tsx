@@ -6,6 +6,10 @@ import { requireAdminLoader } from "~/lib/access.server";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { SCHEDULING_ROLES } from "~/lib/settings/constants";
 import { BookingPoliciesPanel } from "~/components/settings/BookingPoliciesPanel";
+import { CollectPaymentPanel } from "~/components/settings/CollectPaymentPanel";
+import { stripeStatusFromResponse } from "~/lib/settings/stripe-status";
+import { parseSlotInterval, parsePublicPolicy, parseInternalPolicy } from "~/lib/settings/booking-config-parse";
+import { readPaymentSettings } from "~/lib/settings/booking-payment-data";
 import { EmbedWidgetPanel } from "~/components/settings/EmbedWidgetPanel";
 import { ManageTeamSchedulesBar } from "~/components/settings/ManageTeamSchedulesBar";
 import { CompanyBookingLinksPanel } from "~/components/settings/CompanyBookingLinksPanel";
@@ -33,18 +37,15 @@ import {
   parseRoutingBody,
   parseServiceAreaBody,
 } from "~/lib/settings/booking-routing-data";
-import { parseDepositPolicy } from "~/lib/deposit-policy-form";
-import { saveDepositFromForm, handleCancellationPolicyIntent } from "~/lib/settings/booking-policy-actions";
+import { handleDepositIntent, handleCancellationPolicyIntent } from "~/lib/settings/booking-policy-actions";
 import { CancellationPolicyPanel, readCancellationSettings, readClauseAgreements, type ClauseState } from "~/components/settings/CancellationPolicyPanel";
 import type { CancellationPolicy } from "../../server/lib/billing/cancellation-policy";
-import type { DepositPolicy } from "../../server/lib/billing/deposit-policy";
 import { m } from "~/paraglide/messages";
 
 interface TenantConfig {
   conciergeReviewRequired: boolean;
   blockUnsignedAgreement: boolean;
   allowInspectorChoice: boolean;
-  depositPolicy: DepositPolicy | null;
   bookingSlotMode: BookingSlotMode;
   bookingSlotIntervalMin: BookingSlotIntervalMin;
   holidayRegion: string | null;
@@ -59,19 +60,6 @@ interface Member {
   createdAt: string;
 }
 
-function parseSlotInterval(raw: unknown): BookingSlotIntervalMin {
-  return raw === 15 || raw === 60 ? raw : 30;
-}
-
-function parsePublicPolicy(raw: unknown): HolidayPublicPolicy {
-  return raw === "block" || raw === "advisory" || raw === "open" ? raw : "open";
-}
-
-function parseInternalPolicy(raw: unknown): HolidayInternalPolicy {
-  return raw === "block" ? "block" : "advisory";
-}
-
-
 
 export function meta() {
   return [{ title: m.settings_booking_meta_title() }];
@@ -84,7 +72,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const api = createApi(context, { token });
 
-  const [configRes, membersRes, holidaysRes, brandingRes, routingRes, areasRes, agreementsRes, bookingOpenState] = await Promise.all([
+  const [configRes, membersRes, holidaysRes, brandingRes, routingRes, areasRes, agreementsRes, bookingOpenState, stripe] = await Promise.all([
     api.admin["tenant-config"].$get().catch(() => null),
     api.admin.members.$get().catch(() => null),
     (api.admin as unknown as {
@@ -101,13 +89,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // component that fetches is a component that cannot be server-rendered.
     api.admin.agreements.$get().catch(() => null),
     readCompanyBookingOpenState(api),
+    api.integrations.overview.$get().catch(() => null).then(stripeStatusFromResponse),
   ]);
 
   let config: TenantConfig = {
     conciergeReviewRequired: false,
     blockUnsignedAgreement: false,
     allowInspectorChoice: false,
-    depositPolicy: null,
     bookingSlotMode: "fixed",
     bookingSlotIntervalMin: 30,
     holidayRegion: null,
@@ -126,10 +114,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       holidayRegion: typeof d.holidayRegion === "string" ? d.holidayRegion : null,
       holidayPublicPolicy: parsePublicPolicy(d.holidayPublicPolicy),
       holidayInternalPolicy: parseInternalPolicy(d.holidayInternalPolicy),
-      depositPolicy: config.depositPolicy,
     };
   }
 
+  // Absent until the branding payload says otherwise: see readPaymentSettings.
+  let payment = readPaymentSettings(undefined);
   let cancellationPolicy: CancellationPolicy | null = null;
   // Fail-closed default: with no branding payload the clause reads as never
   // confirmed, which is the state that REFUSES fees. An optimistic default here
@@ -137,7 +126,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   let clause: ClauseState = { current: false, everAttested: false, agreementId: null };
   if (brandingRes?.ok) {
     const body = (await brandingRes.json()) as { data?: { branding?: Record<string, unknown> } };
-    config.depositPolicy = parseDepositPolicy(body.data?.branding?.depositPolicy);
+    payment = readPaymentSettings(body.data?.branding);
     const cancellation = readCancellationSettings(body.data?.branding);
     cancellationPolicy = cancellation.policy;
     clause = cancellation.clause;
@@ -152,7 +141,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const body = (await membersRes.json()) as Record<string, unknown>;
     members = (body.data ?? []) as Member[];
   }
-
   let customHolidays: CustomHoliday[] = [];
   if (holidaysRes?.ok) {
     const body = (await holidaysRes.json()) as {
@@ -175,6 +163,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     origins: parsed.origins,
     areasByUser,
     config,
+    payment,
+    stripe,
     cancellationPolicy,
     clause,
     clauseAgreements,
@@ -203,6 +193,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   const cancellation = await handleCancellationPolicyIntent(api, form, intent);
   if (cancellation) return cancellation;
 
+  const deposit = await handleDepositIntent(api, form, intent);
+  if (deposit) return deposit;
+
   if (intent === "policies-save") {
     const res = await api.admin["tenant-config"].$patch({
       json: {
@@ -218,12 +211,6 @@ export async function action({ request, context }: Route.ActionArgs) {
         | undefined;
       return { ok: false, intent, message };
     }
-    // One panel, two endpoints: the deposit default is the only booking policy
-    // in this panel that lives behind branding. It shares its "an absent key
-    // must not read as a clear" rule with the cancellation ladder, so both live
-    // in ~/lib/settings/booking-policy-actions.
-    const deposit = await saveDepositFromForm(api, form);
-    if (deposit && !deposit.ok) return { ok: false, intent, message: deposit.message };
     return { ok: res.ok, intent };
   }
 
@@ -326,6 +313,7 @@ export default function SettingsBookingPage() {
 
   const navSections = [
     { id: "booking-links", label: m.settings_companylink_heading() },
+    { id: "collect-payment", label: m.settings_collect_heading() },
     { id: "booking-policies", label: m.settings_policies_heading() },
     { id: "holidays", label: m.settings_holiday_panel_heading() },
     { id: "slot-rules", label: m.settings_slotrules_heading() },
@@ -354,6 +342,9 @@ export default function SettingsBookingPage() {
       />
       <div id="booking-links" className="scroll-mt-12">
         <CompanyBookingLinksPanel tenant={tenant} booking={data.bookingOpenState} />
+      </div>
+      <div id="collect-payment" className="scroll-mt-12">
+        <CollectPaymentPanel depositPolicy={data.payment.depositPolicy} currency={data.payment.currency} stripe={data.stripe} />
       </div>
       <div id="booking-policies" className="scroll-mt-12">
         <BookingPoliciesPanel initialConfig={data.config} />

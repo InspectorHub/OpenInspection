@@ -74,6 +74,7 @@ describe('native non-OpenAPI contract', () => {
         expect(doc).toMatch(/\bconst MSG_SYNC = 0;/);
         expect(doc).toMatch(/\bconst MSG_RESTORE = 2;/);
         expect(doc).toMatch(/\bconst MSG_ACK = 3;/);
+        expect(source('server/durable-objects/inspection-doc-generation.ts')).toMatch(/\bconst MSG_GENERATION = 4;/);
     });
 
     it.each(NATIVE_NON_OPENAPI_CONTRACT.filter((e) => e.kind === 'oauth').map((e) => [e.path] as const))(

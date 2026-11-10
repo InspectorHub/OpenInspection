@@ -19,7 +19,7 @@
 import { m } from "~/paraglide/messages";
 import { EmptyState, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { formatRelativeTime } from "@core/field-ui/shared/format";
-import { useDisplayLocale } from "~/hooks/useSessionContext";
+import { useUiLocale } from "~/hooks/useSessionContext";
 import {
   channelLabel,
   channelOutcome,
@@ -65,7 +65,7 @@ export function NoticeList({
    */
   busy?: boolean;
 }) {
-  const locale = useDisplayLocale();
+  const locale = useUiLocale();
 
   if (notices.length === 0) {
     return <EmptyState title={m.notice_empty_title()} description={emptyBody} />;

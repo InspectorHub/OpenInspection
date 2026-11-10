@@ -5,6 +5,7 @@ import { inspectionScopedTables } from '../../lib/db/scoped-tables';
 import { r2Keys } from '../../lib/r2-keys';
 import { abortStorage } from '../video/chunked-upload.service';
 import { purgeCollabDocs, type CollabPurgeOutcome } from './collab-purge';
+import type { CollabNamespaces } from '../../lib/collab/collab-namespaces';
 
 /**
  * Hard-delete an inspection and EVERY row + R2 asset it owns.
@@ -22,14 +23,15 @@ import { purgeCollabDocs, type CollabPurgeOutcome } from './collab-purge';
  * When `collab` (the collab Durable Object namespace) is passed, the storage behind
  * each of the inspection's reports is purged AFTER every row and R2 asset is gone.
  * That purge is best effort and its outcome is returned rather than thrown: see
- * `purgeCollabDocs`. Omitting it leaves collab storage alone (`skipped`).
+ * `purgeCollabDocs`. Omitting it leaves collab storage alone (`skipped`). `collab` names the pinned namespace and, when
+ * pinning is on, the old one, so objects created before pinning are purged too (see `collabNamespaces`).
  */
 export async function deleteInspectionCascade(
     db: DrizzleD1Database,
     r2: R2Bucket,
     tenantId: string,
     inspectionId: string,
-    collab?: DurableObjectNamespace,
+    collab?: CollabNamespaces,
 ): Promise<CollabPurgeOutcome> {
     // 0a. Remember the id first. A failed write stops the delete with nothing removed, which is the safe direction:
     // the delete can be retried; a deleted inspection with no tombstone cannot be repaired. The row is what stops a

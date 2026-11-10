@@ -1,14 +1,17 @@
 // @vitest-environment happy-dom
 import { useState } from "react";
 import { render, fireEvent, screen, waitFor, cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
 import { FieldDataSourceProvider } from "../../context";
 import type { CommandDataMap } from "../../commands";
 import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-data-source";
 import type { FakeDataSource } from "../../testing/fake-data-source";
 import { PropertyInfoForm } from "./PropertyInfoForm";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 // PropertyInfoForm reads the data source (the #200 "Fetch property details"
 // button issues a command), so it renders inside a `FieldDataSourceProvider`.

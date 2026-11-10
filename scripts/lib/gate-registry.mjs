@@ -212,11 +212,6 @@ export const SCRIPT_GATES = [
     // plan that builds a primitive before its caller, and a gate that is red
     // for a legitimate reason all week is a gate people learn to pass with
     // --no-verify. ~10s: one knip pass over the production entry graph.
-    // PUSH, not PRECOMMIT: this checks the installed Wrangler bundle, which is
-    // environment state rather than anything a commit stages. The postinstall
-    // script applies the narrowly scoped compatibility patch and fails closed
-    // if Wrangler's bundle no longer matches the expected shape.
-    { key: 'wranglerpatch', label: 'Wrangler compatibility patch present', script: 'check-wrangler-patch.mjs', fix: 'npm run lint:wrangler-patch', rung: PUSH },
     // PUSH, not PRECOMMIT. It parses the TypeScript of every route file (~150 files, a few
     // hundred milliseconds of AST work), which is more than every commit should pay, and what
     // it catches is the sum over a branch -- a loader that has grown wide or started calling
@@ -266,6 +261,11 @@ export const SCRIPT_GATES = [
     // point a branch is shared, not on every commit. The CI shuffled run of the shared project is the
     // dynamic half of the same check.
     { key: 'unitisolation', label: 'lint:unit-isolation', script: 'check-unit-isolation.mjs', fix: 'npm run lint:unit-isolation', rung: PUSH },
+    // The web suite's counterpart of the row above: every spec in tests/web-isolation.json still obeys the
+    // rules that made it shareable, and sits in the project of the environment it declares. PUSH for the
+    // same reasons (about 2 s over ~900 specs; the failure lands in a neighbour). The CI shuffled run of
+    // the two shared web projects is the dynamic half.
+    { key: 'webisolation', label: 'lint:web-isolation', script: 'check-web-isolation.mjs', fix: 'npm run lint:web-isolation', rung: PUSH },
     // The other direction of `tests` above, and the most expensive entry in
     // this list by an order of magnitude: it spawns `playwright test --list`
     // once per playwright config (5 today, ~10-15s in total) because Playwright

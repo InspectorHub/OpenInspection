@@ -250,8 +250,8 @@ const INVENTORY = [
             + "REVEALED BY the `fund` action tag rather than always shown — a narrowing of when "
             + "it is offered, not a change to who authors it, so it stays allowed. Still no "
             + "prefill, no suggested figure and no report estimate anywhere near it." },
-    { kind: "control", id: "app/components/settings/BookingPoliciesPanel.tsx", disposition: "allowed",
-      reason: "Booking policy: deposit thresholds against the tenant's own fee." },
+    { kind: "control", id: "app/components/settings/CollectPaymentPanel.tsx", disposition: "allowed",
+      reason: "Booking policy: the deposit percentage or fixed amount against the tenant's own fee." },
     { kind: "control", id: "app/components/settings/services/DepositWidget.tsx", disposition: "allowed",
       reason: "Booking policy: deposit amount against the tenant's own fee." },
     { kind: "control", id: "app/components/settings/CancellationFeeRow.tsx", disposition: "allowed",

@@ -55,6 +55,12 @@ describe('useFindings (results, setResults, options)', () => {
     expect(result.current.getPhotoCount('i1')).toBe(0);
   });
 
+  it('before the doc connects, adding a video reports that it was NOT written', () => {
+    const { result } = renderHook(() => useFindings({}, vi.fn(), options()));
+    const written = result.current.addVideoToItem('i1', { key: '', mediaType: 'video', provider: 'r2', mediaId: 'pool-1' });
+    expect(written).toBe(false);
+  });
+
   it('with a live doc, a rating is written to the doc under the scoped key', () => {
     const doc = new Y.Doc();
     const opts = options({ collab: { doc }, activeUnitId: 'u_a' });

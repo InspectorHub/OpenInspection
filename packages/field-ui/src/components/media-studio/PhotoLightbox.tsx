@@ -19,8 +19,10 @@ const SAFE_AREA_TOOLBAR_PADDING = {
 } as React.CSSProperties;
 
 /** Isolation wrapper around yet-another-react-lightbox (single-maintainer dep). */
-export function PhotoLightbox({ slides, index, open, onClose, toolbarButtons, toolbarWrap, renderSlide }: {
+export function PhotoLightbox({ slides, index, open, onClose, onView, toolbarButtons, toolbarWrap, renderSlide }: {
   slides: AnySlide[]; index: number; open: boolean; onClose: () => void;
+  /** The slide now on screen, however it got there (Next/Prev, an arrow key, a swipe): the toolbar must follow it. */
+  onView?: (index: number) => void;
   /** Custom toolbar nodes rendered before the built-in Close button (YARL v3 `toolbar.buttons`). */
   toolbarButtons?: React.ReactNode[];
   /** Narrow screens: the toolbar spans the full width and wraps onto a second row instead of letting its buttons shrink into each other. */
@@ -36,6 +38,7 @@ export function PhotoLightbox({ slides, index, open, onClose, toolbarButtons, to
       open={open}
       close={onClose}
       index={index}
+      on={{ view: ({ index: viewed }) => onView?.(viewed) }}
       // YARL's Slide type is the union of its known slide kinds; our custom
       // video slide is rendered by render.slide, so the cast is intentional.
       slides={slides as unknown as { src: string }[]}

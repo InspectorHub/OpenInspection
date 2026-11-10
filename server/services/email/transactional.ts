@@ -1,6 +1,10 @@
 import type { SignatureUser } from '../../lib/inspector-signature';
 import { escapeHtml, type Constructor } from './base';
 import { SUBJECT_RIGHTS_TEMPLATES } from '../../lib/email-templates/subject-rights';
+import { FREE_TIER_CAPS } from '../../features/plan-quota/policy';
+
+/** A quota notice is deduped per month; the marker outlives the month by a margin and then expires on its own. */
+const QUOTA_NOTICE_TTL_SECONDS = 40 * 24 * 60 * 60;
 
 /**
  * Transactional / account email methods: password reset, workspace
@@ -158,9 +162,9 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
 
         /**
          * Free-tier usage quotas (2026-07), Task 8 — threshold notice when a free
-         * tenant's lifetime inspection count crosses 4/5 ("one free inspection
-         * left") or 5/5 (cap reached; existing inspections stay usable, new ones
-         * require a subscription). Recipient is the tenant owner (same
+         * tenant's inspection count for the month crosses 4/5 ("one free inspection
+         * left") or 5/5 (cap reached; existing inspections stay usable, and the
+         * allowance renews at the start of the next UTC month). Recipient is the tenant owner (same
          * `role: 'owner'` lookup used by autoLinkSameEmail in agent/signup.ts).
          *
          * Registry-driven like everything else, but `editable: false` +
@@ -170,9 +174,10 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
          * "one left" and "none left" are different messages, and a recipient
          * reading a list of what we send should see both.
          *
-         * Deduplicated via `quota-notice:{tenantId}:{n}` in KV so a retried
+         * Deduplicated via `quota-notice:{tenantId}:{n}:{YYYY-MM}` in KV so a retried
          * request — or the benign race of two concurrent creates both reading
-         * the lifetime counter at the same threshold — never double-sends.
+         * the counter at the same threshold — never double-sends. The month is in
+         * the key so each new month can notify again; the entry expires on its own.
          *
          * IMPORTANT: the caller MUST assemble this EmailService instance
          * WITHOUT a `meterTenantId` (see `assembleTenantEmailService`) — both
@@ -182,9 +187,9 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
          */
         async sendQuotaThresholdNotice(
             n: 4 | 5,
-            deps: { db: D1Database; kv?: KVNamespace; tenantId: string; billingPortalUrl?: string | null },
+            deps: { db: D1Database; kv?: KVNamespace; tenantId: string; billingPortalUrl?: string | null; period?: string },
         ): Promise<void> {
-            const dedupeKey = `quota-notice:${deps.tenantId}:${n}`;
+            const dedupeKey = `quota-notice:${deps.tenantId}:${n}${deps.period ? `:${deps.period}` : ''}`;
             if (deps.kv && await deps.kv.get(dedupeKey)) return;
 
             const { drizzle } = await import('drizzle-orm/d1');
@@ -201,15 +206,16 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             const cta = deps.billingPortalUrl
                 ? `<p><a href="${deps.billingPortalUrl}" style="background:#4f46e5;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">Manage subscription</a></p>`
                 : '';
+            const cap = FREE_TIER_CAPS.inspections;
             const trigger = n === 4 ? 'usage-quota-warning' : 'usage-quota-reached';
             const rendered = this.renderOr(trigger, {
                 workspaceName: this.appName,
                 billingPortalUrl: deps.billingPortalUrl ?? '',
             }, {
-                subject: n === 4 ? 'One free inspection left' : "You've used your 5 free inspections",
+                subject: n === 4 ? 'One free inspection left this month' : `You've used your ${cap} free inspections this month`,
                 html: n === 4
-                    ? `<p>Your ${appName} workspace has used 4 of your 5 free inspections. You have one free inspection left.</p>${cta}`
-                    : `<p>Your ${appName} workspace has used your 5 free inspections — everything stays usable; subscribe to create new ones.</p>${cta}`,
+                    ? `<p>Your ${appName} workspace has used ${cap - 1} of your ${cap} free inspections this month. You have one left.</p>${cta}`
+                    : `<p>Your ${appName} workspace has used its ${cap} free inspections for this month. Everything stays usable, and the allowance renews at 00:00 UTC on the 1st.</p>${cta}`,
             });
             // No `enabled` check: both descriptors are `required`, so the
             // renderer cannot return a disabled result. Guarding anyway would
@@ -217,7 +223,7 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             // lose the ability to create inspections.
             await this.sendRendered(rendered, [owner.email]);
 
-            if (deps.kv) await deps.kv.put(dedupeKey, '1');
+            if (deps.kv) await deps.kv.put(dedupeKey, '1', { expirationTtl: QUOTA_NOTICE_TTL_SECONDS });
         }
 
         /**

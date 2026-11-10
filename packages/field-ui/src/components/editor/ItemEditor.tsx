@@ -16,7 +16,8 @@ import {
  type CannedTabId,
  type LibraryMatch,
 } from "./CannedCommentTabs";
-import { ItemPhotoStrip, type StripPhoto } from "../media-studio/ItemPhotoStrip";
+import { ItemPhotoStrip, type StripPhoto, type StripVideoRef } from "../media-studio/ItemPhotoStrip";
+import { itemMediaCaption } from "./item-media-caption";
 import type { AttachedRepairItem } from "../../hooks/useFindings";
 import type { ItemAttribute } from "../../shared/types";
 import { shouldTriggerSlash } from "../../shared/slash-trigger";
@@ -145,7 +146,7 @@ interface ItemEditorProps {
  /** Task 9b — bulk-move the given photoIndex set (high→low) to a target item. */
  onBulkMovePhotos?: (itemId: string, indices: number[], to: { itemId: string; sectionId?: string }) => void;
  /** Plan 7 — resolve a Stream poster URL for a video strip thumbnail (fail-closed → null). */
- videoPosterUrl?: (streamUid: string, posterPct?: number) => string | null;
+ videoPosterUrl?: (video: StripVideoRef) => string | null;
  /** #181 PR-G — resolve the local blob URL for a pending (offline) photo entry. */
  pendingPhotoUrl?: (pendingId: string) => string | undefined;
  /** #61 — `inspection_results.id`, the artifact an AI content-review row cites.
@@ -372,8 +373,7 @@ export function ItemEditor({
  photoStatus = m.editor_item_photos_none();
  } else {
  const queuedSuffix = queuedCount > 0 ? m.editor_item_photo_queued_suffix({ count: queuedCount }) : "";
- const base = photoCount === 1 ? m.editor_item_photo_count_one({ count: photoCount }) : m.editor_item_photo_count_other({ count: photoCount });
- photoStatus = `${base}${queuedSuffix}`;
+ photoStatus = `${itemMediaCaption((result.photos as Array<{ mediaType?: string }>) || []) ?? ""}${queuedSuffix}`;
  }
 
  return (

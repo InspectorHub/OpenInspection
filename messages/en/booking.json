@@ -51,6 +51,7 @@
   "booking_step_property_address_placeholder": "123 Main St, City, State ZIP",
   "booking_step_services_heading": "Services",
   "booking_step_services_subtitle": "Choose one or more inspections for this visit.",
+  "booking_step_services_none": "{company} has no services open for online booking right now. Please contact them directly.",
   "booking_step_services_duration": "~{duration} min",
   "booking_unit_inspection_one": "inspection",
   "booking_unit_inspection_other": "inspections",
@@ -87,6 +88,7 @@
   "booking_confirm_row_deposit": "Deposit due today",
   "booking_deposit_quote_note": "A deposit of {amount} is collected when you book. It comes off the total, not on top of it.",
   "booking_deposit_confirm_note": "After you book, you will be asked for a {amount} deposit to hold this slot. It is deducted from your total.",
+  "booking_deposit_contact_note": "{company} will contact you about the deposit for this booking.",
   "booking_deposit_pay_heading": "Deposit to hold your slot",
   "booking_deposit_pay_body": "{company} takes a deposit to hold the appointment. It comes off your final total.",
   "booking_deposit_pay_button": "Pay {amount} deposit",
@@ -96,5 +98,15 @@
   "booking_deposit_already_paid": "Your deposit has already been received. Nothing further is needed.",
   "booking_deposit_unavailable": "Card payment could not be started. Your appointment is booked — {company} will be in touch about the deposit.",
   "booking_deposit_error_generic": "That card could not be charged.",
-  "booking_deposit_decline_keeps_booking": "Your appointment is still booked. You can try another card, or wait to be contacted."
+  "booking_deposit_decline_keeps_booking": "Your appointment is still booked. You can try another card, or wait to be contacted.",
+  "booking_confirm_row_deposit_full": "Amount due today",
+  "booking_deposit_quote_note_full": "The full fee of {amount} is collected when you book.",
+  "booking_deposit_confirm_note_full": "After you book, you will be asked to pay the full fee of {amount} to hold this slot.",
+  "booking_deposit_contact_note_full": "{company} will contact you about payment for this booking.",
+  "booking_deposit_pay_heading_full": "Pay the full fee to hold your slot",
+  "booking_deposit_pay_body_full": "{company} takes the full fee to hold the appointment.",
+  "booking_deposit_pay_button_full": "Pay {amount}",
+  "booking_deposit_already_booked_full": "Your appointment is already booked. Paying the fee secures the slot.",
+  "booking_deposit_already_paid_full": "Your payment has already been received. Nothing further is needed.",
+  "booking_deposit_unavailable_full": "Card payment could not be started. Your appointment is booked — {company} will be in touch about payment."
 }

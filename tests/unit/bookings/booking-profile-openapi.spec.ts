@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
-import { tenants, users, availability, tenantConfigs } from '../../../server/lib/db/schema';
+import { tenants, users, availability, tenantConfigs, services, templates } from '../../../server/lib/db/schema';
 import * as schema from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
 import { buildOpenApiDocument } from '../../../server/lib/openapi/build-document';
@@ -80,6 +80,29 @@ describe('booking profile reads served through OpenAPI routes', () => {
             const body = await res.json() as { data: { bookingOpen: boolean; bookingClosedReason: string | null } };
             expect(body.data.bookingOpen).toBe(true);
             expect(body.data.bookingClosedReason).toBeNull();
+        });
+
+        it('lists only active services that have a template; the rest are hidden from the public page', async () => {
+            await db.insert(templates).values({
+                id: 'tpl-1', tenantId: TENANT_ID, name: 'Home', version: 1, schema: '{}', createdAt: new Date(),
+            } as never);
+            await db.insert(services).values([
+                { id: 's-ok', tenantId: TENANT_ID, name: 'Full inspection', price: 40000, templateId: 'tpl-1', active: true, createdAt: new Date() },
+                { id: 's-notpl', tenantId: TENANT_ID, name: 'No template', price: 10000, templateId: null, active: true, createdAt: new Date() },
+                { id: 's-off', tenantId: TENANT_ID, name: 'Inactive', price: 10000, templateId: 'tpl-1', active: false, createdAt: new Date() },
+            ]);
+            const res = await buildApp([]).request(`/book/${SLUG}`, {}, ENV);
+            const body = await res.json() as { data: { services: Array<{ id: string }> } };
+            expect(body.data.services.map(s => s.id)).toEqual(['s-ok']);
+        });
+
+        it('returns an empty services list when every service lacks a template', async () => {
+            await db.insert(services).values({
+                id: 's-notpl', tenantId: TENANT_ID, name: 'No template', price: 10000, templateId: null, active: true, createdAt: new Date(),
+            });
+            const res = await buildApp([]).request(`/book/${SLUG}`, {}, ENV);
+            const body = await res.json() as { data: { services: unknown[] } };
+            expect(body.data.services).toEqual([]);
         });
 
         it('answers 404 with the not_found body for an unknown company', async () => {

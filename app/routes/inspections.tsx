@@ -102,14 +102,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const checklist = await checklistP;
     let quotaCaps: { inspections: number; email: number } | null = null;
     let quotaUsage: { inspections: number; email: number } | null = null;
+    let quotaResetsAt: string | null = null;
     if (usageRes && usageRes.ok) {
       const ub = (await usageRes.json().catch(() => ({}))) as {
         data?: {
           caps?: { inspections: number; email: number } | null;
           usage?: { inspections?: number; sms?: number; email?: number };
+          period?: { resetsAt?: string } | null;
         };
       };
-      quotaCaps = ub.data?.caps ?? null;
+      quotaCaps = ub.data?.caps ?? null; quotaResetsAt = ub.data?.period?.resetsAt ?? null;
       if (quotaCaps) {
         quotaUsage = {
           inspections: ub.data?.usage?.inspections ?? 0,
@@ -134,6 +136,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       ...checklist,
       quotaCaps,
       quotaUsage,
+      quotaResetsAt,
       loadFailed: false,
     };
   } catch {
@@ -248,7 +251,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function InspectionsPage() {
-  const { buckets: loadedBuckets, conciergePending, greeting: _ssrGreeting, tags, checklistDismissed: loaderDismissed, templateCount, serviceCount, scheduleSet, quotaCaps, quotaUsage, loadFailed } = useLoaderData<typeof loader>();
+  const { buckets: loadedBuckets, conciergePending, greeting: _ssrGreeting, tags, checklistDismissed: loaderDismissed, templateCount, serviceCount, scheduleSet, quotaCaps, quotaUsage, quotaResetsAt, loadFailed } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
   // Scheduled times render in the viewer's effective zone, resolved once here
   // rather than per row (and never left to the browser — see format-date).
@@ -661,8 +664,6 @@ export default function InspectionsPage() {
   // from the auth-layout session context the dashboard already consumes.
   const tenantSlug = sessionCtx?.branding?.tenantSlug ?? null;
 
-  // Portal billing deep-link — consumed by the SeatBanner and free-tier
-  // QuotaBanner below. Undefined when no portal base URL is configured.
   const billingUrl = sessionCtx?.branding?.portalBaseUrl ? `${sessionCtx.branding.portalBaseUrl}/billing` : undefined;
 
   // A row's props are identical in both the grouped and flat views; this keeps
@@ -693,8 +694,7 @@ export default function InspectionsPage() {
         <SeatBanner usage={sessionCtx.seatUsage} billingUrl={billingUrl} />
       )}
 
-      {/* Free-tier usage quota banners — one per capped metric, each hides
-          itself below 80% usage (see QuotaBanner). */}
+      {/* Free-tier quota notes — one per capped metric; each hides below 80%. */}
       {quotaCaps && quotaUsage && (
         <>
           {(["inspections", "email"] as const).map((metric) => (
@@ -703,7 +703,7 @@ export default function InspectionsPage() {
               metric={metric}
               used={quotaUsage[metric]}
               cap={quotaCaps[metric]}
-              billingUrl={billingUrl}
+              resetsAt={quotaResetsAt}
             />
           ))}
         </>

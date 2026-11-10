@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
@@ -12,6 +13,7 @@ import { AgentSignupPanel } from "~/components/agent/AgentSignupPanel";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
+import { useSignupChallenge } from "~/components/agent/useSignupChallenge";
 
 export function meta() {
   return [{ title: m.auth_agent_signup_meta_title() }];
@@ -43,18 +45,25 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // nothing.
   const api = createApi(context);
   let terms: AgentTermsInForce | null = null;
+  // The site key of the bot challenge the server will demand with this signup,
+  // resolved beside the secret it verifies against. Null = this deployment does not challenge.
+  let turnstileSiteKey: string | null = null;
   try {
     const res = await api.agentSignup.terms.$get();
     if (res.ok) {
-      const json = (await res.json()) as { data?: AgentTermsInForce };
-      terms = json.data ?? null;
+      const json = (await res.json()) as { data?: AgentTermsInForce & { turnstileSiteKey?: string | null } };
+      terms = json.data
+        ? { version: json.data.version, contentHash: json.data.contentHash, body: json.data.body }
+        : null;
+      turnstileSiteKey = json.data?.turnstileSiteKey ?? null;
     }
   } catch {
     // Treated as "unavailable", which closes signup. A page that swallowed this
     // and rendered the tick anyway would be back to accepting an absent document.
     terms = null;
+    turnstileSiteKey = null;
   }
-  return { email, returnTo, terms };
+  return { email, returnTo, terms, turnstileSiteKey };
 }
 
 /* ------------------------------------------------------------------ */
@@ -109,14 +118,17 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   const api = createApi(context);
   const res = await api.agentSignup.index.$post({ json: body });
+  // From here the challenge token is spent, whatever the answer; replies from before
+  // this call (validation, cross-site) carry no marker so the page keeps the token.
+  const spent = { tokenSpent: true as const };
 
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok || !(json as Record<string, unknown>).success) {
     const err = json.error as Record<string, string> | undefined;
     if (err?.code === "conflict") {
-      return submission.reply({ formErrors: [m.auth_agent_signup_error_conflict()] });
+      return { ...submission.reply({ formErrors: [m.auth_agent_signup_error_conflict()] }), ...spent };
     }
-    return submission.reply({ formErrors: [err?.message || m.auth_agent_signup_error_failed()] });
+    return { ...submission.reply({ formErrors: [err?.message || m.auth_agent_signup_error_failed()] }), ...spent };
   }
 
   // Re-sanitize returnTo server-side — never trust the hidden field blindly,
@@ -164,7 +176,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function AgentSignupPage() {
-  const { email, returnTo, terms } = useLoaderData<typeof loader>();
+  const { email, returnTo, terms, turnstileSiteKey } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const latch = useSubmitLatch();
@@ -172,6 +184,8 @@ export default function AgentSignupPage() {
   // No published agent terms = signup closed, server-side. The form must not be
   // usable: see AgentSignupClosedNotice for what this state actually is.
   const closed = !terms;
+
+  const challenge = useSignupChallenge(turnstileSiteKey, !closed);
 
   // Success returns a `{ redirect }` sentinel; errors return a Conform
   // SubmissionResult. Only the latter feeds `useForm`.
@@ -184,6 +198,13 @@ export default function AgentSignupPage() {
   if (typeof window !== "undefined" && successRedirect) {
     window.location.href = successRedirect;
   }
+
+  // The API answered with an error, so its token is spent; a refusal that never
+  // reached the API (validation) keeps the token.
+  useEffect(() => {
+    if (!actionData || !("tokenSpent" in actionData)) return;
+    challenge.spend();
+  }, [actionData, challenge.spend]);
 
   const [form, fields] = useForm({
     lastResult,
@@ -215,7 +236,17 @@ export default function AgentSignupPage() {
             </div>
           )}
 
-          <Form method="post" autoComplete="off" id={form.id} onSubmit={latch(form.onSubmit)} noValidate>
+          <Form method="post" autoComplete="off" id={form.id} onSubmit={latch((event) => {
+            // Refuse HERE, before the latch closes, so fixing it and resubmitting is not blocked.
+            if (challenge.needsChallenge && !challenge.token) {
+              event.preventDefault();
+              challenge.setError(challenge.unavailable
+                ? m.auth_agent_signup_verify_unavailable()
+                : m.auth_agent_signup_verify_required());
+              return;
+            }
+            form.onSubmit(event);
+          })} noValidate>
             {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
             <div className="space-y-5">
               <div>
@@ -296,6 +327,20 @@ export default function AgentSignupPage() {
                   checkboxName={fields.agentTerms.name}
                   error={fields.agentTerms.errors?.[0]}
                 />
+              </div>
+            )}
+
+            {challenge.needsChallenge && (
+              <div className="mt-6" data-testid="agent-signup-turnstile">
+                <div className="flex justify-center overflow-x-auto">
+                  <div ref={challenge.host} />
+                </div>
+                <input type="hidden" name="cf-turnstile-response" value={challenge.token} />
+                {(challenge.error || challenge.unavailable) && (
+                  <p role="alert" className="mt-2 text-center text-[13px] font-semibold text-ih-bad-fg">
+                    {challenge.error ?? m.auth_agent_signup_verify_unavailable()}
+                  </p>
+                )}
               </div>
             )}
 

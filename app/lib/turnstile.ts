@@ -96,14 +96,23 @@ export function useTurnstileWidget(
   // Load Turnstile widget
   useEffect(() => {
     if (!siteKey || typeof window === "undefined") return;
-    const existing = document.querySelector('script[src*="turnstile"]');
-    if (!existing) {
-      const s = document.createElement("script");
-      s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad";
-      s.async = true;
-      s.onerror = () => options?.onLoadFailed?.();
-      document.head.appendChild(s);
+    let script = document.querySelector<HTMLScriptElement>('script[src*="turnstile"]');
+    if (!script) {
+      script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad";
+      script.async = true;
+      document.head.appendChild(script);
     }
+    // Listen on the element whoever inserted it: a mount that finds the script
+    // already loading must hear the failure too, or its visitor is left waiting for
+    // a token that can never arrive. A FAILED element is dropped, so the next mount
+    // inserts a fresh one and retries instead of inheriting a dead script.
+    const failed = script;
+    const onScriptError = () => {
+      failed.remove();
+      options?.onLoadFailed?.();
+    };
+    script.addEventListener("error", onScriptError, { once: true });
     // The id of the widget this run rendered, so the cleanup removes exactly that one when the effect runs again or the host unmounts.
     let widgetId: string | undefined;
     const renderWidget = () => {
@@ -120,6 +129,7 @@ export function useTurnstileWidget(
     window.onTurnstileLoad = renderWidget;
     renderWidget();
     return () => {
+      failed.removeEventListener("error", onScriptError);
       if (widgetId === undefined) return;
       try {
         window.turnstile?.remove?.(widgetId);

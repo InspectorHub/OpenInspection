@@ -30,7 +30,10 @@ import { createEmptyEditorData, createFakeCostItems, createFakeDataSource } from
 import type { FakeDataSource } from "../../testing/fake-data-source";
 import { PropertyTypeControl } from "./PropertyTypeControl";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 type Props = Parameters<typeof PropertyTypeControl>[0];
 

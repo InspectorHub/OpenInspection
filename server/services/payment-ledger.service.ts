@@ -201,6 +201,20 @@ export async function getNetReceivedCents(
 }
 
 /**
+ * What is still owed on an invoice: its total minus what the ledger has net
+ * received, never below zero. THE one definition: the card charge, the
+ * mark-paid remainder and the offline-overpayment check all read it, so they
+ * cannot disagree about how much is left to collect.
+ */
+export async function getOutstandingCents(
+    rawDb: AnyDb,
+    tenantId: string,
+    invoice: { id: string; amountCents: number },
+): Promise<number> {
+    return Math.max(0, invoice.amountCents - await getNetReceivedCents(rawDb, tenantId, invoice.id));
+}
+
+/**
  * Money HELD against an order — collected, with no invoice behind it yet.
  *
  * This is the number `heldDepositCount` counts one row at a time on the QBO
@@ -234,6 +248,37 @@ export async function getHeldDepositCents(
         ))
         .all();
     return rows.reduce((sum, r) => sum + signOf(r.kind) * r.amountCents, 0);
+}
+
+/**
+ * What the hub shows for a deposit that has landed but has no invoice yet: the
+ * net amount held (same arithmetic as `getHeldDepositCents`) and when the
+ * latest receipt moved. DISPLAY ONLY — nothing here marks anything paid. Null
+ * when nothing is held, so a refunded deposit shows nothing rather than $0.
+ */
+export async function getHeldDepositSummary(
+    rawDb: AnyDb,
+    tenantId: string,
+    inspectionId: string,
+): Promise<{ cents: number; paidAt: Date } | null> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = rawDb as any;
+    const rows: Array<{ kind: PaymentKind; amountCents: number; occurredAt: Date }> = await db.select({
+        kind: orderPayments.kind,
+        amountCents: orderPayments.amountCents,
+        occurredAt: orderPayments.occurredAt,
+    })
+        .from(orderPayments)
+        .where(and(
+            eq(orderPayments.tenantId, tenantId),
+            eq(orderPayments.inspectionId, inspectionId),
+            isNull(orderPayments.invoiceId),
+        ))
+        .all();
+    const cents = rows.reduce((sum, r) => sum + signOf(r.kind) * r.amountCents, 0);
+    if (cents <= 0) return null;
+    const latest = rows.reduce((max, r) => (r.kind !== 'refund' && r.occurredAt > max ? r.occurredAt : max), new Date(0));
+    return { cents, paidAt: latest };
 }
 
 /**

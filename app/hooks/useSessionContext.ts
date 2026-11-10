@@ -1,4 +1,5 @@
 import { useRouteLoaderData } from "react-router";
+import { getLocale } from "~/paraglide/runtime";
 import { isFieldRole } from "../../server/lib/auth/roles";
 import type { Capability, CapabilitySet } from "../../server/lib/auth/capabilities";
 import {
@@ -217,6 +218,19 @@ export function useSchedulingTimeZone(): string {
 export function useDisplayLocale(): string {
   const ctx = useSessionContext();
   return ctx?.user.locale || ctx?.branding.defaultLocale || "en-US";
+}
+
+/**
+ * The language the page is rendered in: the UI locale cookie, as paraglide
+ * resolves it for every `m.*()` call.
+ *
+ * Use this, not `useDisplayLocale`, for anything formatted with `Intl` that sits
+ * beside translated copy. `useDisplayLocale` is the ACCOUNT's locale (and "en-US"
+ * outside the auth layout, which is where the agent portal lives), so a page whose
+ * words are Spanish printed "7 minutes ago" and "Nov 8".
+ */
+export function useUiLocale(): string {
+  return getLocale();
 }
 
 /** Tenant transaction/display currency (ISO 4217); 'USD' when unset. */

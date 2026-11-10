@@ -199,6 +199,10 @@ describe("DeleteInspectionBlock", () => {
     expect(screen.queryByText("THE LIST")).toBeNull();
     expect(purge).not.toHaveBeenCalled();
     reply = () => ({ ok: true, intent: "delete" });
+    // The alert shows as soon as the action's data arrives, a frame before the button leaves its pending state;
+    // a click in that frame is swallowed by the pending guard (as it should be), and on a loaded CI runner the
+    // retry landed there. Wait until the button is usable, then retry.
+    await waitFor(() => expect(confirmButton().getAttribute("aria-disabled")).toBeNull());
     fireEvent.click(confirmButton());
     expect(await screen.findByText("THE LIST")).toBeTruthy();
   });

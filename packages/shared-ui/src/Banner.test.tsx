@@ -76,4 +76,70 @@ describe("Banner", () => {
     );
     expect(screen.getByTestId("lead-icon")).toBeTruthy();
   });
+
+  // Layout is not computed in happy-dom, so these pin the classes that make it. On a phone the icon, the text
+  // and the dismiss button share ONE row (text `flex-1 min-w-0`, icon and dismiss `shrink-0`, dismiss ordered
+  // right after the text) and only the ACTIONS wrap to a full-width row beneath. From `sm` up the original
+  // layout holds: text flex-1, actions inline at the right, dismiss last. The DOM keeps its original order
+  // (icon, text, actions, dismiss) so keyboard order stays icon-free: actions before dismiss.
+  const cls = (el: HTMLElement) => el.className;
+
+  it("with no icon and no actions the text is the only flexible item", () => {
+    render(<Banner tone="info">Plain notice</Banner>);
+    const text = screen.getByText("Plain notice");
+    expect(cls(text)).toContain("min-w-0");
+    expect(cls(text)).toContain("flex-1");
+    expect(cls(text)).not.toContain("basis-full");
+  });
+
+  it("keeps icon, text and dismiss on one row on a phone", () => {
+    render(
+      <Banner tone="info" icon={<i data-testid="ic" />} dismissible onDismiss={() => {}}>
+        Notice
+      </Banner>,
+    );
+    const icon = screen.getByTestId("ic").parentElement as HTMLElement;
+    const text = screen.getByText("Notice");
+    const dismiss = screen.getByRole("button", { name: /dismiss/i });
+    expect(cls(icon)).toContain("shrink-0");
+    expect(cls(text)).toContain("flex-1");
+    expect(cls(dismiss)).toContain("shrink-0");
+    expect(cls(text)).not.toContain("basis-full");
+  });
+
+  it("wraps only the actions to a full-width row beneath, ordered after the dismiss button on a phone", () => {
+    render(
+      <Banner tone="info" dismissible onDismiss={() => {}} actions={<a href="/x">Do it</a>}>
+        A long notice that should not be squeezed into a narrow column beside its link.
+      </Banner>,
+    );
+    const actions = screen.getByText("Do it").parentElement as HTMLElement;
+    const dismiss = screen.getByRole("button", { name: /dismiss/i });
+    expect(cls(actions)).toContain("w-full");
+    expect(cls(actions)).toContain("order-4");
+    expect(cls(dismiss)).toContain("order-3");
+    // From sm up: actions inline at the right, dismiss last, as before.
+    expect(cls(actions)).toContain("sm:w-auto");
+    expect(cls(actions)).toContain("sm:ml-auto");
+    expect(cls(actions)).toContain("sm:order-3");
+    expect(cls(dismiss)).toContain("sm:order-4");
+  });
+
+  it("with icon, text, actions and dismiss: icon first, text second, both stay beside each other", () => {
+    render(
+      <Banner tone="warn" icon={<i data-testid="ic" />} dismissible onDismiss={() => {}} actions={<a href="/x">Go</a>}>
+        Everything
+      </Banner>,
+    );
+    expect(cls(screen.getByTestId("ic").parentElement as HTMLElement)).toContain("order-1");
+    expect(cls(screen.getByText("Everything"))).toContain("order-2");
+    expect(screen.getByRole("alert")).toBeTruthy();
+  });
+
+  it("uses compact padding on a phone", () => {
+    const { container } = render(<Banner tone="info">i</Banner>);
+    const root = container.firstChild as HTMLElement;
+    expect(root.className).toContain("py-2");
+    expect(root.className).toContain("sm:py-3");
+  });
 });

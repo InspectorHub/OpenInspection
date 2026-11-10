@@ -91,5 +91,6 @@ export function emptyDashboard(loadFailed = false) {
         scheduleSet: false,
         quotaCaps: null as { inspections: number; sms: number; email: number } | null,
         quotaUsage: null as { inspections: number; sms: number; email: number } | null,
+        quotaResetsAt: null as string | null,
     };
 }

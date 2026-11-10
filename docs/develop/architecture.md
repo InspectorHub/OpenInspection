@@ -363,9 +363,11 @@ The DI proxy in `server/lib/middleware/di.ts` lazy-instantiates each service on 
    results document is a Yjs CRDT buffered in IndexedDB and merged on reconnect
    (see [`../concepts/collab-editing.md`](../concepts/collab-editing.md)). The
    `useOfflineQueue` hook this line used to name was retired with the rest of
-   the bespoke offline layer in #181. Photo and video BINARY upload still
-   requires a connection — it writes to R2 — so that half is not offline-capable
-   and the editor says so rather than queueing.
+   the bespoke offline layer in #181. Item photos, crops and annotations
+   taken offline queue in IndexedDB and upload on reconnect
+   (`app/lib/field/web-media-store.ts`); photos attached to a defect and web
+   video upload still require a connection, because they write to R2 and are
+   not queued.
 2. **A native client** (direction, unspecified) — designed for the field rather
    than inherited from the browser: capture, local storage, sync and conflict
    resolution are the requirement, not follow-ups to a shell.

@@ -33,6 +33,7 @@ import { agentTermsAcceptances, deploymentLegalVersions } from '../../lib/db/sch
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { DeploymentLegalService } from '../deployment-legal.service';
+import { agentTermsLedgerRow } from './terms-ledger-row';
 
 type Db = DrizzleD1Database<Record<string, unknown>>;
 
@@ -242,6 +243,13 @@ export async function agentTermsStatus(db: Db, userId: string): Promise<AgentTer
 }
 
 /**
+ * The ledger INSERT as a statement, for a caller that batches it with another write (signup's new user).
+ */
+export function agentTermsLedgerStatement(db: Db, input: Parameters<typeof agentTermsLedgerRow>[0]) {
+    return db.insert(agentTermsAcceptances).values(agentTermsLedgerRow(input));
+}
+
+/**
  * Record that this agent accepted the agent terms in force.
  *
  * The version and hash are read HERE, from the registry, and never taken from
@@ -296,16 +304,14 @@ export async function recordAgentTermsAcceptance(
     // leave the deployment asserting an acceptance it holds no record of, which
     // is the one ordering of these two statements that produces a false record
     // rather than a missing one.
-    await db.insert(agentTermsAcceptances).values({
-        id: crypto.randomUUID(),
+    await db.insert(agentTermsAcceptances).values(agentTermsLedgerRow({
         userId: input.userId,
-        doc: 'agent_terms',
         version: inForce.version,
         contentHash: inForce.contentHash,
         acceptedAt,
-        ip: input.ip ?? null,
-        country: input.country ?? null,
-    });
+        ip: input.ip,
+        country: input.country,
+    }));
 
     await db
         .update(users)

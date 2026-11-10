@@ -26,14 +26,45 @@ preference; it is the failure mode the rule exists to make impossible.
 ## What flows where
 
 **Outbound:** payment intents for an inspection's invoice, and deposits taken at
-booking. The amount comes from the invoice, which is authoritative over the
+booking. The invoice total comes from the invoice, which is authoritative over the
 denormalized `inspections.price` cache — see the money authority chain in
-`CLAUDE.md`.
+`CLAUDE.md`. What a card is charged on an invoice is the **outstanding balance**:
+the total minus everything the payment ledger has received against it (a booking
+deposit, an offline payment, a part-payment), plus any refunds. The pay page is
+shown that same figure. When nothing is outstanding no payment intent is created,
+and the page says the invoice is already paid. A payment request that would ask
+for nothing is refused with a clear message instead of emailing the client.
+
+**Charging at booking.** Settings → Booking → *Collect payment when clients book*
+turns it on: **Charge the full fee when booking** stores a 100% deposit, and
+**Charge a deposit** takes a percent or a fixed amount. The section shows whether
+Stripe is connected (all three keys saved) beside whether payment at booking is
+on. Turning it on before Stripe is connected is allowed: the booking is still
+accepted and the amount shows as unpaid, but the client cannot pay until the keys
+are in, and until then the public booking page quotes no deposit and shows no Pay
+button; the confirmation says the company will contact the client about it. A
+service can set its own deposit, or none, under Services & catalog.
 
 **Inbound:** the webhook at `POST /webhooks/stripe`, verified against
 `STRIPE_WEBHOOK_SECRET` — the workspace's secret saved under Settings →
 Integrations is honoured on this path exactly as it is on the API. A successful
-payment marks the invoice paid, which is what releases the report pay-gate.
+payment is recorded in the ledger for exactly the amount Stripe reports it took
+(the payment intent id makes a redelivery a no-op) and marks the invoice paid once
+the ledger covers its total, which is what releases the report pay-gate. A booking
+deposit alone never releases the report unless it covers the full total.
+
+Card payments need all three keys (publishable, secret and webhook secret). With the
+webhook secret missing, a payment could be taken and never recorded, so the booking
+page offers no Pay button and the payment endpoints answer `503`. Repeated clicks on
+Pay return the same Stripe payment intent while the balance is unchanged; a changed
+balance gets a new one. If that earlier intent has already ended (it succeeded and was later refunded, or it was cancelled), a fresh intent is created instead, so a client is never handed a payment form that cannot be confirmed.
+
+**Overpayments are refunded in the Stripe dashboard.** If a client's card is charged
+after another payment already covered the invoice (a payment page left open while an
+offline payment was recorded), the charge is recorded in full and the invoice shows
+the excess. The payments screen can record offline payments and correct a mistyped
+amount; it does not issue a refund through Stripe. Refund the excess in the Stripe
+dashboard.
 
 The webhook refuses a body larger than 1 MB with `413` and, where the `STRIPE_WEBHOOK_RATE_LIMITER` binding is configured (`wrangler.jsonc`, 300 requests per minute per workspace and source address), a burst beyond it with `429`. Both are answered before any workspace or secret lookup and logged without the payload; Stripe retries a non-2xx delivery.
 

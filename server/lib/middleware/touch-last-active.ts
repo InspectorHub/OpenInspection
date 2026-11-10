@@ -34,6 +34,15 @@ export const MAX_TRACKED_USERS = 10_000;
 const lastFlush = new Map<string, number>();
 
 /**
+ * Forget every user's debounce. Nothing in the product calls this: it exists for the unit suite, whose
+ * `api-shared` project reuses one module registry across spec files and calls it after each file
+ * (`tests/unit/setup-shared.ts`) so a touch recorded by one file never suppresses the next file's.
+ */
+export function resetTouchLastActiveDebounce(): void {
+    lastFlush.clear();
+}
+
+/**
  * Drop entries whose debounce has already expired, and if that is not enough,
  * drop everything.
  *

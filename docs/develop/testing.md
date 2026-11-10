@@ -30,7 +30,7 @@ Collection is enforced in **both** directions, by two gates rather than one:
 
 | Location | Suite | Command | Config | Runtime |
 |---|---|---|---|---|
-| `app/**/*.test.{ts,tsx}` (co-located) | web unit | `test:web` | `vitest.config.ts` | happy-dom |
+| `app/**/*.test.{ts,tsx}` (co-located) | web unit | `test:web` | `vitest.config.ts` | happy-dom (per-file docblock; node by default) |
 | `tests/unit/<domain>/**/*.spec.ts` | api/service unit | `test:unit` | `vitest.api.config.ts` | node (+ better-sqlite3) |
 | `tests/workers/**/*.spec.ts` | worker-runtime | `test:workers` | `vitest.workers.config.ts` | real `workerd` |
 | `tests/contract/<party>/*.contract.spec.ts` | contract (offline) | `test:contract` | `vitest.contract.config.ts` | node, no network |
@@ -119,6 +119,63 @@ tests/
   real defect in that fallback rather than in this sentence — the number is
   recorded here so a reader can tell the two apart.
 
+- **Three vitest projects.** `vitest.config.ts` splits the web specs by `tests/web-isolation.json`:
+  `web-node-shared` and `web-dom-shared` run with `isolate: false` (the files one worker handles
+  reuse its module graph, and in the dom project the same happy-dom window, which removes most of
+  the import and environment cost) and `web-isolated` is the historical one-fresh-graph-per-file
+  behaviour (node by default; a `@vitest-environment happy-dom` docblock still selects the DOM per
+  file). A spec is shareable only if it has no module mock, registry reset, global stub or write,
+  session storage, location or `document` structure write (fake timers and `localStorage` writes are
+  the two exceptions below), hand-made React root or
+  wall-clock bound, and reaches no module that keeps state (type-only imports are not followed).
+  The manifest splits the shareable specs by the environment their docblock declares, and the
+  gate fails when a spec sits in the wrong list. `npm run lint:web-isolation` fails when a listed
+  spec breaks those rules; `npm run gen:web-isolation` regenerates the lists (a spec that passes
+  the rules but fails or flakes when shared goes under `forcedIsolated` with a reason, and stays
+  there). A new spec is isolated until the generator lists it, so nothing breaks by default.
+- **Two hazards are accepted because the shared setup undoes them.** `tests/setup-web.ts` calls
+  `vi.useRealTimers()` and `localStorage.clear()` in an `afterEach` for every project, so a shared
+  spec may use fake timers (installed per test, not once in `beforeAll`) and write `localStorage`
+  without leaving anything for the next file. `SETUP_RESETS` in `scripts/lib/web-isolation.mjs`
+  names each exemption and `npm run lint:web-isolation` fails if the setup file stops making the
+  call. `sessionStorage`, `indexedDB`, spies on browser objects and timers installed in
+  `beforeAll` are still rejected. A spy on an object the spec builds itself (a fake data source)
+  still needs `vi.restoreAllMocks()` in an `afterEach` for the rule to pass.
+- **The generated message catalogues are loaded by Node, not transformed per file.**
+  `vitest.config.ts` lists `app/paraglide/` and `packages/field-ui/src/i18n/generated/` under
+  `test.server.deps.external` (inherited by all three projects). Those two were about half of all
+  import self-time; a full `npm run test:web` went from 405 s to 348 s with this alone. The paraglide
+  runtime is still a single instance, so `setLocale` in a spec works, and `vi.mock('~/paraglide/messages')`
+  still intercepts (repair-builder-action-tag-seam relies on it).
+- **The worker-thread pool was measured and not adopted.** `pool: 'threads'` for `web-isolated`
+  gave 345 s against 348 s, and a worker thread cannot move the ICU zone with `process.env.TZ`
+  (useSchedulingTimeZone, PaymentsModal do). Do not retry it without a gate that keeps such specs on forks.
+- **`FieldEditor.capabilities.test.tsx` mounts once per (tree, inspection, omitted capability),**
+  not once per entry. Every entry that shares a mount is asserted in turn against it, closing any
+  menu or sheet the previous entry opened, and the soft expectation message still names the tree,
+  the entry and the omitted capability. The 533 matrix triples are unchanged; the file went from
+  96 s to 48 s. A new entry needs no change beyond its row in `ENTRIES`; if it leaves state the
+  next entry would trip over, close it in `dismissOverlays`.
+- **Module state that is allowed is listed by name, with one reason each**
+  (`WEB_BENIGN_MODULE_STATE` in `scripts/lib/web-isolation.mjs`): the overlay layer stack, the
+  toast listener list, a counter of mounted navs. Each is state that is only touched inside
+  effects and is back to empty once the component unmounts, or a memo whose value does not depend
+  on the test. Do not add a module to the list without reading it and writing why.
+- **The shared dom project cleans up and checks.** `tests/setup-web-shared.ts` runs
+  testing-library's `cleanup()` after every test (its own automatic cleanup is registered by an
+  import that happens once per worker when the registry is shared, so only the first file of a
+  worker would get it) and then fails the test if `<body>` still has children, an overlay layer is
+  still registered, the scroll lock is still on `<body>`, or `data-mobile-nav` is still on
+  `<html>`. A leaked mount therefore fails in the spec that leaked it, not in its neighbour.
+- **CI re-runs the two shared web projects shuffled** (`npm run test:web:shared-shuffled`, same
+  `--shard=N/4` flag, applied to the shared projects alone, so a file can sit on a different shard
+  number than in the main run). The seed is printed at the START of the run. To replay a failure:
+  `npx vitest run --config vitest.config.ts --project web-node-shared --project web-dom-shared --sequence.shuffle --sequence.seed=<seed> --maxWorkers=1`
+  (plus the same `--shard=N/4`). Use one worker: with `isolate: false` which files share a worker
+  depends on scheduling, so only a single worker reproduces the order. Shuffle also reorders the
+  tests inside a file; run that file alone with the same seed to tell an order-dependent test from a
+  leak between files.
+
 ### API / service unit (`tests/unit/<domain>/*.spec.ts`)
 
 - Node env, `better-sqlite3` in-memory DB — no worker, no network. Use the shared
@@ -140,6 +197,27 @@ tests/
   passes the rules but fails or flakes when shared goes under `forcedIsolated` with a
   reason, and stays there). A new spec is isolated until the generator lists it, so
   nothing breaks by default.
+  A module that keeps state is handled in one of three ways, all in `scripts/lib/unit-isolation.mjs`:
+  `BENIGN_MODULE_STATE` (a memo or registry no spec can observe, each with a written reason),
+  `RESET_BY_SHARED_SETUP` (real state with an exported reset that `tests/unit/setup-shared.ts` calls after
+  every file of `api-shared`: the Google service-account token cache, the last-active debounce, the CSP
+  report sampling window), or `KNOWN_MUTABLE_MODULES` (state the patterns cannot see; keeps every spec that
+  reaches it isolated). `lint:unit-isolation` fails when the setup file stops calling a reset it is promised.
+  A test helper that trips a text rule without being a hazard is listed under `VETTED_HELPERS` with its
+  reason (the tenant-email harness's fetch double, which its `close()` undoes). The setup file also unstubs
+  globals and restores spies after each file as a net under a spec that forgot to (a spec that calls
+  `createHarness(` must call `.close(`, which the gate checks). The helper exemption covers `fetch` only;
+  stubbing any other global in it fails the gate. A new module-level cache that a spec can observe needs one of those
+  three entries, not a bigger manifest. The exempt files are skipped by the module-state rules as a whole, so
+  `EXEMPT_STATE_PINS` records how many top-level state statements each has: a new cache in one fails
+  `lint:unit-isolation` until someone reads it and updates the number. A spec that imports the worker entry
+  (`workers/app`) or installs a fake API app loader is never shared. Both isolation gates also print, without
+  failing, any spec the rules accept but the manifest does not list, so a manifest that fell behind is visible.
+- **The generated message catalogue is loaded by Node, not transformed per file.** `vitest.api.config.ts`
+  lists `app/paraglide/` and `packages/field-ui/src/i18n/generated/` under `test.server.deps.external`
+  (next to `scripts/*.mjs`), because `server/lib/i18n/messages.ts` pulls ~3.7 MB of generated source into
+  most of the graph. Measured on the full unit suite: 421 s to 336 s. No unit spec mocks either path; a
+  `vi.mock` of one would be the thing to re-check before adding it.
 - **Do not mock `drizzle-orm/d1` to inject the test database.** A module mock keeps the spec in
   `api-isolated`. Give the code under test a real binding instead: `tests/unit/helpers/d1-binding.ts`
   has `d1For(db)` (a `D1Database` over the database `createTestDb()` returned), `lazyD1()` (a binding
@@ -273,6 +351,18 @@ branch). The helpers are `tests/unit/helpers/response-shape.ts` (the walker), `r
   corrupt. Before this, ten projects shared one inspection and it worked only
   because nothing ran at the same time: SpeedMode's overlay opens while unrated
   items remain, and a concurrent spec rating those items left it with none.
+- **Wide specs are split into projects, by title.** `editor-responsive` is one project per viewport
+  (`editor-responsive-375x812`, …), each selected by a `grep` on the viewport in the test titles and each with its own
+  seeded inspection, so the working paths run side by side instead of in one serial chain. Splitting a spec this way means
+  adding every new project name to `EXCLUSIVE_SEED_PROJECTS` (an unlisted one silently shares the `shared` entry).
+  Do not add `dependencies` to a project as a scheduling hint: a project that depends on another waits for all of it.
+- **A control that can be missing must fail fast.** Give a `boundingBox()`, `textContent()` or similar locator call an
+  explicit short `timeout`: without one it waits for the whole test timeout and the report says only "Test timeout".
+  A signup form carries a bot challenge; wait for its token (the widget answers by itself on Cloudflare's public test
+  key) before clicking submit. The gate is never bypassed.
+- **`globalSetup` is a handful of wrangler spawns, not one per row.** It migrates, lists the tables, wipes them and
+  publishes the agent terms in one SQL file, lists the KV keys and clears them with one `kv bulk delete`. Keep it that
+  way: each spawn costs seconds on Windows.
 - **Gate on hydration, not on markup.** The app is server-rendered, so `<main>`
   and a full item list are on screen before React attaches any handler — waiting
   for them proves the SSR shell arrived and nothing more. Use

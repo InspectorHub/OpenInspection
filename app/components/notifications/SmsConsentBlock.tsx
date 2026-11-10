@@ -77,12 +77,17 @@ export function SmsConsentBlock({
     locale?: string;
 }) {
     const day = (iso: string | null) => (iso ? formatDate(iso, { locale }) : "");
-    const on = consent.state === "granted" || consent.state === "implied";
+    // ON needs somewhere to send to. A reachable-by-relationship reader with no
+    // number on file used to read "Texts are ON." with a Stop button, which
+    // claimed a channel that cannot carry anything. No number = OFF, nothing to
+    // stop, nothing to resume.
+    const hasPhone = !!consent.phone;
+    const on = (consent.state === "granted" || consent.state === "implied") && hasPhone;
     const [ack, setAck] = useState(false);
     const implied = consent.mode === "implied";
     // An express grant needs the disclosure on screen; a resume does not,
     // because there was never a disclosure to agree to.
-    const canGrant = !on && !!onGrant && (implied || !!consent.disclosure);
+    const canGrant = !on && !!onGrant && (implied ? hasPhone : !!consent.disclosure);
 
     return (
         <section aria-labelledby="notif-sms-h" className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
@@ -94,7 +99,7 @@ export function SmsConsentBlock({
                 {consent.state === "revoked" ? m.notif_prefs_sms_revoked({ date: day(consent.at) })
                     : consent.state === "none" ? m.notif_prefs_sms_none()
                         : consent.phone ? m.notif_prefs_sms_on({ phone: consent.phone })
-                            : m.notif_prefs_sms_on_no_phone()}
+                            : m.notif_prefs_sms_off_no_phone()}
             </p>
 
             {/* The ledger line. It is the same fact a carrier audit would ask
@@ -108,7 +113,7 @@ export function SmsConsentBlock({
                     })}
                 </p>
             )}
-            {consent.state === "implied" && (
+            {consent.state === "implied" && hasPhone && (
                 <p className="text-[13px] text-ih-fg-3 mt-1">{m.notif_prefs_sms_implied()}</p>
             )}
 

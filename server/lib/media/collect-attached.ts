@@ -4,6 +4,13 @@ export interface PhotoEntry {
   crop?: { aspect: string; orientation: 'landscape' | 'portrait'; x: number; y: number; width: number; height: number };
   annotatedKey?: string;
   annotationsJson?: string;
+  /** 'video' entries have no file key; every other value (or none) is a photo. */
+  mediaType?: 'photo' | 'video';
+  /** A video entry is named by one of these, not by `key` (which is empty). */
+  provider?: 'stream' | 'r2';
+  streamUid?: string;
+  mediaId?: string;
+  posterKey?: string;
 }
 export interface AttachedPhoto {
   key: string;          // displayKey = annotatedKey || croppedKey || key (what the report/grid shows)
@@ -16,6 +23,7 @@ export interface AttachedPhoto {
   photoIndex: number;   // index within its own photos[] array
   annotated: boolean;
   defectId?: string;    // present when the photo hangs off a defect, not the item
+  unitId?: string;      // the unit the finding belongs to ('_default' for the common scope), when the key parser knows it
 }
 export interface ItemMeta { itemLabel: string; sectionId: string; sectionTitle: string }
 
@@ -32,11 +40,13 @@ export function collectAttachedPhotos(
   data: Record<string, ResultEntry>,
   itemMeta: Map<string, ItemMeta>,
   makeUrl: (key: string) => string,
-  parseKey: (key: string) => { itemId: string; sectionId?: string } = (k) => ({ itemId: k }),
+  parseKey: (key: string) => { itemId: string; sectionId?: string; unitId?: string } = (k) => ({ itemId: k }),
 ): AttachedPhoto[] {
   const out: AttachedPhoto[] = [];
   const push = (itemId: string, sectionFallback: string | undefined, p: PhotoEntry | null, idx: number, defectId?: string) => {
     if (!p || typeof p.key !== 'string') return;
+    // A video entry has no file key (it is addressed by media id or stream uid) and is not a photo.
+    if (p.mediaType === 'video') return;
     const meta = itemMeta.get(itemId) ?? { itemLabel: itemId, sectionId: sectionFallback || 'unknown', sectionTitle: 'Unsectioned' };
     const displayKey = p.annotatedKey || p.croppedKey || p.key;
     const attached: AttachedPhoto = {
@@ -48,7 +58,8 @@ export function collectAttachedPhotos(
     out.push(attached);
   };
   for (const [key, entry] of Object.entries(data)) {
-    const { itemId, sectionId } = parseKey(key);
+    const { itemId, sectionId, unitId } = parseKey(key);
+    const from = out.length;
     (Array.isArray(entry?.photos) ? entry.photos : []).forEach((p, i) => push(itemId, sectionId, p, i));
     const cannedDefects = entry?.tabs?.defects ?? {};
     for (const [defectId, d] of Object.entries(cannedDefects)) {
@@ -57,6 +68,7 @@ export function collectAttachedPhotos(
     for (const d of (entry?.customComments?.defects ?? [])) {
       (Array.isArray(d?.photos) ? d.photos : []).forEach((p, i) => push(itemId, sectionId, p, i, d.id));
     }
+    if (unitId !== undefined) for (const a of out.slice(from)) a.unitId = unitId;
   }
   return out;
 }

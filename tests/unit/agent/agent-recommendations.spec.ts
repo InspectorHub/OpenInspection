@@ -128,3 +128,17 @@ describe('groupRecommendations — custom categories merge into recommendation (
         expect(g.recommendation.map((r) => r.category)).toContain('Environmental');
     });
 });
+
+describe('flattenInspectionToRecommendations - photos (video entries)', () => {
+    it('lists only still photos: a video entry has no file key and must not become an empty or broken photo link', () => {
+        const rows = flattenInspectionToRecommendations(raw2({
+            '_default:s:it': { customComments: { defects: [{
+                id: 'cd1', title: 'Cracked pane', comment: '', category: 'safety', included: true,
+                photos: [{ key: 'inspections/i/photos/a.jpg' }, { key: '', mediaType: 'video', provider: 'r2', mediaId: 'm1' }, { key: '', mediaType: 'video', streamUid: 'u1' }, 'inspections/i/photos/b.jpg'],
+            }] } },
+        }));
+        expect(rows).toHaveLength(1);
+        expect(rows[0].photos).toHaveLength(2);
+        expect(rows[0].photos.every((p) => p.length > 0)).toBe(true);
+    });
+});

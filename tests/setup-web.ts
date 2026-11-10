@@ -1,4 +1,4 @@
-import { afterEach, beforeEach } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 
 // jest-dom matchers. The reason is failure MESSAGES, not brevity:
 // `expect(el.disabled).toBe(true)` fails with "expected false to be true",
@@ -65,4 +65,12 @@ afterEach(() => {
 // Hermeticity for browser storage: what one test saves (the editor's last place, a sort order) must not decide how the next one opens.
 afterEach(() => {
   if (typeof localStorage !== 'undefined') localStorage.clear();
+});
+
+// Hermeticity for timers: a spec that installs fake timers (or pins the clock) and then fails, or simply forgets, before it
+// puts the real ones back would hand the next spec of a shared worker a frozen clock. Putting them back here, after the
+// spec's own afterEach hooks, makes that impossible; it is a no-op when no fake clock is installed. The web-isolation gate
+// relies on this call to accept fake timers in a shared spec and fails if it is removed (scripts/lib/web-isolation.mjs).
+afterEach(() => {
+  vi.useRealTimers();
 });

@@ -3,7 +3,7 @@ import { m } from "../../i18n";
 import { renderTemplate } from "../../shared/mustache";
 import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "../../shared/defect-fields";
 import { findRatingLevel, type EditorRatingLevel } from "../../shared/rating-levels";
-import { ItemPhotoStrip, type StripPhoto } from "../media-studio/ItemPhotoStrip";
+import { ItemPhotoStrip, type StripPhoto, type StripVideoRef } from "../media-studio/ItemPhotoStrip";
 import { ItemHeading } from "./ItemHeading";
 
 type Entry = { id: string; title?: string; comment?: string; default?: boolean; location?: string };
@@ -18,7 +18,7 @@ interface ReadOnlyItemViewProps {
   inspectionId: string;
   coverKey: string | null;
   onOpenPhoto?: (itemId: string, index: number) => void;
-  videoPosterUrl?: (streamUid: string, posterPct?: number) => string | null;
+  videoPosterUrl?: (video: StripVideoRef) => string | null;
   pendingPhotoUrl?: (pendingId: string) => string | undefined;
 }
 

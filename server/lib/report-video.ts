@@ -68,8 +68,8 @@ export type ReportMedia =
           durationSec?: number | undefined;
           qr: true;
       }
-    /** R2 video — native player (web path). posterUrl links to the poster JPEG; playerSrc is the clip URL. */
-    | { kind: 'r2-video-player'; mediaId: string; posterUrl: string; playerSrc: string; durationSec?: number | undefined }
+    /** R2 video — native player (web path). posterUrl links to the poster JPEG and is absent when none was stored; playerSrc is the clip URL. */
+    | { kind: 'r2-video-player'; mediaId: string; posterUrl?: string | undefined; playerSrc: string; durationSec?: number | undefined }
     /** R2 video — poster only (PDF path). posterUrl links to the poster JPEG. */
     | { kind: 'r2-video-poster'; mediaId: string; posterUrl: string; durationSec?: number | undefined };
 
@@ -127,10 +127,13 @@ export function selectReportMedia(entry: ReportMediaEntry, ctx: ReportMediaConte
         const mediaId = entry.mediaId!;
         const base = ctx.r2BaseUrl!;
         const q = ctx.r2Query ? `?${ctx.r2Query}` : '';
-        const posterUrl = `${base}/r2-object/${encodeURIComponent(mediaId)}/poster${q}`;
         const playerSrc = `${base}/r2-object/${encodeURIComponent(mediaId)}${q}`;
+        // The poster is optional at upload; without a stored one the poster route answers 404, so no URL is named for it.
+        const posterUrl = entry.posterKey ? `${base}/r2-object/${encodeURIComponent(mediaId)}/poster${q}` : undefined;
 
         if (ctx.isPdf) {
+            // Nothing to print without a poster: fall through to the image branch rather than name a poster that 404s.
+            if (!posterUrl) return { kind: 'image', src: entry.url, key: entry.key };
             // PDF cannot play video — degrade to poster JPEG only.
             return {
                 kind: 'r2-video-poster',
@@ -143,7 +146,7 @@ export function selectReportMedia(entry: ReportMediaEntry, ctx: ReportMediaConte
         return {
             kind: 'r2-video-player',
             mediaId,
-            posterUrl,
+            ...(posterUrl ? { posterUrl } : {}),
             playerSrc,
             durationSec: entry.durationSec,
         };

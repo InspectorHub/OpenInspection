@@ -1,7 +1,7 @@
 /**
  * The single-request (multipart form) video route buffers the whole clip, so it has a lower cap than the
  * chunked route: 64 MiB. Over it the answer is 413 VIDEO_TOO_LARGE_FOR_FORM and names the chunked route.
- * The web editor's session route is a different route with its own limit and must not move.
+ * The web editor's session route takes the same single-request limit (64 MiB): the editor buffers one clip per request too.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
@@ -62,7 +62,7 @@ describe('single-request video upload cap', () => {
         expect([...u!.r2.store.values()][0]?.bytes.length).toBe(MAX_FORM_VIDEO_BYTES);
     });
 
-    it('leaves the web editor\'s session route at the larger limit', async () => {
+    it("holds the web editor's session route to the same single-request limit (larger clips go through the chunked route)", async () => {
         u = await createUploadHarness();
         const keyring = await buildKeyring(u.h.env as unknown as Record<string, string | undefined>);
         const now = Math.floor(Date.now() / 1000);
@@ -72,7 +72,7 @@ describe('single-request video upload cap', () => {
         const created = await u.call(CREATE, jsonPost({}), { auth: jwt });
         const { uploadURL } = ((await created.json()) as { data: { uploadURL: string } }).data;
         const parsed = new URL(uploadURL);
-        const res = await u.call(parsed.pathname + parsed.search, { method: 'POST', body: filePart('video/mp4', clip(MAX_FORM_VIDEO_BYTES + 10)) }, { auth: jwt });
-        expect(res.status, await res.clone().text()).toBe(200);
+        const over = await u.call(parsed.pathname + parsed.search, { method: 'POST', body: filePart('video/mp4', clip(MAX_FORM_VIDEO_BYTES + 10)) }, { auth: jwt });
+        expect(over.status, await over.clone().text()).toBe(413);
     });
 });

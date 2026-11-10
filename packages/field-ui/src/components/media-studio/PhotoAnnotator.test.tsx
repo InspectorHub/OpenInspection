@@ -70,6 +70,22 @@ function open(photoUrl: string | null) {
   );
 }
 
+/**
+ * At phone width the header row (close, title, cover, undo, save) does not fit one line. The title used to be squeezed
+ * by the buttons until it wrapped letter by letter; now the row wraps and the title keeps its words together.
+ */
+describe("PhotoAnnotator header on a narrow screen", () => {
+  it("wraps the row instead of squeezing the title, and keeps the title on one line", () => {
+    render(<PhotoAnnotator open photoUrl="/p.jpg" photoIndex={2} totalPhotos={2} onSetCover={NOOP} onSave={NOOP} onClose={NOOP} />);
+    const bar = screen.getByLabelText("Close photo studio").parentElement!;
+    expect(bar.className).toContain("flex-wrap");
+    const title = screen.getByText("Photo 2 of 2");
+    expect(title.className).toContain("whitespace-nowrap");
+    expect(title.parentElement!.className).toMatch(/min-w-\[/);
+    expect(screen.getByRole("button", { name: /set as cover/i }).className).toContain("whitespace-nowrap");
+  });
+});
+
 /** The studio requests the image inside an effect, so wait for the request. */
 async function latestImage(): Promise<FakeImage> {
   await vi.waitFor(() => {

@@ -9,6 +9,10 @@ export interface GalleryPhoto {
   // `| undefined` is explicit because `flattenMedia` copies these straight from an API row whose
   // fields are optional, and the server program checks this file with exactOptionalPropertyTypes.
   itemId?: string | undefined;
+  /** The section that owns `itemId`, so the editor addresses the right finding when the item is not the open one. */
+  sectionId?: string | undefined;
+  /** The unit the finding belongs to ('_default' = common scope); absent from an older server. */
+  unitId?: string | undefined;
   photoIndex?: number | undefined;
   annotated?: boolean | undefined;
   originalKey?: string | undefined;
@@ -45,6 +49,8 @@ export interface MediaApiBody {
       url: string;
       itemLabel?: string;
       itemId?: string;
+      sectionId?: string;
+      unitId?: string;
       photoIndex?: number;
       annotated?: boolean;
       originalKey?: string;
@@ -64,6 +70,8 @@ export function flattenMedia(body: MediaApiBody | null | undefined): GalleryPhot
       url: a.url,
       label: a.itemLabel ?? '',
       itemId: a.itemId,
+      sectionId: a.sectionId || undefined, // '' (a legacy bare key) is no section
+      unitId: a.unitId,
       photoIndex: a.photoIndex,
       annotated: a.annotated,
       originalKey: a.originalKey,

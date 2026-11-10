@@ -16,6 +16,7 @@ import type { HonoConfig } from '../../../server/types/hono';
 import { signUploadToken } from '../../../server/lib/video-upload-token';
 import { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, mimeToExt, registerR2VideoRoutes } from '../../../server/api/inspections/media-video-r2';
 import { r2Keys } from '../../../server/lib/r2-keys';
+import { MAX_FORM_VIDEO_BYTES } from '../../../server/lib/media/video-types';
 import { MAX_PHOTO_BYTES } from '../../../server/lib/media/store-photo';
 import { AVIF_BYTES, HTML_BYTES, JPEG_BYTES, MOV_BYTES, MP4_BYTES, PNG_BYTES, SVG_BYTES, WEBM_BYTES, WEBP_BYTES } from '../helpers/media-bytes';
 
@@ -295,6 +296,73 @@ describe('r2-upload route', () => {
         expect(body.data.r2Key).toContain('.mp4');
         // Verify bytes were written to the stub store.
         expect(photos.store.has(body.data.r2Key)).toBe(true);
+    });
+
+    it('refuses on the declared length alone, before the body is read: a small body that declares 150 MiB gets 413 and nothing is stored', async () => {
+        const { app, photos } = setup();
+        const token = await mintToken();
+        // A pre-built body, so the request can carry a content-length of its own (a FormData body drops it).
+        const encoded = new Response(makeFormData('clip.mp4', 'video/mp4', MP4_BYTES));
+        const bytes = new Uint8Array(await encoded.arrayBuffer());
+        const res = await app.request(`/${INSPECTION_ID}/media/video/r2-upload?token=${token}`, {
+            method: 'POST',
+            body: bytes,
+            headers: { 'x-test-tenant': TENANT_ID, 'content-type': encoded.headers.get('content-type') ?? '', 'content-length': String(150 * 1024 * 1024) },
+        });
+        expect(res.status).toBe(413);
+        expect(photos.store.size).toBe(0);
+    });
+
+    it('a request with no content-length (chunked transfer) skips the early check and is still refused after the body is read, with the shared too-large answer', async () => {
+        const { app, photos } = setup();
+        const token = await mintToken();
+        const encoded = new Response((() => { const fd = new FormData(); fd.append('file', new Blob([MP4_BYTES, new Uint8Array(MAX_FORM_VIDEO_BYTES)], { type: 'video/mp4' }), 'clip.mp4'); return fd; })());
+        const bytes = new Uint8Array(await encoded.arrayBuffer());
+        const res = await app.request(`/${INSPECTION_ID}/media/video/r2-upload?token=${token}`, {
+            method: 'POST',
+            body: bytes,
+            headers: { 'x-test-tenant': TENANT_ID, 'content-type': encoded.headers.get('content-type') ?? '' },
+        });
+        expect(res.status).toBe(413);
+        expect(photos.store.size).toBe(0);
+    });
+
+    it('the early refusal names the code and the limit, and sends the editor to no chunked route', async () => {
+        const { app } = setup();
+        const token = await mintToken();
+        const encoded = new Response(makeFormData('clip.mp4', 'video/mp4', MP4_BYTES));
+        const res = await app.request(`/${INSPECTION_ID}/media/video/r2-upload?token=${token}`, {
+            method: 'POST',
+            body: new Uint8Array(await encoded.arrayBuffer()),
+            headers: { 'x-test-tenant': TENANT_ID, 'content-type': encoded.headers.get('content-type') ?? '', 'content-length': String(150 * 1024 * 1024) },
+        });
+        expect(res.status).toBe(413);
+        const body = await res.json() as { code: string; limits: Record<string, number | string>; error: string };
+        expect(body.code).toBe('VIDEO_TOO_LARGE_FOR_FORM');
+        expect(body.limits.maxBytes).toBe(MAX_FORM_VIDEO_BYTES);
+        expect(body.limits.chunkedPath).toBeUndefined();
+        expect(body.error).not.toMatch(/chunked/i);
+    });
+
+    it('refuses a clip over the single-request limit (64 MiB) with 413, though the general video cap is larger; one at the limit is stored', async () => {
+        const { app, photos } = setup();
+        const send = async (extraBytes: number) => {
+            const token = await mintToken();
+            const fd = new FormData();
+            fd.append('file', new Blob([MP4_BYTES, new Uint8Array(extraBytes)], { type: 'video/mp4' }), 'clip.mp4');
+            return app.request(`/${INSPECTION_ID}/media/video/r2-upload?token=${token}`, {
+                method: 'POST',
+                body: fd,
+                headers: { 'x-test-tenant': TENANT_ID },
+            });
+        };
+        const limit = MAX_FORM_VIDEO_BYTES;
+        expect(limit).toBeLessThan(MAX_VIDEO_BYTES);
+        const over = await send(limit - MP4_BYTES.length + 1);
+        expect(over.status).toBe(413);
+        expect(photos.store.size).toBe(0);
+        // Positive control: exactly at the limit goes through.
+        expect((await send(limit - MP4_BYTES.length)).status).toBe(200);
     });
 });
 

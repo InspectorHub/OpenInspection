@@ -57,4 +57,18 @@ describe('assignPhotoNumbers', () => {
     const sections = [{ id: 's1', title: 'Roof', items: [{ id: 'i1', label: 'A', photos: [], resolvedTabs: { defects: [] } }] }];
     expect(assignPhotoNumbers(sections as never).appendix).toEqual([]);
   });
+
+  it('gives a video entry no photo number and no appendix row (it has no still to print), and does not disturb the numbering around it', () => {
+    const video = { key: '', url: '', caption: null, media: { kind: 'r2-video-player', mediaId: 'm1' } };
+    const video2 = { key: '', url: '', caption: null }; // no video context: still no key, still no number
+    const sections = [{
+      id: 's1', title: 'Roof',
+      items: [{ id: 'i1', label: 'A', photos: [photo('a'), video, video2, photo('b')], resolvedTabs: { defects: [{ defectPhotos: [video, photo('c')] }] } }],
+    }];
+    const { appendix, sections: out } = assignPhotoNumbers(sections as never);
+    expect(appendix.map(p => [p.photoNo, p.key])).toEqual([[1, 'a'], [2, 'b'], [3, 'c']]);
+    // The video stays on the item for the report to render as a player; it just carries no number.
+    expect(out[0].items[0].photos).toHaveLength(4);
+    expect(stampedPhotoNo(out[0].items[0].photos[1])).toBeUndefined();
+  });
 });

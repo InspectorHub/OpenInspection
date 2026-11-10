@@ -7,6 +7,9 @@ describe('r2Keys', () => {
     expect(r2Keys.inspectionPhoto(t, i, m, 'jpg')).toBe('TEN/inspections/INSP/photos/MED.jpg');
     expect(r2Keys.inspectionPhotoAnnotated(t, i, m)).toBe('TEN/inspections/INSP/photos/MED.annotated.png');
     expect(r2Keys.inspectionPhotoCropped(t, i, m)).toBe('TEN/inspections/INSP/photos/MED.cropped.jpg');
+    // A derivative that is baked again must get a NEW key: /photo is cached per key, and a published report keeps showing the old file.
+    expect(r2Keys.inspectionPhotoAnnotated(t, i, m, 'a1b2c3d4')).toBe('TEN/inspections/INSP/photos/MED.annotated.a1b2c3d4.png');
+    expect(r2Keys.inspectionPhotoCropped(t, i, m, 'a1b2c3d4')).toBe('TEN/inspections/INSP/photos/MED.cropped.a1b2c3d4.jpg');
     expect(r2Keys.inspectionVideo(t, i, m, 'mp4')).toBe('TEN/inspections/INSP/videos/MED.mp4');
     expect(r2Keys.inspectionVideoPoster(t, i, m)).toBe('TEN/inspections/INSP/videos/MED.poster.jpg');
     expect(r2Keys.inspectionCover(t, i, m)).toBe('TEN/inspections/INSP/cover/MED.jpg');

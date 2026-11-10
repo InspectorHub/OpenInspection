@@ -48,3 +48,68 @@ describe('ItemPhotoStrip add tile', () => {
     expect(onAddPhoto).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('ItemPhotoStrip R2 video tile', () => {
+  const r2Video = { key: '', mediaType: 'video' as const, provider: 'r2' as const, mediaId: 'pool-9', durationSec: 3 };
+
+  it('draws a video tile for an R2 clip, with the poster the host resolves from the media id', () => {
+    const seen: Array<{ provider?: string; mediaId?: string; streamUid?: string }> = [];
+    strip({
+      photos: [{ key: 'a.jpg' }, r2Video],
+      videoPosterUrl: (v) => {
+        seen.push(v);
+        return v.mediaId ? `/media/video/r2-object/${v.mediaId}/poster` : null;
+      },
+    });
+    expect(screen.getByTestId('video-play-1')).toBeTruthy();
+    expect(screen.getByTestId('video-dur-1').textContent).toBe('0:03');
+    const img = screen.getByTestId('thumb-1').querySelector('img');
+    expect(img?.getAttribute('src')).toBe('/media/video/r2-object/pool-9/poster');
+    expect(seen[0]).toMatchObject({ provider: 'r2', mediaId: 'pool-9' });
+    // control: the photo gets no play glyph
+    expect(screen.queryByTestId('video-play-0')).toBeNull();
+  });
+
+  it('shows the neutral placeholder when the host has no address for the poster (native)', () => {
+    strip({ photos: [r2Video], videoPosterUrl: () => null });
+    expect(screen.getByTestId('video-placeholder-0')).toBeTruthy();
+    expect(screen.getByTestId('video-play-0')).toBeTruthy();
+  });
+});
+
+describe('ItemPhotoStrip select mode with videos', () => {
+  const photos = [
+    { key: 'a.jpg' },
+    { key: '', mediaType: 'video' as const, provider: 'r2' as const, mediaId: 'pool-9' },
+  ];
+  const bulk = () => ({ selectable: true, onBulkDetach: vi.fn(), photos, videoPosterUrl: () => null });
+
+  it('dims a video tile and cannot select it; says why in one line; a photo still selects', () => {
+    const props = bulk();
+    strip(props);
+    fireEvent.click(screen.getByText('Select'));
+    expect(screen.getByTestId('video-bulk-hint').textContent).toMatch(/video/i);
+    const tile = screen.getByTestId('thumb-1');
+    expect(tile.getAttribute('aria-disabled')).toBe('true');
+    expect(screen.queryByTestId('check-1')).toBeNull();
+    fireEvent.click(tile);
+    fireEvent.click(screen.getByTestId('thumb-0'));
+    expect(screen.getByTestId('check-0')).toBeTruthy();
+    fireEvent.click(screen.getByText('Delete 1'));
+    expect(props.onBulkDetach).toHaveBeenCalledWith([0]);
+  });
+
+  it('control: with no video there is no hint and nothing is disabled', () => {
+    strip({ selectable: true, onBulkDetach: vi.fn(), photos: [{ key: 'a.jpg' }] });
+    fireEvent.click(screen.getByText('Select'));
+    expect(screen.queryByTestId('video-bulk-hint')).toBeNull();
+    expect(screen.getByTestId('thumb-0').getAttribute('aria-disabled')).toBeNull();
+  });
+
+  it('outside select mode a video tile still opens', () => {
+    const onOpen = vi.fn();
+    strip({ ...bulk(), onOpen });
+    fireEvent.click(screen.getByTestId('thumb-1'));
+    expect(onOpen).toHaveBeenCalledWith(1);
+  });
+});

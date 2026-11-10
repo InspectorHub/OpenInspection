@@ -53,8 +53,11 @@ import { InspectorToolsDock } from "../components/editor/InspectorToolsDock";
 import { resolveActivePropertyPreset } from "../shared/property-preset";
 import { InspectionSettingsSheet } from "../components/editor/InspectionSettingsSheet";
 import { VideoCapture } from "../components/media-studio/VideoCapture";
+import { attachUploadedVideo } from "../components/media-studio/attach-uploaded-video";
 import { bakePhoto } from "../components/media-studio/bakePhoto";
 import { bakeBatch } from "../components/media-studio/bakeBatch";
+import { photoStudioTarget, type PhotoStudioItem } from "../components/media-studio/photo-studio-target";
+import type { PhotoEntry } from "../shared/results-doc.types";
 import { PublishGateModal } from "../components/editor/PublishGateModal";
 import { AddMediaChooser } from "../components/editor/AddMediaChooser";
 import { useStructureEdit } from "../hooks/useStructureEdit";
@@ -463,7 +466,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
 
  // When the collab doc has synced, `readResultMap` already holds EVERY scope's
  // findings (the DO hydrated the full D1 blob), so a scope switch needs no fetch.
- const collabSynced = Boolean(collab?.synced);
+ const collabSynced = Boolean(collab?.synced) && collab?.lineageHold !== true; // a held connection (stale copy not backed up) is not syncing
 
  // Scope switch is fetch-if-missing, tracked in useScopeLoader (which owns the
  // merged/in-flight bookkeeping + the overlapping-load race). This wrapper
@@ -618,10 +621,13 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  const [photoStudioKey, setPhotoStudioKey] = useState<string | null>(null);
  const [photoStudioIndex, setPhotoStudioIndex] = useState(0);
  const [photoStudioTotal, setPhotoStudioTotal] = useState(0);
+ // The item (and section) the open studio saves onto; null falls back to the active item.
+ const [photoStudioItem, setPhotoStudioItem] = useState<PhotoStudioItem | null>(null);
  // Single entry point for opening the PhotoAnnotator — keeps the five state
  // setters in lockstep across every caller (gallery annotate, tools dock).
  const openPhotoStudio = useCallback(
-  (next: { url: string | null; key: string | null; index: number; total: number }) => {
+  (next: { url: string | null; key: string | null; index: number; total: number; item?: PhotoStudioItem }) => {
+   setPhotoStudioItem(next.item ?? null);
    setPhotoStudioUrl(next.url);
    setPhotoStudioKey(next.key);
    setPhotoStudioIndex(next.index);
@@ -712,7 +718,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
   onBulkDetachPhotos,
   moveTargets,
   onBulkMovePhotos,
-  onViewerAction,
+  onViewerAction, getItemPhotos,
   performPhotoCropSave,
   performPhotoAnnotationSave,
  } = guardPhotoOps(usePhotoOps({
@@ -728,6 +734,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
   setPhotoStudioIndex,
   setPhotoStudioTotal,
   setPhotoStudioOpen,
+  setPhotoStudioItem,
  }), readOnly);
 
  /* Mobile shell state */
@@ -1565,8 +1572,9 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  getRatingLabel={state.getRatingLabel}
  inspectionId={String(state.inspection.id)}
  photoCount={inspectionPhotoCount}
+ activeUnitId={activeUnitId} coverKey={(state.inspection.coverPhotoId as string | null) ?? null} getItemPhotos={getItemPhotos}
  onGallerySetCover={(p) => setGalleryCropSource(p)}
- onGalleryAnnotate={(p) => openPhotoStudio({ url: p.url, key: p.key, index: 0, total: 0 })}
+ onGalleryAnnotate={(p) => onViewerAction("annotate", p)}
  serverComments={serverComments}
  librarySort={comments.sort}
  onLibrarySearch={(q) => state.setCommentLibrarySearch(q)}
@@ -1672,7 +1680,9 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  setAddMediaChooser(null);
  libraryInputRef.current?.click();
  }}
- onPickVideo={!caps.video ? undefined : () => {
+ // A clip is added by writing it into the results document, so with no writable document (read-only, locked, not yet
+ // connected) there is nowhere to put one: the entry is not offered rather than letting a long upload end in a clip no one can see.
+ onPickVideo={!caps.video || !writeDoc ? undefined : () => {
  const t = addMediaChooser;
  setAddMediaChooser(null);
  setVideoCaptureTarget(t);
@@ -1687,10 +1697,11 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  provider={videoProvider}
  itemId={videoCaptureTarget.itemId}
  onClose={() => setVideoCaptureTarget(null)}
- onUploaded={() => {
- setVideoCaptureTarget(null);
- dataSource.reload();
- }}
+ onUploaded={(clip) => attachUploadedVideo(clip, videoCaptureTarget.itemId, {
+ addVideoToItem: findings.addVideoToItem,
+ notify: (message, variant, opts) => dataSource.notify(message, variant, opts),
+ reload: () => dataSource.reload(),
+ })}
  />
  )}
  </>
@@ -1788,8 +1799,8 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  streamCustomerSubdomain={streamCustomerSubdomain}
  onReload={() => dataSource.reload()}
  handleBurstCommit={handleBurstCommit}
- studio={{ open: photoStudioOpen, url: photoStudioUrl, key: photoStudioKey, index: photoStudioIndex, total: photoStudioTotal, setOpen: setPhotoStudioOpen }}
- photoOps={{ viewer, setViewer, itemGalleryPhotos, onViewerAction, posterTarget, setPosterTarget, photoCropTarget, setPhotoCropTarget, recropWarn, setRecropWarn, galleryCropSource, setGalleryCropSource, sessionCoverCrop, setSessionCoverCrop, performPhotoCropSave, performPhotoAnnotationSave }}
+ studio={{ open: photoStudioOpen, url: photoStudioUrl, key: photoStudioKey, index: photoStudioIndex, total: photoStudioTotal, item: photoStudioItem, setOpen: setPhotoStudioOpen }}
+ photoOps={{ viewer, setViewer, itemGalleryPhotos, onViewerAction, posterTarget, setPosterTarget, photoCropTarget, setPhotoCropTarget, recropWarn, setRecropWarn, galleryCropSource, setGalleryCropSource, sessionCoverCrop, setSessionCoverCrop, performPhotoCropSave, performPhotoAnnotationSave, getItemPhotos }}
  addingToGroup={addingToGroup}
  setAddingToGroup={setAddingToGroup}
  versionHistoryOpen={versionHistoryOpen}
@@ -1856,17 +1867,8 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  onPhotoStudio={() => {
  if (!state.activeItemId) return;
  const result = state.getResult(state.activeItemId);
- const photos = (result?.photos as string[]) || [];
- if (photos.length > 0) {
-  openPhotoStudio({
-   url: dataSource.urls.photo(String(state.inspection.id), photos[0], "original"),
-   key: photos[0],
-   index: 1,
-   total: photos.length,
-  });
- } else {
-  openPhotoStudio({ url: null, key: null, index: 0, total: 0 });
- }
+ const target = photoStudioTarget(result?.photos as PhotoEntry[] | undefined, String(state.inspection.id), (id, key, size) => dataSource.urls.photo(id, key, size));
+ openPhotoStudio({ ...target, item: { itemId: state.activeItemId, sectionId: state.currentSection?.id ?? state.sectionIdForItem(state.activeItemId) ?? undefined, originalKey: target.originalKey ?? undefined } });
  }}
  onToggleCheatsheet={() =>
  state.setShowCheatsheet(!state.showCheatsheet)
@@ -1891,7 +1893,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  // The per-unit scope switcher (commercial, per_unit mode only: the desktop header's `perUnitControls`), for the
  // phone's Items drawer and the tablet's list pane, and the save indicator both app bars carry.
  const scopeSwitcherEl = showUnitsSurface && isPerUnit ? <BreadcrumbDropdown units={units} activeUnitId={activeUnitId} onSelect={requestScope} /> : null;
- const saveStatusEl = <WithHostStatus indicator={<SaveStatusIndicator status={state.saveStatus} />} renderStatus={slots.renderStatus} />;
+ const saveStatusEl = <WithHostStatus indicator={<SaveStatusIndicator status={state.saveStatus} held={collab?.lineageHold === true} />} renderStatus={slots.renderStatus} />;
  const { pdf } = slots;
 
  // The bottom drawers of the touch layouts. The phone also has the Items drawer (the tablet shows the list in a pane).
@@ -2074,7 +2076,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  handlePublishClick={handlePublishClick}
  handleFinishFieldwork={handleFinishFieldwork}
  finishingFieldwork={publishFlow.finishing}
- collabEditing={fieldSession.collabEditing}
+ collabEditing={fieldSession.collabEditing} held={collab?.lineageHold === true}
  onOpenVersionHistory={() => setVersionHistoryOpen(true)}
  onChangeTemplate={() => state.setSettingsOpen(true)}
  onSaveAsNewTemplate={() => structure.openSaveTemplate("new")}

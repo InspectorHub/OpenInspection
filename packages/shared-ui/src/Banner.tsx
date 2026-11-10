@@ -53,17 +53,17 @@ export function Banner({
   return (
     <div
       role={toneRole[tone]}
-      className={`flex flex-wrap items-center gap-2 px-4 py-3 rounded-ih-card border text-sm font-semibold ${toneClasses[tone]} ${sticky ? "sticky top-0 z-20" : ""} ${className}`}
+      className={`flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 py-2 sm:px-4 sm:py-3 rounded-ih-card border text-sm font-semibold ${toneClasses[tone]} ${sticky ? "sticky top-0 z-20" : ""} ${className}`}
     >
-      {icon && <span className="flex shrink-0 items-center">{icon}</span>}
-      <div className="min-w-0 flex-1">{children}</div>
-      {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
+      {icon && <span className="order-1 flex shrink-0 items-center">{icon}</span>}
+      <div className="order-2 min-w-0 flex-1">{children}</div>
+      {actions && <div className="order-4 flex w-full items-center gap-2 sm:order-3 sm:ml-auto sm:w-auto">{actions}</div>}
       {dismissible && (
         <button
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss"
-          className="ml-1 shrink-0 text-current opacity-60 transition-opacity hover:opacity-100"
+          className="order-3 ml-1 shrink-0 text-current sm:order-4 opacity-60 transition-opacity hover:opacity-100"
         >
           <Icon name="x" size={16} />
         </button>

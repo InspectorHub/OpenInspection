@@ -18,6 +18,7 @@
 import { SERVICE_SPECS } from './source-catalog';
 import { sourceReasonMessageKey, type SourceReasonMessageKey } from './source-reasons';
 import { integrationSources } from './source-overview';
+import { STRIPE_KEYS, countStripeKeys } from './stripe-keys';
 import type { DeploymentProfile } from '../deployment-profile';
 import type {
     CompanyIntegrationConfig,
@@ -48,7 +49,9 @@ export interface IntegrationCard {
 
 /** The deployment's environment slice the overview reads, beyond what the resolver reads. */
 export interface OverviewEnv extends IntegrationEnv {
+    STRIPE_PUBLISHABLE_KEY?: string | undefined;
     STRIPE_SECRET_KEY?: string | undefined;
+    STRIPE_WEBHOOK_SECRET?: string | undefined;
     GOOGLE_CLIENT_ID?: string | undefined;
     GOOGLE_CLIENT_SECRET?: string | undefined;
     GOOGLE_PLACES_API_KEY?: string | undefined;
@@ -72,8 +75,6 @@ export interface OverviewInputs {
  */
 export const SWITCHABLE_SERVICES = ['email', 'sms', 'ai'] as const satisfies readonly IntegrationService[];
 export type SwitchableService = (typeof SWITCHABLE_SERVICES)[number];
-
-const STRIPE_KEYS = ['STRIPE_PUBLISHABLE_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] as const;
 
 const present = (v: unknown): boolean => typeof v === 'string' && v.trim() !== '';
 
@@ -134,9 +135,8 @@ function keyCard(
 function stripeCard({ profile, company, env }: OverviewInputs): IntegrationCard {
     // Card payments always go to the company's own Stripe account. On a hosted
     // deployment a key in the deployment's environment is never read for it.
-    const have = STRIPE_KEYS.filter((k) => present(company.ownSecrets?.[k])
-        || (profile.envCredentialsAreCompanyOwn && k === 'STRIPE_SECRET_KEY' && present(env.STRIPE_SECRET_KEY)));
-    const status: IntegrationStatus = have.length === STRIPE_KEYS.length ? 'connected' : have.length > 0 ? 'attention' : 'not_connected';
+    const have = countStripeKeys(company.ownSecrets, profile, env);
+    const status: IntegrationStatus = have === STRIPE_KEYS.length ? 'connected' : have > 0 ? 'attention' : 'not_connected';
     return {
         id: 'stripe', category: 'payments', status, source: 'own', dedicatedNumber: false, canUseOwn: false,
         detailPath: '/settings/integrations#stripe', reasonKey: null,
