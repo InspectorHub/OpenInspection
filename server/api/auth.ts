@@ -21,6 +21,7 @@ import { safeReturnTo } from '../lib/mcp/safe-return-to';
 import { findGlobalAgentById } from '../services/agent/account';
 import totpRoutes, { totpRouteConfigs } from './auth/totp';
 import profileRoutes, { profileRouteConfigs } from './auth/profile';
+import stepUpRoutes, { stepUpRouteConfigs } from './auth/step-up';
 import { getDrizzle } from '../lib/route-helpers';
 import { platformActorClaims } from '../lib/platform-actor-claims';
 
@@ -601,6 +602,7 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
 });
 coreAuthRoutes.route('/', profileRoutes);
 coreAuthRoutes.route('/', totpRoutes);
+coreAuthRoutes.route('/', stepUpRoutes);
 coreAuthRoutes.openapi(inviteInfoRoute, async (c) => {
     const { token } = c.req.valid('query');
     const info = await c.var.services.auth.getInviteInfo(token);
@@ -612,7 +614,7 @@ coreAuthRoutes.openapi(setupStatusRoute, async (c) => {
     return c.json({ success: true as const, data: { isSetUp } }, 200); // projection-allow: the nested value is a boolean: whether first-run setup is complete
 });
 
-export const coreAuthRouteParts = [loginRoute, changePasswordRoute, joinTeamRoute, mounted('/', ssoRootRoutes, [ssoConsumeRoute] as const), forgotPasswordRoute, resetPasswordRoute, setupRoute, mounted('/', profileRoutes, profileRouteConfigs), mounted('/', totpRoutes, totpRouteConfigs), inviteInfoRoute, setupStatusRoute] as const;
+export const coreAuthRouteParts = [loginRoute, changePasswordRoute, joinTeamRoute, mounted('/', ssoRootRoutes, [ssoConsumeRoute] as const), forgotPasswordRoute, resetPasswordRoute, setupRoute, mounted('/', profileRoutes, profileRouteConfigs), mounted('/', totpRoutes, totpRouteConfigs), mounted('/', stepUpRoutes, stepUpRouteConfigs), inviteInfoRoute, setupStatusRoute] as const;
 
 export type CoreAuthApi = ApiOf<typeof coreAuthRouteParts>;
 

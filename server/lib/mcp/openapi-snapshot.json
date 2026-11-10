@@ -20018,6 +20018,39 @@
     "description": "Owner and manager, and inspectors who work an inspection the contact is on or hold scheduleOthers (a contact on no inspection yet is open to all staff); other inspectors get 403. Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
+    "operationId": "sendStepUpEmailCode",
+    "method": "POST",
+    "pathTemplate": "/api/auth/step-up/email-code",
+    "scopes": [],
+    "tag": "auth",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "data-export-start",
+              "data-export-download",
+              "data-import-apply",
+              "data-import-revert"
+            ],
+            "example": "data-export-start",
+            "description": "The single sensitive action the emailed code is for. One of: data-export-start, data-export-download, data-import-apply, data-import-revert."
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "description": "The action the code is for."
+      }
+    },
+    "summary": "Email a one-time code to confirm one sensitive action",
+    "description": "For an owner whose account has no usable password (created through a federated sign-in only). Emails a six-digit code, valid for ten minutes, to the address on the owner's own account; no address is read from the request. At most three codes per ten minutes, five wrong tries per code, one live code per action. Refused for an account that has a password. The code is a weaker factor than a password (it proves control of the mailbox), accepted by explicit decision."
+  },
+  {
     "operationId": "sendTenant",
     "method": "POST",
     "pathTemplate": "/api/admin/agreements/send",
@@ -20698,6 +20731,59 @@
     },
     "summary": "Consume a portal-issued SSO handoff code",
     "description": "Reads sso:<code> from KV, issues a session cookie, redirects to /inspections."
+  },
+  {
+    "operationId": "stepUpReauthenticate",
+    "method": "POST",
+    "pathTemplate": "/api/auth/step-up",
+    "scopes": [],
+    "tag": "auth",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "data-export-start",
+              "data-export-download",
+              "data-import-apply",
+              "data-import-revert"
+            ],
+            "example": "data-export-start",
+            "description": "The single sensitive action the elevation is for. The token that comes back is accepted for this action only. One of: data-export-start, data-export-download, data-import-apply, data-import-revert."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "example": "currentPassword",
+            "description": "The signed-in account current password, entered again. Required for an account that has a password. 1-1024 characters."
+          },
+          "emailCode": {
+            "type": "string",
+            "maxLength": 20,
+            "example": "482913",
+            "description": "The code emailed to the account, for an owner who has no password (federated sign-up only). Ignored for an account that has a password. Up to 20 characters."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 20,
+            "example": "123456",
+            "description": "Current TOTP code or a recovery code. Required when the account has two-factor authentication on; ignored otherwise. 6-20 characters."
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "description": "The action to elevate for plus the credentials re-entered."
+      }
+    },
+    "summary": "Re-enter credentials to authorise one sensitive action",
+    "description": "Verifies the signed-in user's password again, and their TOTP or recovery code when two-factor authentication is on. On success, sets an HttpOnly cookie holding a token that is valid for the named action only, for the same user only, once, for five minutes. The token is never returned in the response body. An owner with no password (federated sign-up only) sends the code emailed by POST /api/auth/step-up/email-code as emailCode instead of a password. That is a weaker factor than a password (it proves control of the mailbox), accepted by explicit decision, and it is refused for any account that has a password. An upstream identity provider own two-factor is not re-challenged here; the engine asks for TOTP only when the account has it on in this engine."
   },
   {
     "operationId": "submitReport",

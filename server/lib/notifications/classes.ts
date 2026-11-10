@@ -104,6 +104,7 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     // ─── account access (spec §2.0) — every one of these is the delivery
     // mechanism for getting INTO the account, so none may be switched off.
     { id: 'password-reset',       label: 'Password reset',          category: 'transactional', required: true,  channels: ['email'], audience: ['staff', 'agent'] },
+    { id: 'step-up-code',         label: 'Confirmation code',       category: 'transactional', required: true,  channels: ['email'], audience: ['staff'] },
     { id: 'workspace-invitation', label: 'Workspace invitation',    category: 'transactional', required: true,  channels: ['email'], audience: ['staff'] },
     { id: 'agent-invite',         label: 'Partner agent invite',    category: 'transactional', required: true,  channels: ['email'], audience: ['agent'] },
     { id: 'agent-login-link',     label: 'Agent sign-in link',      category: 'transactional', required: true,  channels: ['email'], audience: ['agent'] },

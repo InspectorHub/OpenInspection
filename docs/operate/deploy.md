@@ -166,6 +166,12 @@ cannot come to mean different words.
 
 The Worker entry at `workers/app.ts` is a Hono app. It routes API-owned paths (`/api/*`, `/status`, `/sign/*`, …) to the API app (`server/`) in-process, and sends every other path to React Router via `createRequestHandler` with `import("virtual:react-router/server-build")`, passing `{ cloudflare: { env, ctx } }` as the `AppLoadContext`. Before delegating to SSR it injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app directly — no network hop, no second worker. `@cloudflare/vite-plugin` integrates the React Router SSR build with wrangler, so the standard `wrangler deploy` pipeline ships everything.
 
+### Rate limiting and the emailed confirmation code
+
+Sensitive owner actions (company data export and import) ask the owner to confirm again before they run. An owner who signed up only through an external sign-in has no password, so the confirmation is a six-digit code emailed to the address on their account. That is a weaker check than a password: it proves control of the mailbox.
+
+The code is valid for ten minutes, allows five wrong tries and three sends per ten minutes. These caps are kept in the cache namespace, which cannot update a counter atomically, so a burst of parallel guesses can exceed them. What holds the line is the `RATE_LIMITER` rate-limit binding (see `wrangler.jsonc`). If you deploy without that binding, or set `DISABLE_RATE_LIMIT=1`, the protection against guessing the code is weaker. Keep the binding in place on any deployment that is reachable from the internet.
+
 ### Local development
 
 ```bash

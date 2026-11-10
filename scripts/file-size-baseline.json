@@ -23,7 +23,7 @@
   "packages/field-ui/src/hooks/usePhotoOps.ts": 648,
   "packages/field-ui/src/components/media-studio/PhotoAnnotator.tsx": 646,
   "server/index.ts": 646,
-  "server/api/auth.ts": 620,
+  "server/api/auth.ts": 622,
   "packages/field-ui/src/hooks/useInspection.ts": 599,
   "server/services/concierge.service.ts": 599,
   "packages/field-ui/src/components/inspection-edit/CompliancePanel.tsx": 586,
