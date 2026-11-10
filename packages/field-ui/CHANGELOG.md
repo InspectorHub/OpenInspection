@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.10.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.9.0...field-ui-v0.10.0) (2026-11-10)
+
+
+### Features
+
+* **field-ui:** put a finished video on the item it was added to ([2c86a4d](https://github.com/InspectorHub/OpenInspection/commit/2c86a4dc10aea5cdd057a60a4beab08f6cd646b6))
+* **payments:** let a company collect a deposit or the full fee at booking, and always ask the client for what is still owed ([4683ada](https://github.com/InspectorHub/OpenInspection/commit/4683ada6b93518abb4260b11af9968df6c638c54))
+* **quota:** monthly plan allowance, video on items and collab fixes ([17d98b9](https://github.com/InspectorHub/OpenInspection/commit/17d98b9db7763b2043cf94a01b097c5cf9775f11))
+* show R2 videos on the item strip and keep every clip when results are merged, loaded or reordered ([a9869fc](https://github.com/InspectorHub/OpenInspection/commit/a9869fc186917378f7958f3dadca2291cfe89562))
+
+
+### Bug Fixes
+
+* **collab:** lineage guard so a stale offline copy cannot merge into a rebuilt results document ([7bf0ea7](https://github.com/InspectorHub/OpenInspection/commit/7bf0ea7de5c4d8e7d4ba78e1522885ff58109136))
+* **collab:** the server also checks the generation a client reports, and a second tab keeps the lineage its own document belongs to ([d4a8fa0](https://github.com/InspectorHub/OpenInspection/commit/d4a8fa007f58a03d0636aede21d89fe3a4c41de0))
+* **field-ui:** open the photo studio with the photo's key, not the photo entry ([758c52a](https://github.com/InspectorHub/OpenInspection/commit/758c52a51767c61fabfd1d2dc46f216927a5db53))
+* **field-ui:** photo studio follows the viewed photo; cover label, hidden actions and delete confirm ([7836e86](https://github.com/InspectorHub/OpenInspection/commit/7836e864a7bed1b815eed2948a8eb3fd35854472))
+* **field-ui:** the media viewer follows a clip by its media id, not by its empty key ([b333b45](https://github.com/InspectorHub/OpenInspection/commit/b333b45b128b5faab51822fae6418d0801ad2f78))
+* **prefs:** one default for agent repair-list access, and an unrelated preference save no longer widens it ([4f947ce](https://github.com/InspectorHub/OpenInspection/commit/4f947cee7969e12edb530b09ea4019016af1bdcc))
+* **prefs:** the report-link expiry default is two years in every layer, not never on the settings page ([9dbe155](https://github.com/InspectorHub/OpenInspection/commit/9dbe155b3e5771b3ef06ba47cfe4a121fbff8286))
+* **prefs:** use one default for agent repair-list access and report-link expiry in every layer ([5d7f910](https://github.com/InspectorHub/OpenInspection/commit/5d7f91049d1c604b055d52d348e5f84ee20d6f33))
+* **security:** clear the two CodeQL findings on the release PR ([ca5ef16](https://github.com/InspectorHub/OpenInspection/commit/ca5ef1634a5cd99f64a9a7c1a397b38bff86cc07))
+
 ## [0.9.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.8.0...field-ui-v0.9.0) (2026-11-07)
 
 
