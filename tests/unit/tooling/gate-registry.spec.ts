@@ -68,17 +68,19 @@ describe('gate registry', () => {
         // made by editing this list, not by forgetting to set a rung.
         const EXPECTED_PRECOMMIT = [
             'ds', 'contrast', 'svg', 'migrefs', 'filesize', 'tz', 'idempotency',
-            'extcollide', 'price', 'zerotrack', 'aiclass', 'teststsconfig',
-            'submitguard', 'seedsql', 'dup',
-            // Added 2026-08-18 with the coverage gate, and this edit is the
-            // decision the lock exists to force. It earns pre-commit on the
-            // same argument as the price and tracking gates: what it catches is
-            // a `lint:*` script ARRIVING with no rung, which is cheapest to
-            // answer while the line is being typed and is invisible by
-            // construction afterwards. Cost is two file reads and a set
-            // difference — measured, the rung went 15 gates to 16 and stayed
-            // at 6s.
-            'gateregistry',
+            'price', 'zerotrack', 'aiclass', 'teststsconfig',
+            'submitguard',
+            // Left this rung, each on a recorded argument (see the registry):
+            //  - `dup`: a third-party CLI in a child process, and duplication is a
+            //    property of a body of work rather than of a keystroke. PUSH.
+            //  - `seedsql`: a seeder-rot check; CI's lint-gates job reads the
+            //    seeders on every push. PUSH.
+            //  - `gateregistry`: the coverage check over the registry. This spec
+            //    asserts the same invariants (every lint:* script registered or
+            //    excluded with a reason, no stale exclusion, no gate pointing at a
+            //    missing script) on every CI unit run, so the hook paid for it twice.
+            //    The script stays for running by hand and is in UNREGISTERED.
+            // `extcollide`, `rawnul` and `eol` are one row now: `treehygiene`.
             // Added 2026-08-23 with the Chrome-record judge, and this edit is
             // again the decision the lock exists to force. What runs here is
             // ONLY `--self-test`: the judge scored against its own 30 labelled
@@ -101,7 +103,7 @@ describe('gate registry', () => {
             // cannot be fixed at all — a force-push does not reach a clone, a
             // fork, or anyone who already read it. The window in which the
             // repair is a one-line edit closes when the commit is created.
-            // Measured at 0.67s over 3,605 files, so the rung costs nothing.
+            // A whole-tree walk of about a second or two warm.
             'privatereview',
             // Added 2026-08-24 with the agent-terms route classification, and
             // the lock caught it: the gate was registered at this rung without
@@ -183,7 +185,7 @@ describe('gate registry', () => {
             // subsystems and the oldest went unnoticed for months.
             // Cost: one `git ls-files` and an indexOf per file — 0.33s over
             // 3,940 files, measured three times.
-            'rawnul',
+            'treehygiene',
             // Added 2026-09-03 with the URL-taxonomy gate, and the lock did its
             // job once more: registered at this rung without this entry, so the
             // full run went red on a tree whose pre-commit hook was green.
@@ -221,7 +223,7 @@ describe('gate registry', () => {
             // repository were already in that state and nothing had reported
             // them. Cost: 310 ms over 4,002 files, measured against `rawnul`'s
             // 272 ms beside it.
-            'eol',
+            // (`eol` is a check of `treehygiene`, above; this note is its argument.)
             // Added 2026-09-09 with the lockfile-registry gate, and the lock did
             // its job again: registered at this rung without this entry, so the
             // full run went red on a tree whose pre-commit hook and every one of
@@ -350,7 +352,13 @@ describe('gate registry', () => {
             'lint:sigcompare', 'lint:signature-dynamics', 'lint:sms-gate-args',
             'lint:messaging-rules',
         ];
+        // A script that was a gate of its own and is now one check of a combined gate
+        // stays covered through its alias, which is registered by way of its target.
         const registered = new Set([...SCRIPT_GATES, DUP_GATE].map((g) => g.fix.replace(/^npm run /, '')));
+        for (const [name, reason] of UNREGISTERED) {
+            const alias = /^alias of (lint:[a-z0-9:-]+)/.exec(reason);
+            if (alias && registered.has(alias[1])) registered.add(name);
+        }
         const missing = CHAINED_NODE_GATES.filter((n) => !registered.has(n));
         expect(
             missing,
@@ -379,7 +387,7 @@ describe('gate registry', () => {
         // registered exactly that way, deliberately, so the pattern is sitting
         // in the same file waiting to be copied onto a gate whose whole value is
         // the scan. This locks the two that must never take it.
-        for (const key of ['verificationcopy', 'endorsementcopy']) {
+        for (const key of ['copypolicy']) {
             const gate = SCRIPT_GATES.find((g) => g.key === key);
             expect(gate, `${key} is not registered`).toBeDefined();
             expect(
@@ -388,6 +396,35 @@ describe('gate registry', () => {
                 + 'its self-test instead of its scan reports a clean catalogue it never opened',
             ).toBeUndefined();
             expect(gate!.rung, `${key} should stay on the push rung`).toBe(PUSH);
+        }
+    });
+
+    it('keeps every combined gate reachable: aliases point at registered rows, and the script takes --only', () => {
+        const aliasOf = new Map<string, string[]>();
+        const aliases: Array<{ name: string; target: string; check: string }> = [];
+        for (const [name, reason] of UNREGISTERED) {
+            const m = /^alias of (lint:[a-z0-9:-]+) \(runs only the ([a-z-]+) check/.exec(reason);
+            if (!m) continue;
+            aliasOf.set(m[1], [...(aliasOf.get(m[1]) ?? []), name]);
+            aliases.push({ name, target: m[1], check: m[2] });
+            expect(scripts[name], `${name} is an alias but package.json does not define it`).toContain('--only ' + m[2]);
+        }
+        expect(aliasOf.size, 'no aliases recorded — the combined gates were meant to keep their old commands').toBeGreaterThan(0);
+        for (const [target, names] of aliasOf) {
+            const gate = [...SCRIPT_GATES, DUP_GATE].find((g) => g.fix === `npm run ${target}`);
+            expect(gate, `${names.join(', ')} alias ${target}, which is not a registered gate`).toBeDefined();
+            expect(gate!.args, `${gate!.key} must run all its checks, not a subset`).toBeUndefined();
+            expect(readFileSync(path.join(ROOT, 'scripts', gate!.script!), 'utf8'), `${gate!.script} must accept --only`).toMatch(/runCombined/);
+        }
+        // The alias must call THE combined script that holds its check, and that script must still list the check.
+        // Otherwise deleting a member, or a typo in the alias's script path, leaves every assertion above green while
+        // the check quietly stops running.
+        for (const { name, target, check } of aliases) {
+            const gate = [...SCRIPT_GATES, DUP_GATE].find((g) => g.fix === `npm run ${target}`)!;
+            expect(scripts[name], `${name} must call node scripts/${gate.script}`)
+                .toMatch(new RegExp(`^node scripts/${gate.script!.replace(/\./g, '\\.')} --only ${check}\\b`));
+            expect(readFileSync(path.join(ROOT, 'scripts', gate.script!), 'utf8'), `${gate.script} no longer lists the ${check} check`)
+                .toContain(`name: '${check}'`);
         }
     });
 

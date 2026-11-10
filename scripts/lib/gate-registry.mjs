@@ -8,9 +8,14 @@
  * running every gate as an import side effect.
  *
  * `rung` says which ladder rung pays for the gate:
- *   PRECOMMIT — every commit. Adding one here costs every commit in the repo,
- *               so each entry below carries the argument for why it earns that.
- *   PUSH      — the full `npm run lint`, i.e. pre-push and CI's verify job.
+ *   PRECOMMIT — every commit. `.githooks/pre-commit` runs these over the whole
+ *               working tree (not just the staged files), so adding one here
+ *               costs every commit in the repo; each entry below carries the
+ *               argument for why it earns that.
+ *   PUSH      — the rest. These run in CI's `lint-gates` job
+ *               (`npm run lint:gates-full`) and by hand before pushing. The
+ *               pre-push hook runs NO gate: it holds the bundle-size build and
+ *               the dependency advisory check, which are not registry entries.
  * A run at PUSH includes everything at PRECOMMIT; a run at PRECOMMIT does not
  * include PUSH.
  */
@@ -106,29 +111,26 @@ export const SCRIPT_GATES = [
     // assertions in both directions over literal fixtures, ~30 ms, and the only
     // thing here that can tell a green agent-terms run from a blind one.
     { key: 'agenttermsselftest', label: 'Agent-terms gate self-test', script: 'check-agent-terms.mjs', fix: 'npm run lint:agent-terms:self-test', rung: PRECOMMIT, args: ['--self-test'] },
-    // Pre-commit and not CI because a collision is created at exactly one moment
-    // -- when a file is added or renamed -- and this is the rung that sees that
-    // moment. It is also the rung where the fix is free: renaming a file nobody
-    // has pulled yet costs nothing, renaming one after it lands costs everyone a
-    // merge. An fs walk of ~2765 files, no parsing; among the cheapest here.
-    { key: 'extcollide', label: 'Extension collisions (files invisible to tsc)', script: 'check-extension-collisions.mjs', fix: 'npm run lint:ext-collisions', rung: PRECOMMIT },
-    // Pre-commit, and for the same reason as the gate above it: what it catches
-    // is free to fix while the line is still being typed and annoying to find
-    // later. A raw NUL byte makes the whole file BINARY to git grep, ripgrep and
-    // every review diff -- they answer "Binary file ... matches" with no line
-    // number -- while compiling and behaving exactly as intended, so nothing
-    // else here reports it. Three files had one, in three unrelated subsystems,
-    // and the oldest had been unreadable that way for months. A `git ls-files`
-    // walk with an indexOf per file; among the cheapest gates in this list.
-    { key: 'rawnul', label: 'Raw NUL bytes (files invisible to git grep)', script: 'check-raw-nul.mjs', fix: 'npm run lint:raw-nul', rung: PRECOMMIT },
-    // The CR twin of the gate above, at PRECOMMIT for the same reason: one tool
-    // writing one file creates it, and it is free to undo in that commit and a
-    // whole-file merge conflict on somebody else's branch later. Not redundant
-    // with `.gitattributes` -- `text=auto` calls a LONE-CR file binary and so
-    // declines to normalise the worst case. Why, and the ten files it was
-    // already true of, are in check-line-endings.mjs's header. Cost measured
-    // against `rawnul` beside it: 310 ms vs 272 ms over 4002 files.
-    { key: 'eol', label: 'LF line endings (no CRLF, no lone CR)', script: 'check-line-endings.mjs', fix: 'npm run lint:eol', rung: PRECOMMIT },
+    // Three whole-tree walks for a file that is invisible to some tool, run as one
+    // row over one listing of the tracked files (scripts/check-tree-hygiene.mjs):
+    //   raw-nul         a raw NUL byte makes a text file BINARY to git grep, ripgrep and
+    //                   every review diff -- "Binary file ... matches", no line number --
+    //                   while compiling and behaving exactly as intended. Three files
+    //                   carried one, in unrelated subsystems, and nothing reported it.
+    //   eol             a CRLF or lone-CR rewrite turns a three-line edit into a whole-file
+    //                   diff, and a lone CR makes the file binary to git just as a NUL does.
+    //                   Not redundant with `.gitattributes`: `text=auto` calls a lone-CR
+    //                   file binary and so declines to normalise the worst case.
+    //   ext-collisions  `foo.ts` beside `foo.tsx`: tsc keeps one per base path and drops the
+    //                   other from every program, with no diagnostic anywhere.
+    // PRECOMMIT for all three, and for the same reason: each is created at exactly one
+    // moment -- a file is added, renamed or rewritten by one tool -- and that commit is the
+    // cheap place to undo it (renaming a file nobody has pulled yet costs nothing; after it
+    // lands it costs everyone a merge). raw-nul and eol read the bytes of every tracked text
+    // file, so the file is read once for both; the extension check is a name-only walk.
+    // Each check keeps its own messages, counts and exit codes, and `npm run lint:raw-nul`,
+    // `lint:eol` and `lint:ext-collisions` still run one of them (`--only`).
+    { key: 'treehygiene', label: 'Tree hygiene (NUL bytes, line endings, extension collisions)', script: 'check-tree-hygiene.mjs', fix: 'npm run lint:tree-hygiene', rung: PRECOMMIT },
     // A send in the wrong tenant's voice fails nothing and reads fine — only its
     // author knows the route resolves its tenant in the handler. One regex walk.
     { key: 'tenantemail', label: 'Tenant email resolution', script: 'check-tenant-email-resolution.mjs', fix: 'npm run lint:tenant-email', rung: PRECOMMIT },
@@ -168,27 +170,11 @@ export const SCRIPT_GATES = [
     // moment the line is typed, and `0 new` stayed true on every run while the
     // backlog grew.
     { key: 'submitguard', label: 'Client submit-guard coverage', script: 'check-submit-guard.mjs', fix: 'npm run lint:submit-guard', rung: PRECOMMIT },
-    // Pre-commit rather than CI, and for a reason the gates above do not share:
-    // a seeder that nothing runs automatically has NO other rung. The CLI
-    // self-host setup script is invoked by hand, months apart, so CI would never
-    // report it — it rots until a human hits the error. The demo PCA seeder was
-    // the same story and ended worse: twelve of its column names had drifted
-    // away from the schema, its first INSERT could not run, and nobody found out
-    // for months. It has since been retired into `tests/seed-fixtures.ts`, which
-    // e2e globalSetup does run. That one still fails a rung LATE — several
-    // minutes and one push after the mistake was typed — which is why this gate
-    // reads it here instead.
-    // Reads 31 files with two regexes.
-    { key: 'seedsql', label: 'Seed SQL vs schema', script: 'check-seed-sql.mjs', fix: 'npm run lint:seed-sql', rung: PRECOMMIT },
-    // The gate that guards this list. At PRECOMMIT because what it catches is a
-    // `lint:*` script ARRIVING with no rung — cheapest to answer while the line
-    // is being typed, and the check is two file reads and a set difference.
-    { key: 'gateregistry', label: 'Gate-registry coverage', script: 'check-gate-registry.mjs', fix: 'npm run lint:gate-registry', rung: PRECOMMIT },
     // PRECOMMIT rather than PUSH, and the rung is the whole point. What this
     // catches ends up in a PUBLIC repository's permanent history, so the only
     // moment the fix is cheap is before the commit exists — after that it is a
-    // rebase, and after a push it is not fixable at all. Measured at 0.67s over
-    // 3,605 files.
+    // rebase, and after a push it is not fixable at all. A whole-tree walk, about a
+    // second or two warm.
     { key: 'privatereview', label: 'No private-review references', script: 'check-no-private-review-refs.mjs', fix: 'npm run lint:private-review', rung: PRECOMMIT },
     // PRECOMMIT: an import from the host app (react-router, `~/`, a .server module) compiles in
     // the web app and only breaks the package in some other host, so the one moment it is cheap
@@ -201,7 +187,7 @@ export const SCRIPT_GATES = [
     // same chain — the chain is the historical record of what the full run
     // covered, and a list typed from memory is how one quietly falls out.
     //
-    // They sit at PUSH, not PRECOMMIT: each was in the pre-push/CI run before
+    // They sit at PUSH, not PRECOMMIT: each was in the full CI run before
     // this change and none of them was in the hook. Moving one down a rung is
     // a cost decision for every commit in the repo and belongs in its own
     // change, with the argument written beside it like the entries above.
@@ -254,18 +240,16 @@ export const SCRIPT_GATES = [
     { key: 'providerhelpers', label: 'lint:provider-helpers', script: 'check-provider-helpers.mjs', fix: 'npm run lint:provider-helpers', rung: PUSH },
     { key: 'notificationdispatch', label: 'lint:notification-dispatch', script: 'check-notification-dispatch.mjs', fix: 'npm run lint:notification-dispatch', rung: PUSH },
     { key: 'tests', label: 'lint:tests', script: 'check-test-layout.mjs', fix: 'npm run lint:tests', rung: PUSH },
-    // Every spec listed as shareable in tests/unit/isolation.json still obeys the rules that made it
-    // shareable (no module mock, no global or env write, no timers, no module that keeps state).
-    // PUSH, not PRECOMMIT: the walk reads ~660 specs and their import closures (about 2 s), and the
-    // failure appears in a different spec from the one that caused it, so the answer matters at the
-    // point a branch is shared, not on every commit. The CI shuffled run of the shared project is the
-    // dynamic half of the same check.
-    { key: 'unitisolation', label: 'lint:unit-isolation', script: 'check-unit-isolation.mjs', fix: 'npm run lint:unit-isolation', rung: PUSH },
-    // The web suite's counterpart of the row above: every spec in tests/web-isolation.json still obeys the
-    // rules that made it shareable, and sits in the project of the environment it declares. PUSH for the
-    // same reasons (about 2 s over ~900 specs; the failure lands in a neighbour). The CI shuffled run of
-    // the two shared web projects is the dynamic half.
-    { key: 'webisolation', label: 'lint:web-isolation', script: 'check-web-isolation.mjs', fix: 'npm run lint:web-isolation', rung: PUSH },
+    // Every spec listed as shareable in tests/unit/isolation.json and tests/web-isolation.json
+    // still obeys the rules that made it shareable (no module mock, no global or env write, no
+    // timers, no module that keeps state, and in the web manifest the project of the environment
+    // it declares), as one row over two manifests (scripts/check-test-isolation.mjs;
+    // `lint:unit-isolation` and `lint:web-isolation` still run one half).
+    // PUSH, not PRECOMMIT: the walk reads ~1,500 api specs and ~900 web specs and their import
+    // closures (about 2 s each), and the failure appears in a different spec from the one that
+    // caused it, so the answer matters at the point a branch is shared, not on every commit.
+    // The CI shuffled run of the shared projects is the dynamic half of the same check.
+    { key: 'testisolation', label: 'lint:test-isolation', script: 'check-test-isolation.mjs', fix: 'npm run lint:test-isolation', rung: PUSH },
     // The other direction of `tests` above, and the most expensive entry in
     // this list by an order of magnitude: it spawns `playwright test --list`
     // once per playwright config (5 today, ~10-15s in total) because Playwright
@@ -285,7 +269,6 @@ export const SCRIPT_GATES = [
     { key: 'e2ecoverage', label: 'lint:e2e-coverage', script: 'check-e2e-spec-coverage.mjs', fix: 'npm run lint:e2e-coverage', rung: PUSH },
     { key: 'testimports', label: 'lint:test-imports', script: 'check-test-imports.mjs', fix: 'npm run lint:test-imports', rung: PUSH },
     { key: 'deadcode', label: 'lint:deadcode', script: 'check-deadcode.mjs', fix: 'npm run lint:deadcode', rung: PUSH },
-    { key: 'timestamps', label: 'lint:timestamps', script: 'check-timestamps.mjs', fix: 'npm run lint:timestamps', rung: PUSH },
     // PUSH, not PRECOMMIT: it walks 778 files under app/, too much to charge
     // every commit for drift that only matters once work leaves the machine.
     // It protects a measurement -- a render fans out into 15 in-process API
@@ -307,7 +290,12 @@ export const SCRIPT_GATES = [
     // a raw literal') had no enforcement for months. The three gates above guard
     // the CATALOGUE; none of them reads JSX. This one does.
     { key: 'i18nliterals', label: 'lint:i18n-literals', script: 'check-i18n-literals.mjs', fix: 'npm run lint:i18n-literals', rung: PUSH },
-    { key: 'naming', label: 'lint:naming', script: 'check-naming.mjs', fix: 'npm run lint:naming', rung: PUSH },
+    // The two line-by-line readers of server/lib/db/schema, as one row over one listing of the
+    // directory (scripts/check-schema-conventions.mjs): timestamps (`*_at` columns are integer
+    // timestamp_ms, never seconds or text) and naming (booleans start is_/has_). PUSH: a column
+    // is typed in a schema change that also carries its migration, and CI reads all of it.
+    // `lint:timestamps` and `lint:naming` still run one half.
+    { key: 'schemaconventions', label: 'lint:schema-conventions', script: 'check-schema-conventions.mjs', fix: 'npm run lint:schema-conventions', rung: PUSH },
     { key: 'agentroutes', label: 'lint:agent-routes', script: 'check-agent-routes.mjs', fix: 'npm run lint:agent-routes', rung: PUSH },
     { key: 'doclinks', label: 'lint:doclinks', script: 'check-doc-links.mjs', fix: 'npm run lint:doclinks', rung: PUSH },
     // The Workers Free CPU ceiling is 10 ms PER INVOCATION and this repo
@@ -347,24 +335,19 @@ export const SCRIPT_GATES = [
     { key: 'nativecontract', label: 'lint:native-contract', script: 'check-native-contract.mjs', fix: 'npm run lint:native-contract', rung: PUSH },
     { key: 'noportalroutes', label: 'lint:no-portal-routes', script: 'check-no-portal-routes.mjs', fix: 'npm run lint:no-portal-routes', rung: PUSH },
     { key: 'schemadoc', label: 'lint:schema-doc', script: 'gen-schema-doc.mjs', fix: 'npm run lint:schema-doc', rung: PUSH, args: ['--check'] },
-    { key: 'verificationcopy', label: 'lint:verification-copy', script: 'check-verification-copy.mjs', fix: 'npm run lint:verification-copy', rung: PUSH },
-    // The other copy-policy gate, and it sits beside `verificationcopy` on the
-    // same rung for the same reason. What it catches is a claim that an
-    // AUTHORITY approved what this software renders — "OIR-approved", "approved
-    // by the Office of Insurance Regulation" — which is a statement about a
-    // third party that nobody at that agency ever made.
-    //
-    // PUSH rather than PRECOMMIT, on two arguments. First, its subject is
-    // authored in batches, not keystrokes: statutory-form copy arrives when a
-    // form is published, by hand, weeks apart — the same rhythm that puts
-    // `statutoryfidelity` at this rung. Second, and this is the one that
-    // settles it, the gate reads every LOCALE. A claim and its translation
-    // routinely land in different commits, so a per-commit rung would go green
-    // on the English commit and red on the translation, blaming the wrong
-    // change; PUSH is the first rung where the answer is complete. It walks
-    // ~83 files / ~20k strings in well under a second, so the cost is not what
-    // decides it — the completeness of the answer is.
-    { key: 'endorsementcopy', label: 'lint:endorsement-copy', script: 'check-endorsement-copy.mjs', fix: 'npm run lint:endorsement-copy', rung: PUSH },
+    // The two copy-policy gates, as one row (scripts/check-copy-policy.mjs), run UNMODIFIED and
+    // in sequence: verification-copy (no surface converts an integrity result into a conclusion)
+    // and endorsement-copy (no copy attributes an approval of our output to an authority --
+    // "OIR-approved", "approved by the Office of Insurance Regulation" -- a statement about a
+    // third party that nobody at that agency ever made). PUSH rather than PRECOMMIT, on two
+    // arguments. First, the subject is authored in batches, not keystrokes: statutory-form copy
+    // arrives when a form is published, by hand, weeks apart. Second, and this settles it, both
+    // read every LOCALE: a claim and its translation routinely land in different commits, so a
+    // per-commit rung would go green on the English commit and red on the translation, blaming
+    // the wrong change; PUSH is the first rung where the answer is complete.
+    // ⚠️ Registered with NO args, and the spec pins it: both scripts accept `--self-test`, which
+    // scores their patterns against fixtures and exits 0 without reading a catalogue.
+    { key: 'copypolicy', label: 'lint:copy-policy', script: 'check-copy-policy.mjs', fix: 'npm run lint:copy-policy', rung: PUSH },
     // PUSH rather than PRECOMMIT, unlike the tracking gate above it, and for a
     // reason that is about WHERE the breakage comes from rather than how much
     // it costs: this one fails when an anchor comment is deleted or a guarded
@@ -399,17 +382,16 @@ export const SCRIPT_GATES = [
     // list. PUSH sees the whole change; that is the rung where the answer is
     // complete.
     { key: 'auditregistry', label: 'lint:audit-registry', script: 'check-audit-registry.mjs', fix: 'npm run lint:audit-registry', rung: PUSH },
-    // PUSH rather than pre-commit, and the two converter gates sit together
-    // because they answer halves of one question. `converter-capability` asks
-    // whether a converter is registered, tested and has a declared format;
-    // `converter-literals` asks whether every string it embeds is classified.
-    // Both read a handful of files and cost almost nothing, but neither catches
-    // a keystroke — they catch a converter ARRIVING, and a converter arrives in
-    // one change rather than one line. ⚠️ Neither says anything about whether a
-    // reader has ever seen a real file: that is `verify:real-corpus`, which is a
-    // release-time manual rung and is in UNREGISTERED below with its reason.
-    { key: 'convcapability', label: 'lint:converter-capability', script: 'check-converter-capability.mjs', fix: 'npm run lint:converter-capability', rung: PUSH },
-    { key: 'convliterals', label: 'lint:converter-literals', script: 'check-converter-literals.mjs', fix: 'npm run lint:converter-literals', rung: PUSH },
+    // PUSH rather than pre-commit, and the two converter gates are one row because they answer
+    // halves of one question (scripts/check-converters.mjs). `converter-capability` asks
+    // whether a converter is registered, tested and has a declared format; `converter-literals`
+    // asks whether every string it embeds is classified. Both read a handful of files and cost
+    // almost nothing, but neither catches a keystroke -- they catch a converter ARRIVING, and a
+    // converter arrives in one change rather than one line. `lint:converter-capability` and
+    // `lint:converter-literals` still run one half. ⚠️ Neither says anything about whether a
+    // reader has ever seen a real file: that is `verify:real-corpus`, which is a release-time
+    // manual rung and is in UNREGISTERED below with its reason.
+    { key: 'converters', label: 'lint:converters', script: 'check-converters.mjs', fix: 'npm run lint:converters', rung: PUSH },
     // PUSH rather than PRECOMMIT: a statutory form revision is published by
     // hand, weeks or months apart, so there is no stream of commits for a
     // pre-commit rung to watch. It reads one directory and a handful of files
@@ -423,8 +405,9 @@ export const SCRIPT_GATES = [
     // record. Measured on the Citizens four-point: `electrical.wiring_types`
     // offers `other`, the page prints a bare "Other", and an inspector who
     // picks it sends an insurer a lone X.
-    // ⚠️ It reads 0 options today, because TX TREC REI 7-6 has no `other` at
-    // all, and it PRINTS that zero rather than a tick.
+    // ⚠️ A form with no `other` option at all contributes nothing to examine
+    // (TX TREC REI 7-6 is one), and the gate PRINTS that count rather than a
+    // tick, so an empty examination is visible instead of reading as a pass.
     { key: 'statutoryanswerable', label: 'lint:statutory-answerable', script: 'check-statutory-answerable.mjs', fix: 'npm run lint:statutory-answerable', rung: PUSH },
     { key: 'statutoryfidelity', label: 'lint:statutory-fidelity', script: 'check-statutory-fidelity.mjs', fix: 'npm run lint:statutory-fidelity', rung: PUSH },
     // Same rung as `statutoryfidelity` beside it and for the same reason: its
@@ -482,9 +465,26 @@ export const SCRIPT_GATES = [
     // and unit tests call the handler directly, so nothing else can see it.
     // Registering it found a forward dead since the single-worker migration.
     { key: 'routedispatch', label: 'lint:route-dispatch', script: 'check-route-dispatch-parity.mjs', fix: 'npm run lint:route-dispatch', rung: PUSH },
+    // PUSH, not PRECOMMIT. This is a seeder-rot check: the CLI self-host setup script and
+    // the e2e fixtures talk to D1 in raw SQL that nothing type-checks, and a renamed or
+    // dropped column leaves them compiling, linting and passing both unit suites until a
+    // real database rejects the statement. Removing `tenants.name` once left four raw-SQL
+    // seeders still writing it. What it guards is not a keystroke: the seeders are touched
+    // rarely, and CI's lint-gates job reads them on every push, which is soon enough --
+    // the e2e globalSetup that runs the fixtures is minutes later still. Reads about 80
+    // files with two regexes. The UPDATE reading takes only the SET list as written
+    // columns (see scripts/lib/seed-sql-detect.mjs).
+    { key: 'seedsql', label: 'Seed SQL vs schema', script: 'check-seed-sql.mjs', fix: 'npm run lint:seed-sql', rung: PUSH },
 ];
 
-export const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup', rung: PRECOMMIT };
+/**
+ * The jscpd duplicate-code ceiling. PUSH, not PRECOMMIT: it is a third-party CLI
+ * that scans server/, app/ and packages/ in a child process, so it is the one
+ * entry here that cannot share the runner's single node process, and duplication
+ * is a property of a body of work rather than of a keystroke. CI's lint-gates
+ * job runs it on every push.
+ */
+export const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup', rung: PUSH };
 
 /**
  * npm scripts that are deliberately NOT gates, each with the reason.
@@ -499,6 +499,18 @@ export const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm
 export const UNREGISTERED = new Map([
     ['lint:gates', 'the pre-commit rung entry point, not a gate'],
     ['lint:gates-full', 'the push rung entry point, not a gate'],
+    ['lint:gate-registry', 'the coverage check over this very list (every lint:* script is registered or excluded with a reason here, no exclusion is stale, no gate points at a missing script). It left the pre-commit rung because tests/unit/tooling/gate-registry.spec.ts asserts the same invariants on every CI unit run; the script stays for running by hand, and it is excluded rather than registered so it is not run twice in lint-gates'],
+    ['lint:raw-nul', 'alias of lint:tree-hygiene (runs only the raw-nul check, `--only raw-nul`); the combined row is the registered one'],
+    ['lint:eol', 'alias of lint:tree-hygiene (runs only the eol check, `--only eol`); the combined row is the registered one'],
+    ['lint:ext-collisions', 'alias of lint:tree-hygiene (runs only the ext-collisions check, `--only ext-collisions`); the combined row is the registered one'],
+    ['lint:timestamps', 'alias of lint:schema-conventions (runs only the timestamps check, `--only timestamps`); the combined row is the registered one'],
+    ['lint:naming', 'alias of lint:schema-conventions (runs only the naming check, `--only naming`); the combined row is the registered one'],
+    ['lint:converter-capability', 'alias of lint:converters (runs only the converter-capability check, `--only converter-capability`); the combined row is the registered one'],
+    ['lint:converter-literals', 'alias of lint:converters (runs only the converter-literals check, `--only converter-literals`); the combined row is the registered one'],
+    ['lint:unit-isolation', 'alias of lint:test-isolation (runs only the unit-isolation check, `--only unit-isolation`); the combined row is the registered one'],
+    ['lint:web-isolation', 'alias of lint:test-isolation (runs only the web-isolation check, `--only web-isolation`); the combined row is the registered one'],
+    ['lint:verification-copy', 'alias of lint:copy-policy (runs only the verification-copy check, `--only verification-copy`); the combined row is the registered one'],
+    ['lint:endorsement-copy', 'alias of lint:copy-policy (runs only the endorsement-copy check, `--only endorsement-copy`); the combined row is the registered one'],
     ['lint:fix', 'eslint --fix; a mutation, not a check'],
     ['lint:eslint', 'eslint keeps its own process — it needs the type-aware program and a 12 GB heap, which is not something to import into a shared runner'],
     ['lint:advisories', 'queries the network (npm audit), so it cannot run at a rung that must work offline'],

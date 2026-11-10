@@ -8,6 +8,10 @@
  *   - text `datetime('now')` time columns
  * A line can opt out with a trailing `// ts-lint-ok: <reason>` comment (e.g.
  * calendar-semantic `YYYY-MM-DD` fields, or a documented raw-epoch-ms design).
+ *
+ * `npm run lint:timestamps` runs this through check-schema-conventions.mjs
+ * (`--only timestamps`), which reads the schema files once for this and the
+ * naming check. This file still runs on its own.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -51,7 +55,7 @@ export function findTimestampViolations(source, filename) {
 // Recursively collect *.ts files under a directory. Node 22 on this repo does
 // not export `globSync` from `node:fs` (that lands later), so walk manually
 // instead of depending on a glob API that may not exist at runtime.
-function collectTsFiles(dir) {
+export function collectTsFiles(dir) {
   const out = [];
   let entries;
   try {
@@ -71,9 +75,17 @@ function collectTsFiles(dir) {
   return out;
 }
 
-// CLI
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const files = collectTsFiles('server/lib/db/schema');
+/**
+ * The gate over a list of schema files. Called by the CLI below and by
+ * check-schema-conventions.mjs, which reads the schema directory once for this
+ * check and the naming check.
+ */
+export function run(files) {
+  // A gate that read nothing passes everything; an empty directory is a failure.
+  if (files.length === 0) {
+    console.error('timestamp gate FAILED: read ZERO schema files from server/lib/db/schema; refusing to report OK.');
+    process.exit(1);
+  }
   let violations = [];
   for (const f of files) violations = violations.concat(findTimestampViolations(readFileSync(f, 'utf8'), f));
   if (violations.length) {
@@ -81,4 +93,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     process.exit(1);
   }
   console.log(`timestamp gate OK (${files.length} schema files)`);
+}
+
+// CLI
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  run(collectTsFiles('server/lib/db/schema'));
 }

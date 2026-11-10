@@ -42,7 +42,7 @@
  *   - scope is the co-located web suite (`app/`), because that is the suite the
  *     paraglide graph lives in. `tests/unit/` runs a node env over server code.
  *
- * WHICH RUNG: `npm run lint` (pre-push + CI), not `run-gates.mjs` (pre-commit).
+ * WHICH RUNG: `npm run lint` (CI's lint-gates job + by hand), not `run-gates.mjs` (pre-commit).
  * It parses all ~333 specs exactly rather than pre-filtering on a substring,
  * because a prefilter that is wrong does not error — it produces a green run.
  * That costs ~5.5 s (2.1 s of it just loading the TypeScript compiler), which

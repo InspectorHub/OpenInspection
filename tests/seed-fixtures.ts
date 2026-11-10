@@ -806,7 +806,7 @@ export function seedFixtures(appDir: string): void {
  * first INSERT failed. A script no rung watches is a script that rots. This one
  * runs under globalSetup, whose failure is fatal when the seed was asked for,
  * and every column name below is checked against the schema by
- * `npm run lint:seed-sql` before it can be committed.
+ * `npm run lint:seed-sql` (CI's lint-gates job) before it can merge.
  */
 export function seedPcaFixtures(appDir: string): void {
     const cwd = appDir;

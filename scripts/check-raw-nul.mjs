@@ -34,10 +34,17 @@
  * repository stores binary content in. An unknown extension carrying a NUL
  * FAILS, and the fix is either the escape or one line here.
  *
+ * This file is one check of the tree-hygiene gate: `run(ctx)` is called by
+ * check-tree-hygiene.mjs with a context that lists the tracked files once and
+ * reads each file once for every check that wants it. Run directly it builds its
+ * own context, so the standalone command keeps working.
+ *
  * Usage: node scripts/check-raw-nul.mjs [--self-test]
+ *        npm run lint:raw-nul     (the same check, through check-tree-hygiene.mjs)
  */
-import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { treeContext } from './lib/tree-files.mjs';
 
 const NUL = 0x00;
 
@@ -58,6 +65,7 @@ const extOf = (path) => {
     return dot <= 0 ? '' : base.slice(dot + 1).toLowerCase();
 };
 
+export function run(ctx) {
 // ── Self-test. A scanner that reports absence is the failure mode here, so it
 // runs against a planted NUL before it is allowed to report a clean tree.
 const probeClean = Buffer.from('const key = `${a}\\0${b}`;\n', 'utf8');
@@ -76,17 +84,14 @@ if (scan(probeFaulty) === -1 || scan(probeClean) !== -1) {
     process.exit(1);
 }
 
-if (process.argv.slice(2).includes('--self-test')) {
+if (ctx.args.includes('--self-test')) {
     console.log('\n[raw-nul] self-test OK — a planted NUL is detected and an escaped \\0 is not.\n');
     process.exit(0);
 }
 
 // ── The scan ────────────────────────────────────────────────────────────────
 
-const tracked = execSync('git ls-files -z', { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024 })
-    .toString('utf8')
-    .split('\0')
-    .filter((p) => p !== '');
+const tracked = ctx.tracked();
 
 const hits = [];
 let scanned = 0;
@@ -97,7 +102,7 @@ for (const path of tracked) {
     if (BINARY_EXTS.has(extOf(path))) { skippedBinary += 1; continue; }
     let buf;
     try {
-        buf = readFileSync(path);
+        buf = ctx.read(path);
     } catch {
         // A tracked path the working tree does not hold (a deletion staged
         // elsewhere). Counted, never silently folded into "clean".
@@ -132,3 +137,8 @@ if (hits.length) {
 }
 
 console.log('[raw-nul] OK — every tracked text file is readable as text.\n');
+}
+
+if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href) {
+    run(treeContext(process.argv.slice(2)));
+}

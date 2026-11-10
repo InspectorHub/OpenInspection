@@ -24,9 +24,18 @@ Two rungs:
 - **`PRECOMMIT`** — every commit. Adding a gate here costs every commit anyone
   makes, so the bar is high: it should be fast, and it should catch something
   that is expensive to discover later.
-- **`PUSH`** — the full `npm run lint`, which is what runs before a push and what
-  CI's verify job runs. A push-rung run includes everything at pre-commit; a
-  pre-commit run does not include push.
+- **`PUSH`** — everything else. These run in CI's `lint-gates` job
+  (`npm run lint:gates-full`) and by hand before a push; the pre-push hook itself
+  runs no gate. A push-rung run includes everything at pre-commit; a pre-commit
+  run does not include push.
+
+A row can be a **combined gate**: several checks that read the same kind of input,
+run in one process behind one registry row (`scripts/check-tree-hygiene.mjs`,
+`check-schema-conventions.mjs`, `check-converters.mjs`, `check-test-isolation.mjs`,
+`check-copy-policy.mjs`; shared runner in `scripts/lib/combined-gate.mjs`). Each
+check keeps its own messages, counts and exit code, `--only <check>` runs one, and
+the old `lint:<check>` npm scripts remain as aliases of that (excluded in
+`UNREGISTERED` as "alias of ..."). A selection that matches nothing exits non-zero.
 
 `scripts/run-gates.mjs` executes them. It imports each gate into **one node
 process** rather than spawning `npm run` per gate.
@@ -62,10 +71,15 @@ forever, checking nothing.
 
 `scripts/check-gate-registry.mjs` closes that. It compares the `lint:*` scripts
 that exist against the registry and fails on a gate that belongs to neither the
-registry nor a declared exclusion list. The exclusions are aggregates and the two
-checks that must keep their own process; each is named in `UNREGISTERED` with its
-reason, so an exclusion is a decision somebody wrote down rather than an
-omission nobody noticed.
+registry nor a declared exclusion list. The exclusions are aggregates, the checks
+that must keep their own process, and the per-check aliases of a combined gate;
+each is named in `UNREGISTERED` with its reason, so an exclusion is a decision
+somebody wrote down rather than an omission nobody noticed. An alias must point
+at a registered gate.
+
+The registry check itself no longer runs at the pre-commit rung:
+`tests/unit/tooling/gate-registry.spec.ts` asserts the same invariants on every CI
+unit run. `npm run lint:gate-registry` still works by hand.
 
 ## Results are cached on their inputs
 

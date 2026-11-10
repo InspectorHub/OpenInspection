@@ -27,7 +27,7 @@
  *     apart: a complete, well-reasoned classification nothing reads. Both
  *     halves live here, in `account-export-delete.spec.ts` alongside it.
  *
- *  3. Rung cost. `lint:erasure` runs at the PUSH rung (pre-push + CI verify);
+ *  3. Rung cost. `lint:erasure` runs at the PUSH rung (CI lint-gates job);
  *     `test:unit` runs in CI. Both are pre-merge, so a gate would buy no
  *     earlier warning here — while a new `lint:*` script must also be
  *     registered in `scripts/lib/gate-registry.mjs` or it runs on no rung at
