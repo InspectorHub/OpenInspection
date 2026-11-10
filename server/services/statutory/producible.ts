@@ -34,6 +34,7 @@ import { refusalToUser } from '../../lib/statutory/refusal-to-user';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import * as schema from '../../lib/db/schema';
+import { normalizeStoredObject } from '../../lib/stored-json';
 import { StatutoryOverflowService } from './overflow.service';
 import { gatherStatutoryInputs } from './statutory-inputs';
 import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
@@ -80,7 +81,7 @@ export async function resolveProducibleStatutoryForm(
     // the two apart is itself a disclosure.
     if (!inspection) throw Errors.NotFound('Inspection not found');
 
-    const snapshot = inspection.templateSnapshot as StatutorySnapshot | null;
+    const snapshot = normalizeStoredObject(inspection.templateSnapshot) as StatutorySnapshot | null;
     const declaration = snapshot?.statutoryForm;
     if (!snapshot || !declaration) {
         throw Errors.NotFound('This inspection produces no statutory form');

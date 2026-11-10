@@ -1,4 +1,5 @@
 import { eq, and } from 'drizzle-orm';
+import { normalizeStoredObject } from '../../lib/stored-json';
 import { inspections, inspectionResults, templates } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { sanitizeDefectStates, type PropertyFacts, type PropertyFactFoundation } from './shared';
@@ -243,7 +244,7 @@ export class InspectionResultsService extends InspectionSubService {
             .get();
         if (!row) throw Errors.NotFound('Inspection not found or access denied');
         await db.update(inspections)
-            .set({ templateSnapshot: JSON.stringify(snapshot) as never })
+            .set({ templateSnapshot: snapshot })
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
     }
 
@@ -297,8 +298,7 @@ export class InspectionResultsService extends InspectionSubService {
         }));
 
         // Build remap: old level label/id → new level id, matched by severity.
-        const snapStr = inspection.templateSnapshot as unknown as string | null;
-        const oldSnapshot = snapStr ? JSON.parse(snapStr) as { ratingSystem?: { levels?: Array<{ id: string; label?: string; severity?: string }> }; [k: string]: unknown } : {};
+        const oldSnapshot = (normalizeStoredObject(inspection.templateSnapshot) ?? {}) as { ratingSystem?: { levels?: Array<{ id: string; label?: string; severity?: string }> }; [k: string]: unknown };
         const oldLevels = oldSnapshot.ratingSystem?.levels ?? [];
         const remap = new Map<string, string | null>();
         for (const oldL of oldLevels) {
@@ -317,7 +317,7 @@ export class InspectionResultsService extends InspectionSubService {
             },
         };
         await db.update(inspections)
-            .set({ templateSnapshot: JSON.stringify(newSnapshot) as never })
+            .set({ templateSnapshot: newSnapshot })
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
 
         // Rewrite per-item ratings on inspection_results

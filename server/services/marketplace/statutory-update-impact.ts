@@ -23,6 +23,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import { inspections, templates } from '../../lib/db/schema';
+import { normalizeStoredObject } from '../../lib/stored-json';
 import { marketplaceLibraries, tenantLibraryImports } from '../../lib/db/schema/marketplace';
 import { revisionStatusForInspection } from '../../lib/statutory/revision-status';
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
@@ -67,7 +68,7 @@ const EMPTY: StatutoryUpdateImpact = {
 
 /** The statutory form a template schema declares, if it declares one. */
 function declarationOf(schema: unknown): { formId: string; revision: string } | null {
-    const declared = (schema as {
+    const declared = (normalizeStoredObject(schema) as {
         statutoryForm?: { formId?: unknown; revision?: unknown };
     } | null)?.statutoryForm;
     if (typeof declared?.formId !== 'string' || typeof declared.revision !== 'string') return null;

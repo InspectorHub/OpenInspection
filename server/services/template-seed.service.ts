@@ -29,7 +29,7 @@ export class TemplateSeedService {
                 tenantId,
                 name:      seed.name,
                 version:   seed.version,
-                schema:    JSON.stringify(seed.schema),
+                schema:    seed.schema,
                 createdAt: new Date(),
             }).run();
             seeded++;

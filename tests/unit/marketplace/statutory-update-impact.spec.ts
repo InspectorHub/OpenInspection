@@ -121,6 +121,23 @@ describe('statutoryUpdateImpact', () => {
         expect(impact.toRevision).toBe('7-7');
     });
 
+    it('reads the same numbers when the stored documents are double-encoded', async () => {
+        // Older writers handed the JSON column an already-stringified document, so it stored a
+        // string literal. Handing it a string here reproduces that shape.
+        await db.update(schema.templates)
+            .set({ schema: JSON.stringify(snapshot('7-6')) })
+            .where(eq(schema.templates.id, OLD_LOCAL));
+        await addInspection('i1', '2026-03-01', 'scheduled');
+        await addInspection('i2', '2026-03-20', 'scheduled');
+        await db.update(schema.inspections).set({ templateSnapshot: JSON.stringify(snapshot('7-6')) });
+
+        const impact = await statutoryUpdateImpact(db as unknown as ImpactDb, TENANT, LIBRARY, NOW);
+        expect(impact.total).toBe(2);
+        expect(impact.producible).toBe(1);
+        expect(impact.blocked).toBe(1);
+        expect(impact.fromRevision).toBe('7-6');
+    });
+
     it('reports zero blocked when nothing in flight crosses the cutover', async () => {
         // The positive control. A counter that called every in-flight inspection
         // blocked would pass the assertion above on its `blocked` half, and this

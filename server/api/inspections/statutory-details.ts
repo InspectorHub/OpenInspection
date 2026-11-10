@@ -22,6 +22,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { StatutoryDetailsService } from '../../services/statutory/details.service';
 import { Errors } from '../../lib/errors';
 import * as schema from '../../lib/db/schema';
+import { normalizeStoredObject } from '../../lib/stored-json';
 import type { StatutoryFormDeclaration } from '@core/field-ui/shared/template-schema';
 
 /**
@@ -102,7 +103,7 @@ async function requireStatutoryInspection(
         .where(and(eq(schema.inspections.id, id), eq(schema.inspections.tenantId, tenantId)))
         .get();
     if (!inspection) throw Errors.NotFound('Inspection not found');
-    const declaration = (inspection.snapshot as {
+    const declaration = (normalizeStoredObject(inspection.snapshot) as {
         statutoryForm?: StatutoryFormDeclaration;
     } | null)?.statutoryForm;
     if (!declaration) throw Errors.NotFound('This inspection produces no statutory form');

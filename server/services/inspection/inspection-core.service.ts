@@ -19,6 +19,7 @@ import { InspectionQueryService } from './inspection-query.service';
 import { InspectionReinspectionService, type CreatedReinspection } from './inspection-reinspection.service';
 import { InspectionCreateVariantsService } from './inspection-create-variants.service';
 import { InspectionRecipientsService } from './inspection-recipients.service';
+import { normalizeStoredJson } from '../../lib/stored-json';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 
 /** Steps a caller needs run inside the create, ahead of its last write. */
@@ -245,13 +246,11 @@ export class InspectionCoreService extends InspectionSubService {
                 .where(and(eq(templates.id, data.templateId), eq(templates.tenantId, tenantId))).get();
             // Unknown and another company's template answer alike; the insert would otherwise fail on its constraint.
             if (!tpl) throw Errors.BadRequest('Unknown template for this workspace');
-            templateSnapshot = tpl.schema;
+            templateSnapshot = normalizeStoredJson(tpl.schema) ?? tpl.schema;
             templateSnapshotVersion = tpl.version;
-            // Sprint 2 S2-1 — the template's rating system is captured at
-            // first results-write time (see updateResults below) rather
-            // than at inspection creation. Until the inspector touches an
-            // item the inspection_results row doesn't exist yet, so there
-            // is nowhere to attach the snapshot here.
+            // Sprint 2 S2-1 — the template's rating system is captured at first results-write time
+            // (see updateResults below) rather than at inspection creation. Until the inspector touches an
+            // item the inspection_results row doesn't exist yet, so there is nowhere to attach it here.
         }
 
         // Round-2 #10 — read tenant block-report policy. New inspections
