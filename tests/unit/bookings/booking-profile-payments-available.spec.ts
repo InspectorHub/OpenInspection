@@ -1,7 +1,8 @@
 /**
  * `paymentsAvailable` on GET /book/{tenant}: a boolean that is true only when the company's OWN Stripe account holds all three
  * keys. The booking page uses it to decide whether to quote a deposit and offer a Pay button, so a partial set must read false
- * (the deposit-intent route answers 503 without the secret and publishable keys, and a payment with no webhook is never recorded).
+ * (the deposit-intent route applies the same three-key rule and answers 503 otherwise, because a payment with no webhook is never
+ * recorded; `stripe-keys-entry-points-agree.spec.ts` pins that both entry points agree for all 8 combinations).
  * The response carries the boolean and never a key.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';

@@ -18144,7 +18144,7 @@
       }
     },
     "summary": "Save tenant integration API secrets",
-    "description": "Save integration secrets. Masked values (containing bullet characters) are skipped — they indicate unchanged fields."
+    "description": "Save integration secrets. Masked values (containing bullet characters) and omitted keys are unchanged. An explicit empty string clears that key."
   },
   {
     "operationId": "recordCollabFollowup",
