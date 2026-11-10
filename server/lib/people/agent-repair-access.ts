@@ -8,6 +8,9 @@
  */
 export type AgentRepairAccess = 'off' | 'read' | 'readwrite';
 
+/** The policy a company has when it never chose one. Every layer that needs a default imports THIS, so they cannot disagree. */
+export const DEFAULT_AGENT_REPAIR_ACCESS: AgentRepairAccess = 'read';
+
 interface InspectionPrefsLike {
     agentRepairAccess?: AgentRepairAccess | undefined;
 }
@@ -30,7 +33,7 @@ interface InspectionPrefsLike {
  * a company that wants them writing turns it on and knows it did.
  */
 export function resolveAgentRepairAccess(prefs: InspectionPrefsLike | null | undefined): AgentRepairAccess {
-    return prefs?.agentRepairAccess ?? 'read';
+    return prefs?.agentRepairAccess ?? DEFAULT_AGENT_REPAIR_ACCESS;
 }
 
 /** Whether the agent may open the list at all. */

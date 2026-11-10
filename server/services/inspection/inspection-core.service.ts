@@ -76,7 +76,7 @@ export class InspectionCoreService extends InspectionSubService {
      * enforce FK constraints at runtime, so this is the application-layer gate).
      * IA-35 / IA-73 — the tenant's policy for whether agents may act on the
      * repair request list (`off` / `read` / `readwrite`). Stored in the
-     * inspectionPrefs JSON; absent → `readwrite` (see the schema default).
+     * inspectionPrefs JSON; absent → `read` (DEFAULT_AGENT_REPAIR_ACCESS).
      */
     async getAgentRepairAccess(tenantId: string): Promise<AgentRepairAccess> {
         const db = this.getDrizzle();
