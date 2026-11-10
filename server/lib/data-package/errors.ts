@@ -29,7 +29,8 @@ export type FormatErrorCode =
   | 'stream_incomplete'
   | 'stream_chunk_invalid'
   | 'hasher_finished'
-  | 'fingerprint_invalid';
+  | 'fingerprint_invalid'
+  | 'media_index_invalid';
 
 export class DataPackageFormatError extends Error {
   readonly code: FormatErrorCode;

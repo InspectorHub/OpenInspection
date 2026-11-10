@@ -9,11 +9,11 @@ import { DataPackageFormatError } from './errors';
  * an extraction on a case-insensitive, non-UTF-8-safe disk):
  *  - Names are compared case-folded (`entryNameFoldKey`), so two legitimate R2 keys that differ only by case
  *    (`photos/A.jpg` and `photos/a.jpg`) count as duplicates and the package is refused. The exporter must
- *    detect such keys while listing and either rename one (recording the mapping in `media/index.json`) or
+ *    detect such keys while listing and either rename one (`mapKeyToEntryName` does this deterministically, and the media index row records key and entry) or
  *    exclude it with an `excluded` entry; it must never write both.
  *  - The allowlist is ASCII only (`A-Za-z0-9._@+=,~() -`, space only inside a segment). An R2 key with any other
  *    character (non-ASCII letters, `%`, `#`, `:`, `&`, ...) cannot be a zip entry name as it stands: the
- *    exporter must map it to a safe name (again recorded in `media/index.json`) or exclude it. The importer
+ *    exporter must map it to a safe name (`mapKeyToEntryName`; the media index row records both) or exclude it. The importer
  *    restores keys under a new tenant prefix from that mapping, never from the entry name.
  */
 const MAX_ENTRY_NAME_BYTES = 512;
@@ -67,7 +67,7 @@ export function assertNoDuplicateEntryNames(names: Iterable<string>): void {
 }
 
 /**
- * Throws when one entry is a directory prefix of another (`media/index.json` and `media/index.json/x`): on
+ * Throws when one entry is a directory prefix of another (`media/index.ndjson` and `media/index.ndjson/x`): on
  * disk one of them cannot exist. Case-folded; names must already be valid.
  */
 export function assertNoPrefixCollisions(names: readonly string[]): void {

@@ -11,10 +11,18 @@ export * from './entry-name';
  */
 export const ROOT_VOLUME_NAME = 'package.zip';
 
+/**
+ * The media index: one NDJSON row per media object (`media-index.ts`). It lives in the root volume under a fixed name
+ * (never sharded: 150,000 rows is about 50 MB, far below any zip limit) and is described by `manifest.media`, not by
+ * `manifest.files`. No media object may take this entry name (`media-key.ts` reserves it).
+ */
+// Named with a DATA_PACKAGE_ prefix on purpose: `server/lib/native/offline-zip.ts` exports a different MEDIA_INDEX_ENTRY ('media/index.json') for the offline client package.
+export const DATA_PACKAGE_MEDIA_INDEX_ENTRY = 'media/index.ndjson';
+
 /** Fixed entry names a package may carry beside `data/`, `media/<key>` and `esign/` shards. */
 const FIXED_ENTRIES = new Set([
   'README.txt',
-  'media/index.json',
+  DATA_PACKAGE_MEDIA_INDEX_ENTRY,
   'esign/events.ndjson',
   'esign/keys.ndjson',
   'esign/README.txt',
@@ -51,6 +59,16 @@ export function parseVolumeName(name: string): number | null {
 
 // ---------------------------------------------------------------- planning
 
+/**
+ * Volumes hold STORED (uncompressed) entries, so a media volume's `bytes` is its real zip size: at least the sum of its
+ * objects' bytes plus `zipEntryOverhead` per entry. The exporter must write them that way: the per-volume byte check
+ * in `verifyMediaIndex` (volume.bytes >= the bytes the index lists for it) would refuse a compressed volume.
+ *
+ * Media volumes carry NO `checksums.sha256` (a volume may hold up to 65,000 entries, more than a checksums file may
+ * list). Media objects are verified by the `sha256` of their index row, and each media volume as a whole by
+ * `volumes[].sha256`. The root volume's `checksums.sha256` lists exactly the files in `manifest.files` plus the media
+ * index (`assertRootChecksums` in `manifest.ts`).
+ */
 /** A stored zip entry costs a local header, a central-directory record, the name twice and a data descriptor. */
 export function zipEntryOverhead(nameBytes: number): number {
   return 30 + 46 + 16 + 2 * nameBytes;

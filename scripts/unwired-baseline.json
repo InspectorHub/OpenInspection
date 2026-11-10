@@ -142,5 +142,13 @@
   "server/lib/data-package/volume.ts": {
     "kind": "deferred",
     "reason": "Consumed by the data package exporter and importer that land in later changes."
+  },
+  "server/lib/data-package/media-index.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
+  },
+  "server/lib/data-package/media-key.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
   }
 }

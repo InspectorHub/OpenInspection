@@ -8,7 +8,12 @@ import { describe, expect, it } from 'vitest';
  * out-of-memory abort (a non-zero exit and no output line). The caps sit above what the current code needs
  * and below what the old code needed; measured minimum heaps (child includes building its own fixture):
  * wide-array 48 MB, wide-nested 80 MB, wide-manifest 96 MB, tiny-chunks 32 MB, checksums-max 48 MB,
- * checksums-over 24 MB.
+ * checksums-over 24 MB, media-index-150k 24 MB.
+ *
+ * Caveat: `--max-old-space-size` limits the V8 heap only, not ArrayBuffer backing stores (external memory). These
+ * tests therefore prove that row OBJECTS, parsed values and stack entries do not accumulate; they do not prove that
+ * the BYTES of a file are never buffered (a Uint8Array of the whole input would not trip the cap). Byte buffering is
+ * bounded separately by the explicit byte limits (line, manifest, checksums), each tested on its own.
  */
 const child = fileURLToPath(new URL('./memory-child.ts', import.meta.url));
 
@@ -47,6 +52,12 @@ describe('bounded memory on hostile shapes (child process, capped heap)', () => 
     const { status, last } = run('checksums-max', 64);
     expect(status).toBe(0);
     expect(JSON.parse(last)).toMatchObject({ ok: true, entries: 50_002 });
+  }, 120_000);
+
+  it('a 150,000-row media index (46.8 MB) is hashed and verified against its declaration in a streaming pass', () => {
+    const { status, last } = run('media-index-150k', 32);
+    expect(status).toBe(0);
+    expect(JSON.parse(last)).toEqual({ ok: true, rows: 150_000, bytes: 46_838_890 });
   }, 120_000);
 
   it('a checksums file one byte over the cap is refused before decoding', () => {

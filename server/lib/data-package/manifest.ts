@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { MAX_CHECKSUM_ENTRIES, SHA256_HEX_RE } from './checksums';
+import { type ChecksumEntry, MAX_CHECKSUM_ENTRIES, SHA256_HEX_RE } from './checksums';
 import { assertNoPrefixCollisions, entryNameFoldKey } from './entry-name';
 import { DataPackageFormatError } from './errors';
+import { MIN_MEDIA_INDEX_ROW_BYTES } from './media-index';
 import { assertSafeJson, type JsonValue } from './safe-json';
 import { isTableName, parseDataFileName } from './shard';
-import { classifyPackageEntry, parseVolumeName, ROOT_VOLUME_NAME, ZIP_MAX_BYTES, ZIP_MAX_ENTRIES } from './volume';
+import { classifyPackageEntry, DATA_PACKAGE_MEDIA_INDEX_ENTRY, parseVolumeName, ROOT_VOLUME_NAME, ZIP_MAX_BYTES, ZIP_MAX_ENTRIES } from './volume';
 
 /**
  * `manifest.json`. This zod schema IS the format contract: the exporter serializes through it, the
@@ -13,6 +14,11 @@ import { classifyPackageEntry, parseVolumeName, ROOT_VOLUME_NAME, ZIP_MAX_BYTES,
  *
  * Text fields that come from the source deployment (`excluded[].reason`, `sourceHost`, ids) are attacker
  * text on import: whatever displays them (UI, logs, the verifier) must escape them.
+ *
+ * Checksums: the root volume's `checksums.sha256` lists exactly `files[]` plus the media index (see
+ * `assertRootChecksums`). Media volumes carry no checksums file: a volume may hold up to 65,000 entries, more than a
+ * checksums file may list, so media objects are verified by the `sha256` in their media index row and each volume as a
+ * whole by `volumes[].sha256`.
  *
  * Entry names follow the allowlist and case-folded uniqueness rules documented in `entry-name.ts`: an exporter
  * must map or exclude any object key that is non-ASCII, uses characters outside the allowlist, or differs from
@@ -37,9 +43,10 @@ const MIN_SUPPORTED_FORMAT_VERSION = 1;
  *   5,000 files (1.5 MB)   -> 16 MB heap
  *   20,000 files (6.2 MB)  -> 32 MB heap
  *   49,100 files (15.2 MB) -> 64 MB heap
- * A listed media object costs about 312 bytes of manifest. The limits therefore leave roughly 60 MB of a
- * 128 MB isolate for everything else at the largest accepted size. A larger tenant must keep per-object media
- * hashes in `media/index.json` (read as a stream) and list only volumes here.
+ * A listed file costs about 312 bytes of manifest. The limits therefore leave roughly 60 MB of a 128 MB isolate
+ * for everything else at the largest accepted size. Media objects are NOT listed here: per-object bytes, hashes
+ * and entry names live in the streamed media index (`media-index.ts`), and the manifest keeps only `media`
+ * (count, and the index file's size and SHA-256), so the manifest stays small however many photos a tenant has.
  */
 export const MAX_MANIFEST_BYTES = 16 * 1024 * 1024;
 const MAX_MANIFEST_FILES = MAX_CHECKSUM_ENTRIES - 2;
@@ -71,6 +78,7 @@ const fileEntry = z.strictObject({
 
 const volumeEntry = z.strictObject({
   name: volumeName,
+  /** The volume's real zip size. Volumes are stored (uncompressed), so this is at least the sum of the object bytes the media index lists for it plus per-entry overhead; the exporter must write them that way. */
   bytes: count,
   entries: count.max(ZIP_MAX_ENTRIES),
   sha256,
@@ -101,6 +109,8 @@ const manifestSchema = z
     /** Always `null` in format 1: the format defines no encrypted layout, so a reader would take ciphertext for plaintext. Encryption arrives with a new `formatVersion`. */
     encryption: z.null(),
     counts: z.record(z.string().refine(isTableName, 'table name outside [a-z][a-z0-9_]{0,63}'), count),
+    /** The media objects: how many, and the index file that describes each (fixed name `media/index.ndjson` in the root volume, checksummed in `checksums.sha256`). */
+    media: z.strictObject({ count, index: z.strictObject({ path: z.literal(DATA_PACKAGE_MEDIA_INDEX_ENTRY), bytes: count, sha256 }) }),
     files: z.array(fileEntry).max(MAX_MANIFEST_FILES),
     volumes: z.array(volumeEntry).max(MAX_MANIFEST_VOLUMES),
     excluded: z.array(excludedEntry).max(MAX_MANIFEST_EXCLUDED),
@@ -110,39 +120,50 @@ const manifestSchema = z
       ctx.addIssue({ code: 'custom', message });
     };
 
-    // Volumes: unique names, consecutive media indices from 1, the root never listed.
-    const volumeStats = new Map<string, { listed: number; bytes: number }>([[ROOT_VOLUME_NAME, { listed: 0, bytes: 0 }]]);
+    // Volumes: unique names, consecutive media indices from 1, the root never listed, every one holding entries.
+    const names = new Set<string>();
     const indices: number[] = [];
+    let volumeEntries = 0;
     for (const volume of manifest.volumes) {
       if (volume.name === ROOT_VOLUME_NAME) problem('the root volume is not listed in volumes (its own digest cannot be inside it)');
-      else if (volumeStats.has(volume.name)) problem('duplicate volume name');
+      else if (names.has(volume.name)) problem('duplicate volume name');
       else indices.push(parseVolumeName(volume.name) ?? 0);
-      volumeStats.set(volume.name, { listed: 0, bytes: 0 });
+      names.add(volume.name);
+      if (volume.entries < 1) problem('a media volume holds no entries');
+      volumeEntries += volume.entries;
     }
     indices.sort((a, b) => a - b);
     if (indices.some((index, i) => index !== i + 1)) problem('media volumes are not numbered consecutively from 001');
 
-    // Files.
+    // Media: the index file and the volumes agree with the count.
+    const { count: mediaCount, index } = manifest.media;
+    if (mediaCount === 0) {
+      if (manifest.volumes.length > 0) problem('an empty media index has no media volumes');
+      if (index.bytes !== 0) problem('an empty media index has no bytes');
+    } else {
+      if (manifest.volumes.length === 0) problem('media objects need at least one media volume');
+      if (volumeEntries !== mediaCount) problem('volume entry counts do not add up to media.count');
+      if (index.bytes < mediaCount * MIN_MEDIA_INDEX_ROW_BYTES) problem('the media index is too small for its row count');
+    }
+
+    // Files: all in the root volume; media objects and the index are described by `media`, never listed.
     const paths: string[] = [];
     const seenPaths = new Set<string>();
     const rowsByTable = new Map<string, number>();
     const shardsByTable = new Map<string, Set<number>>();
+    let rootBytes = index.bytes;
     for (const file of manifest.files) {
       paths.push(file.path);
       const key = entryNameFoldKey(file.path);
       if (seenPaths.has(key)) problem('duplicate file path (case-folded)');
       seenPaths.add(key);
-      const stats = volumeStats.get(file.volume);
-      if (!stats) problem('file refers to a volume that is not listed');
-      else {
-        stats.listed += 1;
-        stats.bytes += file.bytes;
-      }
+      rootBytes += file.bytes;
       const kind = classifyPackageEntry(file.path);
-      if (kind === 'media' && file.volume === ROOT_VOLUME_NAME) problem('a media object belongs in a media volume');
-      if (kind !== 'media' && file.volume !== ROOT_VOLUME_NAME) problem('only media objects travel in media volumes');
+      if (file.volume !== ROOT_VOLUME_NAME) problem('only the root volume holds listed files');
+      if (kind === 'media') problem('media objects are described by the media index, not listed in files');
+      if (file.path === DATA_PACKAGE_MEDIA_INDEX_ENTRY) problem('the media index is described by media.index, not listed in files');
       const data = parseDataFileName(file.path);
-      const rowFile = data !== null || (kind === 'fixed' && file.path.endsWith('.ndjson'));
+      const rowFile = data !== null || (kind === 'fixed' && file.path.endsWith('.ndjson') && file.path !== DATA_PACKAGE_MEDIA_INDEX_ENTRY);
       if (file.rows !== undefined && !rowFile) problem('only data and esign ndjson files carry a row count');
       if (data && file.rows === undefined) problem('a data file must state its row count');
       if (file.rows !== undefined && rowFile) {
@@ -156,6 +177,7 @@ const manifestSchema = z
         shardsByTable.set(data.table, shards);
       }
     }
+    paths.push(DATA_PACKAGE_MEDIA_INDEX_ENTRY);
     try {
       assertNoPrefixCollisions(paths);
     } catch {
@@ -171,19 +193,8 @@ const manifestSchema = z
       if (!shardsByTable.has(table)) problem(`counts.${table} has no data file`);
     }
 
-    // Volumes agree with the files they hold. A volume whose files are listed here must state exactly that
-    // many entries; a volume listing none (media hashes kept in media/index.json instead) must hold at least one.
-    for (const volume of manifest.volumes) {
-      const stats = volumeStats.get(volume.name);
-      if (!stats || volume.name === ROOT_VOLUME_NAME) continue;
-      if (stats.listed > 0 && volume.entries !== stats.listed) problem('a volume entry count differs from the files listed in it');
-      if (volume.entries < 1) problem('a media volume holds no entries');
-      if (volume.bytes < stats.bytes) problem('a volume is smaller than the files listed in it');
-    }
-
-    // The root volume must stay within classic zip limits (manifest.json and checksums.sha256 are two more entries).
-    const root = volumeStats.get(ROOT_VOLUME_NAME);
-    if (root && (root.listed + 2 > ZIP_MAX_ENTRIES || root.bytes > ZIP_MAX_BYTES)) problem('the root volume would need ZIP64');
+    // The root volume (listed files, the index, manifest.json and checksums.sha256) must stay within classic zip limits.
+    if (manifest.files.length + 3 > ZIP_MAX_ENTRIES || rootBytes > ZIP_MAX_BYTES) problem('the root volume would need ZIP64');
   });
 
 export type Manifest = z.infer<typeof manifestSchema>;
@@ -249,4 +260,21 @@ export function parseManifest(input: Uint8Array | string): Manifest {
 export function serializeManifest(manifest: Manifest): Uint8Array {
   const checked = manifestSchema.parse(manifest);
   return encoder.encode(`${JSON.stringify(checked, null, 2)}\n`);
+}
+
+/**
+ * The root volume's `checksums.sha256` must list exactly the manifest's listed files and the media index, each with
+ * the digest the manifest states: no media object (those are covered by the index), no extra or missing line, no
+ * different digest. Throws `checksums_invalid`. `entries` come from `parseChecksums`, which already guarantees unique,
+ * valid names.
+ */
+export function assertRootChecksums(entries: readonly ChecksumEntry[], manifest: Pick<Manifest, 'files' | 'media'>): void {
+  const expected = new Map<string, string>(manifest.files.map((file) => [file.path, file.sha256]));
+  expected.set(manifest.media.index.path, manifest.media.index.sha256);
+  if (entries.length !== expected.size) {
+    throw new DataPackageFormatError('checksums_invalid', 'checksums.sha256 must list exactly the root volume files and the media index');
+  }
+  for (const entry of entries) {
+    if (expected.get(entry.path) !== entry.sha256) throw new DataPackageFormatError('checksums_invalid', 'checksums.sha256 differs from the manifest');
+  }
 }

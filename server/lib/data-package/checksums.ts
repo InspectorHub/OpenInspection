@@ -174,7 +174,11 @@ export interface ChecksumEntry {
   readonly sha256: string;
 }
 
-/** Derived from the manifest's file limit (50,000) plus the two files a volume carries beside its listed ones. `manifest.ts` derives its own limit from this. */
+/**
+ * The root volume's `checksums.sha256` lists the manifest's listed files (at most 50,000) and the media index (one),
+ * leaving one spare entry. Media volumes carry no checksums file (see `volume.ts`). `manifest.ts` derives its own
+ * file limit from this constant.
+ */
 export const MAX_CHECKSUM_ENTRIES = 50_002;
 /** A line is 64 hex + 2 spaces + a name of at most 512 characters + LF. */
 const MAX_CHECKSUM_LINE_CHARS = 64 + 2 + 512 + 1;

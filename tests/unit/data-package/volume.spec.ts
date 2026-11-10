@@ -76,7 +76,8 @@ describe('entry names', () => {
 describe('classifyPackageEntry', () => {
   it('knows the fixed names, data shards and media objects, and nothing else', () => {
     expect(classifyPackageEntry('README.txt')).toBe('fixed');
-    expect(classifyPackageEntry('media/index.json')).toBe('fixed');
+    expect(classifyPackageEntry('media/index.ndjson')).toBe('fixed');
+    expect(classifyPackageEntry('media/index.json')).toBe('media'); // the old fixed name is now an ordinary media object name
     expect(classifyPackageEntry('data/users.ndjson')).toBe('data');
     expect(classifyPackageEntry('data/users.2.ndjson')).toBe('data');
     expect(classifyPackageEntry('media/t/inspections/i/photos/p.jpg')).toBe('media');

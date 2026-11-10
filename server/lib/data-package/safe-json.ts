@@ -15,10 +15,15 @@ function unsafe(why: string): never {
   throw new DataPackageFormatError('json_unsafe', why);
 }
 
+/** True when the text holds an unpaired UTF-16 surrogate (it could not round-trip as UTF-8). */
+export function hasUnpairedSurrogate(text: string): boolean {
+  return LONE_SURROGATE_RE.test(text);
+}
+
 function checkString(text: string): void {
   if (text.length === 0) return;
   if (text.includes(NUL)) unsafe('NUL character');
-  if (LONE_SURROGATE_RE.test(text)) unsafe('unpaired surrogate');
+  if (hasUnpairedSurrogate(text)) unsafe('unpaired surrogate');
 }
 
 function checkScalar(value: string | number | boolean | null): void {

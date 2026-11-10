@@ -13,6 +13,14 @@
     "inspections": 812,
     "users": 3
   },
+  "media": {
+    "count": 1,
+    "index": {
+      "path": "media/index.ndjson",
+      "bytes": 330,
+      "sha256": "8123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    }
+  },
   "files": [
     {
       "path": "data/inspections.ndjson",
@@ -36,12 +44,6 @@
       "sha256": "2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     },
     {
-      "path": "media/index.json",
-      "volume": "package.zip",
-      "bytes": 4000,
-      "sha256": "3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-    },
-    {
       "path": "esign/events.ndjson",
       "volume": "package.zip",
       "rows": 10,
@@ -53,12 +55,6 @@
       "volume": "package.zip",
       "bytes": 1500,
       "sha256": "5123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-    },
-    {
-      "path": "media/9b1c7e52-aaaa-4bbb-8ccc-ddddeeeeffff/inspections/i1/photos/p1.jpg",
-      "volume": "media-001.zip",
-      "bytes": 88121,
-      "sha256": "6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     }
   ],
   "volumes": [

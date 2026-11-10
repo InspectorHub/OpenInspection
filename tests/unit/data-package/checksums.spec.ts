@@ -271,7 +271,7 @@ describe('parseChecksums limits and name set', () => {
   });
 
   it('refuses an entry that is a directory prefix of another', () => {
-    expect(() => parseChecksums(`${H1}  media/index.json\n${H2}  media/index.json/x\n`)).toThrowError(expect.objectContaining({ code: 'entry_name_duplicate' }));
+    expect(() => parseChecksums(`${H1}  media/index.ndjson\n${H2}  media/index.ndjson/x\n`)).toThrowError(expect.objectContaining({ code: 'entry_name_duplicate' }));
   });
 
   it('refuses a line longer than the cap and a file larger than the cap, before parsing lines', () => {
