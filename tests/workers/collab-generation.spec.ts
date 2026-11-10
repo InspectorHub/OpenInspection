@@ -204,7 +204,12 @@ describe('generation: the object checks the generation the client reports', () =
         // Control: an ordinary last disconnect still persists.
         const ok = await openSocket(name, gen);
         ok.close();
-        await new Promise<void>((r) => setTimeout(r, 100));
+        // Poll rather than sleep a fixed time: the flush runs after the close is delivered, and a loaded CI
+        // runner took longer than 100 ms. The refused-socket assertion above stays a fixed wait on purpose
+        // (absence cannot be polled for), the positive control is the part that must not be timing-bound.
+        for (let waited = 0; waited < 5000 && writes === before; waited += 50) {
+            await new Promise<void>((r) => setTimeout(r, 50));
+        }
         expect(writes).toBeGreaterThan(before);
     });
 
