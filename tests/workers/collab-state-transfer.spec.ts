@@ -127,10 +127,12 @@ describe('InspectionDocDO state transfer', () => {
         const payload = await (await stub('src-409').fetch(url('state-export'))).text();
 
         const holding = stub('dst-409-ydoc');
-        await seedSource('dst-409-ydoc');
+        // The size to expect is the size of the bytes that were STORED. A fresh sourceBytes() builds a new
+        // Y.Doc with a random client id, whose varint is 4 or 5 bytes, so its length differs run to run.
+        const stored = await seedSource('dst-409-ydoc');
         const refused = await holding.fetch(url('state-import'), { method: 'POST', body: payload });
         expect(refused.status).toBe(409);
-        expect(await refused.json()).toMatchObject({ error: 'target-not-empty', reason: 'target-has-state', targetBytes: sourceBytes().length });
+        expect(await refused.json()).toMatchObject({ error: 'target-not-empty', reason: 'target-has-state', targetBytes: stored.length });
 
         const partial = stub('dst-409-snapshots');
         await runInDurableObject(partial, async (_i, state) => { await state.storage.put('snapshots', SNAPSHOTS); });
