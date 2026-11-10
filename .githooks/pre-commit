@@ -239,15 +239,15 @@ fi
 timing "lint-staged"
 
 # 3. Conformance gates, all in ONE node process (scripts/run-gates.mjs):
-#      DS tokens · SVG dimensions · migration-reference hygiene · large-file
-#      ratchet · calendar timezone-safety · duplicate-code ceiling
+#      every gate at the `precommit` rung of scripts/lib/gate-registry.mjs
+#      (that file is the list; it is not copied here, so it cannot go stale)
 #    Each was its own `node scripts/check-*.mjs` spawn. The checks themselves scan
 #    a few hundred files in milliseconds; what cost 0.7-1.3s apiece was node
-#    starting up, so paying it six times was almost all of the 5.5s these gates
-#    took. Merged: 1.9s. The runner prints the same per-gate ✓/✗ lines, runs every
-#    gate even after one fails, and shows violations only for the ones that did.
-#    CI still runs them individually via `npm run lint` -- that stays the
-#    authoritative gate, and jscpd is a child process either way.
+#    starting up, so paying it once per gate was almost all of the time these gates
+#    took. Merged into one process, that cost is paid once. The runner prints a ✓/✗ line per gate,
+#    runs every gate even after one fails, and shows violations only for the ones that did.
+#    CI's lint-gates job runs the whole registry (`npm run lint:gates-full`) -- that
+#    stays the authoritative gate, and jscpd is a child process either way.
 step "Conformance gates"
 if node scripts/run-gates.mjs --rung precommit; then
     :

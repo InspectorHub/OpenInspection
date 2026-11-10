@@ -19,10 +19,14 @@
  * catch that half.
  *
  * A line can opt out with a trailing `// naming-lint-ok: <reason>` comment.
+ *
+ * `npm run lint:naming` runs this through check-schema-conventions.mjs
+ * (`--only naming`), which reads the schema files once for this and the
+ * timestamp check. This file still runs on its own.
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
+import { collectTsFiles } from './check-timestamps.mjs';
 
 /** @returns {string[]} human-readable violation messages */
 export function findNamingViolations(source, filename) {
@@ -46,31 +50,17 @@ export function findNamingViolations(source, filename) {
   return out;
 }
 
-// Recursively collect *.ts files under a directory. Node 22 on this repo does
-// not export `globSync` from `node:fs` (mirrors scripts/check-timestamps.mjs).
-function collectTsFiles(dir) {
-  const out = [];
-  let entries;
-  try {
-    entries = readdirSync(dir);
-  } catch {
-    return out;
+/**
+ * The gate over a list of schema files. Called by the CLI below and by
+ * check-schema-conventions.mjs, which reads the schema directory once for this
+ * check and the timestamp check.
+ */
+export function run(files) {
+  // A gate that read nothing passes everything; an empty directory is a failure.
+  if (files.length === 0) {
+    console.error('naming gate FAILED: read ZERO schema files from server/lib/db/schema; refusing to report OK.');
+    process.exit(1);
   }
-  for (const entry of entries) {
-    const full = join(dir, entry);
-    const stat = statSync(full);
-    if (stat.isDirectory()) {
-      out.push(...collectTsFiles(full));
-    } else if (entry.endsWith('.ts')) {
-      out.push(full);
-    }
-  }
-  return out;
-}
-
-// CLI
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const files = collectTsFiles('server/lib/db/schema');
   let violations = [];
   for (const f of files) violations = violations.concat(findNamingViolations(readFileSync(f, 'utf8'), f));
   if (violations.length) {
@@ -78,4 +68,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     process.exit(1);
   }
   console.log(`naming gate OK (${files.length} schema files)`);
+}
+
+// CLI
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  run(collectTsFiles('server/lib/db/schema'));
 }

@@ -83,7 +83,10 @@ async function runScriptGate(gate) {
     // it off argv like any CLI would. Splicing rather than replacing keeps
     // argv[0]/argv[1] intact for the entry-point guards above.
     const realArgvTail = process.argv.slice(2);
-    if (gate.args?.length) process.argv.splice(2, process.argv.length - 2, ...gate.args);
+    // Always replace the tail, not only when the gate has args: the runner's own
+    // `--only ds,svg` / `--rung precommit` would otherwise be what the gate reads,
+    // and a combined gate takes its own `--only <check>`.
+    process.argv.splice(2, process.argv.length - 2, ...(gate.args ?? []));
 
     let thrown = null;
     try {

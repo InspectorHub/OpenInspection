@@ -8,8 +8,8 @@ canonical reference for the three things you need to get right: **where a spec
 lives**, **how to write it**, and **how the run is initialized**.
 
 The layout is enforced — `npm run lint:tests` (`scripts/check-test-layout.mjs`)
-fails the build on a misplaced spec, and it runs in `npm run lint` (pre-push and
-CI's `verify` job; it is not in the pre-commit rung).
+fails the build on a misplaced spec, and it runs in `npm run lint` (CI's
+`lint-gates` job, and by hand; it is not in the pre-commit rung).
 
 Collection is enforced in **both** directions, by two gates rather than one:
 

@@ -71,6 +71,21 @@ if (danglingFix.length) {
     );
 }
 
+// An alias is an npm script that runs ONE check of a combined gate. Its exclusion
+// reason says "alias of <script>", and that claim is only worth anything if the
+// combined script is itself registered: an alias of an unregistered script would
+// be a check that runs on no rung while looking accounted for.
+const ALIAS = /^alias of (lint:[a-z0-9:-]+)/;
+const badAliases = [...UNREGISTERED]
+    .filter(([, reason]) => ALIAS.test(reason) && !registered.has(ALIAS.exec(reason)[1]))
+    .map(([name, reason]) => `${name} — ${ALIAS.exec(reason)[1]} is not a registered gate`);
+if (badAliases.length) {
+    errors.push(
+        `${badAliases.length} alias exclusion(s) point at a script that is not registered:\n` +
+        badAliases.map((a) => `    ${a}`).join('\n'),
+    );
+}
+
 const excludedLintScripts = [...UNREGISTERED.keys()].filter((k) => k.startsWith('lint:'));
 const accounted = registered.size + excludedLintScripts.length;
 
