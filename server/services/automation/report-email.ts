@@ -4,7 +4,7 @@ import { automationLogs, type automations, type tenants } from '../../lib/db/sch
 import { buildPortalUrl } from '../../lib/portal-urls';
 import { buildRenderReportUrl } from '../../lib/public-urls';
 import { logger } from '../../lib/logger';
-import { interpolate, isStaffRecipient } from './shared';
+import { interpolate, interpolateHtml, isStaffRecipient } from './shared';
 import { buildBaseTemplateVars } from './template-vars';
 import { resolveAutomationCompanyName } from './company-name';
 import { readTenantDisplay } from '../../lib/inspection/scheduled-date-display';
@@ -199,7 +199,7 @@ export async function deliverReportEmail(
             // the PDF render it waits on costs orders of magnitude more than one
             // indexed row read.
             const viewCountingEnabled = await readReportViewCountingEnabled(db, inspection.tenantId);
-            const html = interpolate(ruleCopy.body, vars)
+            const html = interpolateHtml(ruleCopy.body, vars)
                 + reportDeliverySystemBlocks({ reportUrl: linkUrl, hasAttachment: !!pdf, viewCountingEnabled });
             const attachments = pdf
                 ? [{ filename: `${address.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60)}-report.pdf`, content: pdf }]

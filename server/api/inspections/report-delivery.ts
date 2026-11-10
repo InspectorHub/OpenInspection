@@ -36,7 +36,7 @@ import { resolveSignatureInspector } from '../../lib/signature-helpers';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { resolveRoleEmailTemplate } from '../../lib/people/role-template';
-import { interpolate } from '../../services/automation/shared';
+import { interpolate, interpolateHtml } from '../../services/automation/shared';
 import { resolveReportTier } from '../../lib/report-tier';
 import { hubPayLink } from '../../lib/inspection/hub-pay-url';
 import { moneyView } from '../../lib/auth/money-access';
@@ -448,7 +448,7 @@ reportDeliveryRoutes.openapi(sendReportPdfRoute, async (c) => {
                 await c.var.services.email.sendEmail(
                     [recipientEmail],
                     interpolate(roleTemplate.subject, vars),
-                    interpolate(roleTemplate.body, vars),
+                    interpolateHtml(roleTemplate.body, vars),
                     pdf ? [{ filename: `${address.replace(/[^a-z0-9]+/gi, '-')}-report.pdf`, content: pdf }] : undefined,
                     // Same class as the two branches below: only the WORDING
                     // differs, chosen by role. A different template is not a

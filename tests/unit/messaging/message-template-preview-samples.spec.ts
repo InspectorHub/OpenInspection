@@ -141,3 +141,33 @@ describe('POST /api/message-templates/test-send', () => {
         expect(sent).not.toMatch(/\{\{/);
     });
 });
+
+describe('values substituted into an email body are escaped; subjects and SMS are not', () => {
+    const hostile = { client_name: "<b>O'Brien</b> & Co" };
+
+    it('preview: body escaped, subject plain, a URL keeps working in an href', async () => {
+        const res = await post('preview', {
+            channel: 'email', subject: 'Hi {{client_name}}',
+            body: '<p>{{client_name}}</p><a href="{{report_url}}">r</a>',
+            sampleVars: { ...hostile, report_url: 'https://a.test/r?x=1&y=2' },
+        });
+        const { data } = await res.json() as { data: { subject: string; html: string } };
+        expect(data.subject).toBe("Hi <b>O'Brien</b> & Co");
+        expect(data.html).toBe('<p>&lt;b&gt;O&#39;Brien&lt;/b&gt; &amp; Co</p><a href="https://a.test/r?x=1&amp;y=2">r</a>');
+    });
+
+    it('preview: SMS text is not escaped', async () => {
+        const res = await post('preview', { channel: 'sms', body: '{{client_name}}', sampleVars: hostile });
+        const { data } = await res.json() as { data: { text: string } };
+        expect(data.text).toBe("<b>O'Brien</b> & Co");
+    });
+
+    it('test send: email body escaped, subject plain', async () => {
+        const sendEmail = vi.fn().mockResolvedValue({ delivered: true });
+        vi.spyOn(buildEmailModule, 'buildTenantEmailService').mockResolvedValue({ sendEmail } as never);
+        await post('test-send', { channel: 'email', subject: '{{client_name}}', body: '<p>{{client_name}}</p>', to: 'me@example.test', sampleVars: hostile });
+        const [, subject, html] = sendEmail.mock.calls[0] as [string[], string, string];
+        expect(subject).toBe("[Test] <b>O'Brien</b> & Co");
+        expect(html).toBe('<p>&lt;b&gt;O&#39;Brien&lt;/b&gt; &amp; Co</p>');
+    });
+});

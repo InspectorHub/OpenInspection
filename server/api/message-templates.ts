@@ -6,7 +6,7 @@ import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { MessageTemplateService, type TemplateChannel } from '../services/message-template.service';
 import { smsSegmentInfo } from '../lib/sms/segments';
-import { interpolate } from '../services/automation/shared';
+import { interpolate, interpolateHtml } from '../services/automation/shared';
 import { previewVariables } from '../services/automation/variable-catalogue';
 import { buildTenantEmailService } from '../lib/email/build-email-service';
 import { PlanQuotaGuard, readTenantTier } from '../features/plan-quota/guard';
@@ -148,7 +148,7 @@ app.openapi(previewRoute, async (c) => {
     }
     // Email: interpolate the author body (same {{var}} dialect delivery uses).
     const renderedSubject = interpolate(subject ?? '', vars);
-    const renderedHtml = interpolate(body, vars);
+    const renderedHtml = interpolateHtml(body, vars);
     return c.json({ success: true as const, data: { subject: renderedSubject, html: renderedHtml } }, 200);
 });
 app.openapi(testSendRoute, async (c) => {
@@ -223,7 +223,7 @@ app.openapi(testSendRoute, async (c) => {
     // boundary still has to be able to say what it is sending.
     const { delivered } = await emailSvc.sendEmail(
         // Marked so a real inbox can tell a template test from a message sent to a client.
-        [to], `[Test] ${interpolate(subject ?? '', vars)}`, interpolate(body, vars),
+        [to], `[Test] ${interpolate(subject ?? '', vars)}`, interpolateHtml(body, vars),
         undefined, { classId: 'admin-test-send' },
     );
     return delivered ? c.json({ success: true }, 200) : c.json({ success: false, error: 'Email is not configured.' }, 200);

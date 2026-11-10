@@ -2,7 +2,7 @@
 import type {
   TemplateStore, Transport, AutomationLogger, Clock, CoreAction, DeliveryOutcome,
 } from './ports';
-import { interpolate } from './interpolate';
+import { interpolate, interpolateHtml } from './interpolate';
 import { checkRequiredVars } from './required-vars';
 
 export interface DeliverArgs {
@@ -42,7 +42,8 @@ export async function deliverAction(args: DeliverArgs): Promise<DeliveryOutcome>
   }
 
   const subject = tpl.subject !== undefined ? interpolate(tpl.subject, vars) : undefined;
-  const body = interpolate(tpl.body, vars);
+  // An email body is HTML, so substituted values are escaped; a text message is plain.
+  const body = action.channel === 'sms' ? interpolate(tpl.body, vars) : interpolateHtml(tpl.body, vars);
 
   const result = action.channel === 'sms'
     ? await deps.transport.sendSms({ tenantId, to, body })

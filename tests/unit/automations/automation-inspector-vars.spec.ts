@@ -28,14 +28,14 @@ async function addUser(id: string, tenantId: string, name: string | null) {
     } as never);
 }
 
-async function addInspection(overrides: Record<string, unknown> = {}) {
+async function addInspection(overrides: Record<string, unknown> = {}, clientName = 'Jane') {
     await db.insert(schema.inspections).values({
         id: INSP, tenantId: T, propertyAddress: '1 Main St', date: '2026-06-01', status: 'scheduled',
         reportStatus: 'draft', paymentStatus: 'unpaid', price: 50000,
         agreementRequired: false, paymentRequired: false, createdAt: new Date(), ...overrides,
     } as never);
     await db.insert(schema.contacts).values({
-        id: 'contact-1', tenantId: T, type: 'client', name: 'Jane', email: 'client@example.test', createdAt: new Date(),
+        id: 'contact-1', tenantId: T, type: 'client', name: clientName, email: 'client@example.test', createdAt: new Date(),
     } as never);
     await new PeopleService({ DB: testD1.binding }).addPerson(T, INSP, 'contact-1', roleProfileId('client'));
 }
@@ -47,13 +47,13 @@ async function link(userId: string, tenantId: string, role: 'lead' | 'helper' = 
 }
 
 /** Flush one pending log for the named seeded rule; return the captured email. */
-async function flushSeed(ruleName: string, opts: { body?: string; eventId?: string } = {}) {
+async function flushSeed(ruleName: string, opts: { body?: string; subject?: string; eventId?: string } = {}) {
     const svc = new AutomationService(testD1.binding);
     await svc.ensureSeeds(T);
     const rule = (await db.select().from(schema.automations).where(eq(schema.automations.tenantId, T)))
         .find((a) => a.name === ruleName)!;
-    if (opts.body) {
-        await db.update(schema.messageTemplates).set({ body: opts.body })
+    if (opts.body || opts.subject) {
+        await db.update(schema.messageTemplates).set({ ...(opts.body ? { body: opts.body } : {}), ...(opts.subject ? { subject: opts.subject } : {}) })
             .where(eq(schema.messageTemplates.id, rule.emailTemplateId!));
     }
     await db.insert(schema.automationLogs).values({
@@ -189,5 +189,25 @@ describe('{{event_inspector_name}} in automation email', () => {
         await link('u-lead', T);
         const { captured } = await flushSeed('Booking Confirmation', { body });
         expect(captured!.html).toBe('<p> by </p>');
+    });
+});
+
+describe('substituted values in the HTML body', () => {
+    it('escapes a client name that contains markup, keeps the author markup, leaves the subject plain', async () => {
+        await addInspection({}, '<img src=x onerror=1>');
+        const { captured } = await flushSeed('Booking Confirmation', {
+            subject: "AT&T for O'Brien {{client_name}}", body: '<p>Hi {{client_name}}</p>',
+        });
+        expect(captured!.html).toBe('<p>Hi &lt;img src=x onerror=1&gt;</p>');
+        expect(captured!.subject).toBe("AT&T for O'Brien <img src=x onerror=1>");
+    });
+
+    it('escapes inspector and company names that contain markup', async () => {
+        await addUser('u-lead', T, '<b>Dana</b>');
+        await addInspection();
+        await link('u-lead', T);
+        await db.insert(schema.tenantConfigs).values({ tenantId: T, companyName: '<b>Acme</b>', updatedAt: new Date() } as never);
+        const { captured } = await flushSeed('Booking Confirmation', { body: '<p>{{inspector_name}} / {{company_name}}</p>' });
+        expect(captured!.html).toBe('<p>&lt;b&gt;Dana&lt;/b&gt; / &lt;b&gt;Acme&lt;/b&gt;</p>');
     });
 });

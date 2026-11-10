@@ -41,7 +41,7 @@ const CancellationPolicySchema = z.object({
  * Validation schema for the branding configuration update.
  */
 export const UpdateBrandingSchema = z.object({
-    companyName: z.string().min(1, 'Company name is required').max(50).optional().openapi({ example: 'My Inspection Pro' }).describe('Trading name shown to clients on reports, emails and booking pages (1-50 characters)'),
+    companyName: z.string().trim().min(1, 'Company name is required').max(50).optional().openapi({ example: 'My Inspection Pro' }).describe('Trading name shown to clients on reports, emails and booking pages (1-50 characters)'),
     // `max(120)` rather than companyName's `max(50)`: registered entity names
     // are longer than brands ("Acme Home Inspections of Greater Cincinnati, LLC").
     legalName: z.string().max(120).nullable().optional().openapi({ example: 'Acme Holdings LLC' }).describe('Registered legal entity name, as it appears on the licence. Distinct from companyName (the trading brand). Blank means "same as the company name" and is the correct answer for a sole proprietor. Appears on agreements, signature certificates, invoices and the TCPA disclosure.'),
