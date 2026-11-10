@@ -81,6 +81,37 @@ describe('InspectionDocDO purge', () => {
         expectSeededIntact(await storedKeys(stub));
     });
 
+    describe('with an expected tenant', () => {
+        const withTenant = (tenant: string) => new Request('https://do.local/purge', { method: 'POST', headers: { 'x-expected-tenant': tenant } });
+
+        it('refuses an object that stores the identity of another tenant, and deletes nothing', async () => {
+            await seed(stub, { identity: { tenantId: TENANT, inspectionId: 'i1', reportId: REPORT } });
+            const res = await stub.fetch(withTenant('some-other-tenant'));
+            expect(res.status).toBe(403);
+            const keys = await storedKeys(stub);
+            for (const k of [...SEEDED_KEYS, 'identity']) expect(keys).toContain(k);
+        });
+
+        it('purges an object whose stored identity names that tenant', async () => {
+            await seed(stub, { identity: { tenantId: TENANT, inspectionId: 'i1', reportId: REPORT } });
+            const res = await stub.fetch(withTenant(TENANT));
+            expect(res.status).toBe(200);
+            expect(await storedKeys(stub)).toEqual([]);
+        });
+
+        it('refuses an object that holds a document but no identity, since it cannot be attributed', async () => {
+            const res = await stub.fetch(withTenant(TENANT));
+            expect(res.status).toBe(403);
+            expectSeededIntact(await storedKeys(stub));
+        });
+
+        it('purges an object that holds nothing', async () => {
+            const empty = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:never-written`));
+            const res = await empty.fetch(withTenant(TENANT));
+            expect(res.status).toBe(200);
+        });
+    });
+
     it('does not purge on a GET', async () => {
         const res = await stub.fetch(new Request('https://do.local/purge'));
         expect(res.status).toBe(404);
