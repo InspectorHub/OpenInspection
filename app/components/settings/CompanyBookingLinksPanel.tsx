@@ -30,9 +30,14 @@ export function CompanyBookingLinksPanel({
           because this is the section the page lands on and the one that used to
           invite sharing a dead end. Renders nothing when booking is open. */}
       <BookingClosedNotice state={booking} />
-      <div className="flex items-center gap-3">
-        <span className="text-[12px] font-bold text-ih-fg-2 w-36 shrink-0">{m.settings_companylink_booking_page()}</span>
-        <span className="text-[12px] text-ih-fg-1 truncate flex-1 font-mono bg-ih-bg-muted rounded px-2 py-1.5 border border-ih-border">
+      {/* Narrow screens: the label takes its own line (`w-full`) so the address gets the row
+          with the Copy button instead of what is left after a 144px label. The address is
+          `basis-0 flex-1` so it takes the free space and truncates instead of sizing to its
+          text, with a `min-w-32` floor so it can never collapse to nothing. From `sm` up the
+          label sits beside it as before. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="text-[12px] font-bold text-ih-fg-2 w-full sm:w-36 sm:shrink-0">{m.settings_companylink_booking_page()}</span>
+        <span className="text-[12px] text-ih-fg-1 truncate min-w-32 basis-0 flex-1 font-mono bg-ih-bg-muted rounded px-2 py-1.5 border border-ih-border">
           {companyUrl}
         </span>
         <button

@@ -90,8 +90,10 @@ app.openapi(depositIntentRoute, async (c) => {
 
     const secretKey = c.env.STRIPE_SECRET_KEY;
     const publishableKey = c.env.STRIPE_PUBLISHABLE_KEY;
-    // The same completeness rule the booking page uses to offer a Pay button: without the webhook
-    // secret a payment could be taken and never recorded.
+    // The same completeness rule the booking page uses to offer a Pay button (all THREE keys, one
+    // definition in `companyStripeKeysComplete`). Secret + publishable are enough to START a payment, but
+    // the webhook secret is what RECORDS it: without it money would be taken and never booked, so a
+    // partial set is refused here exactly as the page refuses to offer it.
     if (!secretKey || !publishableKey
         || !await companyStripeKeysComplete({ env: c.env, profile: c.var.profile, tenantId })) {
         return c.json({ success: false as const, error: { code: 'STRIPE_NOT_CONFIGURED', message: 'Online payment is not set up for this inspector.' } }, 503);

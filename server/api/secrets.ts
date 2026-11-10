@@ -87,7 +87,7 @@ const putSecretsRoute = createRoute(withMcpMetadata({
         422: { description: 'Key format invalid or Stripe rejected the secret key' },
     },
     operationId: 'putIntegrationSecrets',
-    description: 'Save integration secrets. Masked values (containing bullet characters) are skipped — they indicate unchanged fields.',
+    description: 'Save integration secrets. Masked values (containing bullet characters) and omitted keys are unchanged. An explicit empty string clears that key.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
 // ─── POST /secrets (alias for PUT — backwards compat with settings-advanced action) ─
@@ -187,13 +187,23 @@ export async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: SecretsSa
         }
     }
 
-    // 2. Merge: skip masked values and empty strings (no change); empty string
-    //    after trim clears the key; only known keys accepted.
+    // 2. Merge: a key that is absent or masked is unchanged; an explicit empty
+    //    (or whitespace-only) string CLEARS that key; only known keys accepted.
+    //    The settings pages never send an empty field -- they drop it before the
+    //    PUT, so "left blank" still means "leave as is" there -- which makes an
+    //    empty string on the wire a deliberate "not configured", the same word
+    //    GET /secrets uses for an unset key. Clearing one Stripe key leaves the
+    //    set incomplete, and `companyStripeKeysComplete` then reads false.
+    const cleared: string[] = [];
     for (const [key, value] of Object.entries(body)) {
         if (!allowedKeys.has(key)) continue;
-        if (!value || isMasked(value)) continue;
+        if (value === undefined || isMasked(value)) continue;
         if (value.trim() === '') {
-            delete existing[key];
+            // Clearing a key that was never stored changes nothing, so it is neither audited nor counted.
+            if (key in existing) {
+                delete existing[key];
+                cleared.push(key);
+            }
         } else {
             // Store TRIMMED — the live-verify below tests the trimmed value, and
             // consumers read the stored value raw; a pasted trailing newline must
@@ -349,7 +359,9 @@ export async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: SecretsSa
 
     auditFromContext(c, 'config.secrets.update', 'tenant_config', {
         metadata: {
-            keysUpdated: Object.keys(body).filter(k => body[k] && !isMasked(body[k])),
+            // Names only, never values.
+            keysUpdated: Object.keys(body).filter(k => body[k] && !isMasked(body[k]) && !cleared.includes(k)),
+            ...(cleared.length > 0 ? { keysCleared: cleared } : {}),
             // Versions only — the tenant_configs row is the record; this is the
             // timeline entry that says when it was written and against what.
             ...(record ? { aiKeyAttestation: { termsVersion: record.termsVersion, policyVersion: record.policyVersion } } : {}),
