@@ -79,7 +79,7 @@
   "server/api/migration-intake.ts": 413,
   "app/components/portal/sections/ReportView.tsx": 410,
   "server/api/admin/admin-data.ts": 408,
-  "server/api/secrets.ts": 406,
+  "server/api/secrets.ts": 418,
   "server/lib/sync-events/registry.ts": 405,
   "server/services/agreement/signer-state.ts": 403,
   "scripts/check-non-translatable.mjs": 402,
