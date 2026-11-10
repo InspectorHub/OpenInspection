@@ -15,7 +15,7 @@
 # feeds itself. Ask how this was measured: by falling into it.
 #
 # Mechanism is .githooks + core.hooksPath (no husky), aligned with the
-# superproject and the portal/cms submodules.
+# project's other repositories.
 
 # Never run in CI / non-interactive contexts (CI does not commit, but guard anyway).
 [ -n "$CI" ] && exit 0

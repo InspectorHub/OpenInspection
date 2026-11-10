@@ -30,7 +30,7 @@ test.beforeEach(({}, testInfo) => {
  * `billing-and-usage/settings-billing` is absent ON PURPOSE — the billing tile
  * does not render on a standalone deployment, which is what this stack is, so
  * there is no screen to photograph. It is recorded with its reason in
- * `apps/portal/docs/shot-exemptions.json` and ships as text.
+ * the docs publisher's shot-exemptions list and ships as text.
  *
  * Connected apps NEEDS `MCP_ENABLED=true` on the capture server. Without it the
  * page renders "Contact your administrator to enable remote MCP access", which

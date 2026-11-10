@@ -16,8 +16,7 @@
  * numbers below move because of a one-line change in THIS repository, with no
  * portal deploy. That is the point of asserting them here.
  *
- * Wire contract pinned by portal's `narrowAiProvisioning`
- * (apps/portal server/services/tier-quota.service.ts): `{ tiers: { <tier>:
+ * Wire contract pinned by the hosted control plane's `narrowAiProvisioning`: `{ tiers: { <tier>:
  * { managed, byo, unconfigured } } }`, all three numbers finite, and a tier
  * with NO tenants ABSENT rather than zeroed (absent = "core did not mention
  * it", which portal renders differently from a zero row).

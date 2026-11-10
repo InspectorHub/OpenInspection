@@ -63,10 +63,10 @@ describe('agreement language disclosure', () => {
 // ---------------------------------------------------------------------------
 // This repo is PUBLIC. The module's header used to carry a preliminary legal
 // position, the platform's legal posture, and a citation to a document that
-// exists only in the private superproject — and the guard here asserted all of
+// exists only in a private repository — and the guard here asserted all of
 // it STAYED. That was backwards twice over: it published private legal analysis
 // from an open-source file, and it could only be verified from a checkout that
-// has the superproject above it, so it failed on CI, where this repo is checked
+// has that private repository above it, so it failed on CI, where this repo is checked
 // out alone. That failure was the useful part: a guard that cannot run where the
 // code is published is not guarding the code that is published.
 //
