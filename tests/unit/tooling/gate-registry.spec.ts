@@ -421,8 +421,10 @@ describe('gate registry', () => {
         // the check quietly stops running.
         for (const { name, target, check } of aliases) {
             const gate = [...SCRIPT_GATES, DUP_GATE].find((g) => g.fix === `npm run ${target}`)!;
-            expect(scripts[name], `${name} must call node scripts/${gate.script}`)
-                .toMatch(new RegExp(`^node scripts/${gate.script!.replace(/\./g, '\\.')} --only ${check}\\b`));
+            // A plain string comparison: building a RegExp from a file name would need every metacharacter escaped.
+            const expected = `node scripts/${gate.script} --only ${check}`;
+            const actual = scripts[name] ?? '';
+            expect(actual === expected || actual.startsWith(`${expected} `), `${name} must call node scripts/${gate.script} --only ${check}`).toBe(true);
             expect(readFileSync(path.join(ROOT, 'scripts', gate.script!), 'utf8'), `${gate.script} no longer lists the ${check} check`)
                 .toContain(`name: '${check}'`);
         }
