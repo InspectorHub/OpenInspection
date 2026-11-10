@@ -98,5 +98,49 @@
   "server/lib/statutory/binding-policy.ts": {
     "kind": "deferred",
     "reason": "Refuses personal data bound onto a statutory form by a route that would store it. It guards a declaration the stored form values make about themselves, and the validation path that will call it runs when a form declaration is loaded -- which cannot happen until a form is published."
+  },
+  "server/lib/data-package/bytes.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
+  },
+  "server/lib/data-package/checksums.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
+  },
+  "server/lib/data-package/entry-name.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
+  },
+  "server/lib/data-package/errors.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
+  },
+  "server/lib/data-package/fingerprint.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
+  },
+  "server/lib/data-package/manifest.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
+  },
+  "server/lib/data-package/ndjson.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
+  },
+  "server/lib/data-package/safe-json.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
+  },
+  "server/lib/data-package/sha256-js.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
+  },
+  "server/lib/data-package/shard.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
+  },
+  "server/lib/data-package/volume.ts": {
+    "kind": "deferred",
+    "reason": "Consumed by the data package exporter and importer that land in later changes."
   }
 }

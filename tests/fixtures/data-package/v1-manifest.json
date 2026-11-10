@@ -1,0 +1,97 @@
+{
+  "formatVersion": 1,
+  "schemaVersion": "example_migration",
+  "columnFingerprint": "529b10e0320b2cb957d74a25c0a5487f95f3f935e41174d2657e0d20370ca401",
+  "engineVersion": "2.5.0",
+  "packageId": "3f2c0a8e-1111-4222-8333-444455556666",
+  "exportedAt": "2026-11-09T12:00:00.000Z",
+  "sourceMode": "standalone",
+  "sourceTenantId": "9b1c7e52-aaaa-4bbb-8ccc-ddddeeeeffff",
+  "sourceHost": null,
+  "encryption": null,
+  "counts": {
+    "inspections": 812,
+    "users": 3
+  },
+  "files": [
+    {
+      "path": "data/inspections.ndjson",
+      "volume": "package.zip",
+      "rows": 500,
+      "bytes": 123456,
+      "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    {
+      "path": "data/inspections.2.ndjson",
+      "volume": "package.zip",
+      "rows": 312,
+      "bytes": 80000,
+      "sha256": "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    {
+      "path": "data/users.ndjson",
+      "volume": "package.zip",
+      "rows": 3,
+      "bytes": 900,
+      "sha256": "2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    {
+      "path": "media/index.json",
+      "volume": "package.zip",
+      "bytes": 4000,
+      "sha256": "3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    {
+      "path": "esign/events.ndjson",
+      "volume": "package.zip",
+      "rows": 10,
+      "bytes": 2000,
+      "sha256": "4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    {
+      "path": "README.txt",
+      "volume": "package.zip",
+      "bytes": 1500,
+      "sha256": "5123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    {
+      "path": "media/9b1c7e52-aaaa-4bbb-8ccc-ddddeeeeffff/inspections/i1/photos/p1.jpg",
+      "volume": "media-001.zip",
+      "bytes": 88121,
+      "sha256": "6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    }
+  ],
+  "volumes": [
+    {
+      "name": "media-001.zip",
+      "bytes": 88400,
+      "entries": 1,
+      "sha256": "7123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    }
+  ],
+  "excluded": [
+    {
+      "class": "withheld_secret",
+      "table": "users",
+      "columns": [
+        "password_hash",
+        "totp_secret"
+      ],
+      "reason": "credentials never travel"
+    },
+    {
+      "class": "out_of_scope",
+      "table": "usage_counters",
+      "reason": "derived"
+    },
+    {
+      "class": "external_media",
+      "table": "inspection_media_pool",
+      "ids": [
+        "vid_1",
+        "vid_2"
+      ],
+      "reason": "hosted by an external video service; bytes are not in the package"
+    }
+  ]
+}
