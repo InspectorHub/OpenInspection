@@ -43,6 +43,14 @@ export interface TemplatedEmailDeps {
     appBaseUrl: string;
 }
 
+/** The `{{token}}` names either template source contains. Module level so the tenant-scoping baseline keys stay on `deliverTemplatedEmail`. */
+function tokensNamedIn(body: string, subject: string): Set<string> {
+    const names = new Set<string>();
+    for (const m of `${body}
+${subject}`.matchAll(/\{\{([a-z_]+)\}\}/g)) names.add(m[1] as string);
+    return names;
+}
+
 export async function deliverTemplatedEmail(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     db: any,
@@ -94,14 +102,14 @@ export async function deliverTemplatedEmail(
     const display = await readTenantDisplay(db, inspection.tenantId);
 
     // Name lookups (inspector, company) cost D1 reads, so they run only for a template that names the token.
-    const usesToken = (name: string) => bodySource.includes(`{{${name}}}`) || subjectSource.includes(`{{${name}}}`);
+    const used = tokensNamedIn(bodySource, subjectSource);
     const vars: Record<string, string> = {
-        ...buildBaseTemplateVars(inspection, tenant, usesToken('company_name') ? await resolveAutomationCompanyName(db, inspection.tenantId) : '', appHost, display, {
+        ...buildBaseTemplateVars(inspection, tenant, used.has('company_name') ? await resolveAutomationCompanyName(db, inspection.tenantId) : '', appHost, display, {
             summary: automation?.trigger === 'report.amended'
                 ? await deps.latestSummary(inspection.id, inspection.tenantId)
                 : '',
         }),
-        inspector_name:   usesToken('inspector_name')
+        inspector_name:   used.has('inspector_name')
             ? await resolveInspectorName(db, inspection.tenantId, inspection.id)
             : '',
         invoice_url:      `${appBaseUrl}/invoices`,
@@ -134,7 +142,7 @@ export async function deliverTemplatedEmail(
                 vars.event_scheduled_at = ev.scheduledAt
                     ? formatDateTime(ev.scheduledAt as Date, display)
                     : '';
-                if (usesToken('event_inspector_name')) {
+                if (used.has('event_inspector_name')) {
                     vars.event_inspector_name = await resolveEventInspectorName(db, inspection.tenantId, ev.inspectorId as string | null);
                 }
             }
