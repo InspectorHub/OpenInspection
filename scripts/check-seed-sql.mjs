@@ -45,6 +45,7 @@
  */
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { findSeedSqlViolations } from './lib/seed-sql-detect.mjs';
 
 const ROOT = join(import.meta.dirname, '..');
 const SCHEMA_DIR = join(ROOT, 'server/lib/db/schema');
@@ -94,74 +95,6 @@ function walk(dir, re, out = []) {
         if (statSync(p).isDirectory()) walk(p, re, out);
         else if (re.test(e)) out.push(p);
     }
-    return out;
-}
-
-/* ── Rule 1: columns named in raw INSERT / UPDATE must exist ── */
-
-/** @returns {{table:string, column:string, index:number}[]} */
-function rawSqlColumnRefs(src) {
-    const refs = [];
-
-    // INSERT [OR REPLACE|IGNORE] INTO <table> (a, b, c)
-    for (const m of src.matchAll(/INSERT\s+(?:OR\s+\w+\s+)?INTO\s+"?([a-z0-9_]+)"?\s*\(([^)]*)\)/gi)) {
-        for (const raw of m[2].split(',')) {
-            const column = raw.trim().replace(/^["'`]|["'`]$/g, '');
-            if (/^[a-z0-9_]+$/i.test(column)) {
-                refs.push({ table: m[1], column, index: m.index });
-            }
-        }
-    }
-
-    // UPDATE <table> SET col = ..., col2 = ...
-    for (const m of src.matchAll(/UPDATE\s+"?([a-z0-9_]+)"?\s+SET\s+([^;`]*)/gi)) {
-        for (const assignment of m[2].split(',')) {
-            const column = assignment.split('=')[0]?.trim().replace(/^["'`]|["'`]$/g, '') ?? '';
-            if (/^[a-z0-9_]+$/i.test(column)) {
-                refs.push({ table: m[1], column, index: m.index });
-            }
-        }
-    }
-
-    return refs;
-}
-
-const lineOf = (src, index) => src.slice(0, index).split('\n').length;
-
-export function findSeedSqlViolations(src, filename, schema) {
-    const out = [];
-    const lines = src.split('\n');
-    const allowed = (line) => /seed-lint-ok:/.test(lines[line - 1] ?? '');
-
-    const touchedMsColumns = [];
-
-    for (const { table, column, index } of rawSqlColumnRefs(src)) {
-        const columns = schema.tables.get(table);
-        if (!columns) continue;  // not one of ours (D1 internals, portal-side)
-        const line = lineOf(src, index);
-        if (!columns.has(column)) {
-            if (allowed(line)) continue;
-            out.push(
-                `${filename}:${line} writes ${table}.${column}, which does not exist in the schema`,
-            );
-        } else if (schema.msColumns.get(table)?.has(column)) {
-            touchedMsColumns.push({ table, column, line });
-        }
-    }
-
-    // Rule 2 — seconds into a millisecond column.
-    if (touchedMsColumns.length > 0) {
-        const secondsAt = src.split('\n').findIndex(l =>
-            /Date\.now\(\)\s*\/\s*1000/.test(l) && !/seed-lint-ok:/.test(l));
-        if (secondsAt !== -1) {
-            const { table, column } = touchedMsColumns[0];
-            out.push(
-                `${filename}:${secondsAt + 1} computes SECONDS (Date.now() / 1000) but this file ` +
-                `writes ${table}.${column}, which is timestamp_ms — the row will read as 1970`,
-            );
-        }
-    }
-
     return out;
 }
 

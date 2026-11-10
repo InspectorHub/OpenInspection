@@ -51,12 +51,21 @@
  * should build it, not store it. If a file genuinely must hold raw bytes, its
  * extension belongs in BINARY_EXTS below — one line, and a reviewer can see it.
  *
+ * This file is one check of the tree-hygiene gate: `run(ctx)` is called by
+ * check-tree-hygiene.mjs with a context that lists the tracked files once and
+ * reads each file once for every check that wants it. Run directly it builds its
+ * own context, so the standalone command keeps working.
+ *
  * Usage: node scripts/check-line-endings.mjs [--fix] [--self-test]
+ *        npm run lint:eol -- [--fix]   (the same check, through check-tree-hygiene.mjs)
  *   --fix        rewrite offending tracked files to LF in place
  *   --self-test  prove the scanner detects planted faults, then exit
  */
-import { execSync, execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { treeContext } from './lib/tree-files.mjs';
 
 const CR = 0x0d;
 const LF = 0x0a;
@@ -132,6 +141,7 @@ function toLf(buf) {
     return out.subarray(0, n);
 }
 
+export function run(ctx) {
 // ── Self-test ───────────────────────────────────────────────────────────────
 // A scanner whose job is to report absence must be shown finding something
 // before it is allowed to report finding nothing. Four probes: the two faults
@@ -174,7 +184,7 @@ if (selfTestFailures.length) {
     process.exit(1);
 }
 
-if (process.argv.slice(2).includes('--self-test')) {
+if (ctx.args.includes('--self-test')) {
     console.log(`\n[line-endings] self-test OK — ${probes.length} probes: CRLF and lone CR are`);
     console.log('detected, a clean LF file and a source-level `\\r` escape are not, and the');
     console.log('repair preserves the line count of all four.\n');
@@ -267,12 +277,9 @@ if (attrFailures.length) {
 
 // ── The scan ────────────────────────────────────────────────────────────────
 
-const FIX = process.argv.slice(2).includes('--fix');
+const FIX = ctx.args.includes('--fix');
 
-const tracked = execSync('git ls-files -z', { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024 })
-    .toString('utf8')
-    .split('\0')
-    .filter((p) => p !== '');
+const tracked = ctx.tracked();
 
 const attrs = gitAttributes(tracked);
 if (tracked.length && attrs.size === 0) {
@@ -300,7 +307,7 @@ for (const path of tracked) {
     if (BINARY_EXTS.has(extOf(path))) { skippedBinary += 1; continue; }
     let buf;
     try {
-        buf = readFileSync(path);
+        buf = ctx.read(path);
     } catch {
         // A tracked path the working tree does not hold (a deletion staged
         // elsewhere). Counted, never silently folded into "clean".
@@ -325,6 +332,7 @@ for (const path of tracked) {
     hits.push({ path, crlf, lonecr });
     if (FIX) {
         writeFileSync(path, toLf(buf));
+        ctx.forget(path);
         fixedCount += 1;
     }
 }
@@ -371,3 +379,8 @@ if (hits.length) {
 }
 
 console.log(`   ✓ all ${scanned} tracked text file(s) use LF.\n`);
+}
+
+if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href) {
+    run(treeContext(process.argv.slice(2)));
+}

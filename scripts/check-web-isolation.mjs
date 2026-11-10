@@ -18,6 +18,9 @@
  *
  * A few hazards (fake timers, localStorage writes) are accepted in a shared spec because tests/setup-web.ts undoes
  * them after every test; this gate also fails when that reset is removed (SETUP_RESETS in scripts/lib/web-isolation.mjs).
+ *
+ * `npm run lint:web-isolation` runs this through check-test-isolation.mjs
+ * (`--only web-isolation`) beside the unit check. This file still runs on its own.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -63,7 +66,11 @@ export function checkManifest(root, manifest, specsOnDisk) {
     return { errors, shared: count, total: specsOnDisk.length };
 }
 
-if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href) {
+/**
+ * The CLI body. Called by the guard below and by check-test-isolation.mjs, which
+ * runs the unit and web isolation checks in one process.
+ */
+export async function run() {
     const root = process.cwd();
     const manifestPath = join(root, 'tests/web-isolation.json');
     if (!existsSync(manifestPath)) {
@@ -91,4 +98,8 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href) {
         for (const s of unlisted) console.log(`  ${s}`);
     }
     console.log(`web isolation OK (shared ${shared}: node ${manifest.shared.node.length}, dom ${manifest.shared.dom.length}; isolated ${total - shared}, of ${total} specs)`);
+}
+
+if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href) {
+    await run();
 }

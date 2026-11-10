@@ -143,6 +143,20 @@ async function probeValue(name: string): Promise<unknown> {
     return runInDurableObject(stub(name), async (instance) => (instance as unknown as DOInternals).doc.getMap('probe').get('x'));
 }
 
+/**
+ * The probe value once the update sent over the socket has been applied. A fixed 50 ms sleep before reading it was enough on a quiet
+ * machine and not on a loaded CI runner (the read came back undefined). Polls up to five seconds and returns the last value read, so a
+ * wrong value still fails the assertion with what was actually there. Used only where a value is EXPECTED: asserting that nothing was
+ * applied cannot be polled for and keeps its fixed wait.
+ */
+async function probeEventually(name: string, expected: unknown): Promise<unknown> {
+    for (let waited = 0; waited < 5000; waited += 50) {
+        if ((await probeValue(name)) === expected) return expected;
+        await new Promise<void>((r) => setTimeout(r, 50));
+    }
+    return probeValue(name);
+}
+
 describe('generation: the object checks the generation the client reports', () => {
     async function currentGen(name: string): Promise<string> {
         const first = await openSocket(name);
@@ -157,8 +171,7 @@ describe('generation: the object checks the generation the client reports', () =
         const sock = await openSocket(name, gen);
         expect(sock.frames.map(frameType).slice(0, 2)).toEqual([MSG_GENERATION, MSG_SYNC]);
         sock.send(probeUpdate('current'));
-        await new Promise<void>((r) => setTimeout(r, 50));
-        expect(await probeValue(name)).toBe('current');
+        expect(await probeEventually(name, 'current')).toBe('current');
         expect(sock.closeCode()).toBeNull();
         sock.close();
     });
@@ -168,8 +181,7 @@ describe('generation: the object checks the generation the client reports', () =
         await currentGen(name);
         const sock = await openSocket(name);
         sock.send(probeUpdate('legacy'));
-        await new Promise<void>((r) => setTimeout(r, 50));
-        expect(await probeValue(name)).toBe('legacy');
+        expect(await probeEventually(name, 'legacy')).toBe('legacy');
         expect(sock.closeCode()).toBeNull();
         sock.close();
     });
@@ -237,8 +249,7 @@ describe('generation: the object checks the generation the client reports', () =
         const again = await openSocket(name, gen);
         expect(again.closeCode()).toBeNull();
         again.send(probeUpdate('after'));
-        await new Promise<void>((r) => setTimeout(r, 50));
-        expect(await probeValue(name)).toBe('after');
+        expect(await probeEventually(name, 'after')).toBe('after');
         again.close();
     });
 

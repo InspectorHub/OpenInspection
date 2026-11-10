@@ -15,6 +15,9 @@
  * A failing spec is fixed by removing it from `shared` and recording it under
  * `forcedIsolated` with the reason (or by running `node
  * scripts/gen-unit-isolation.mjs`, which re-derives the list from the rules).
+ *
+ * `npm run lint:unit-isolation` runs this through check-test-isolation.mjs
+ * (`--only unit-isolation`) beside the web check. This file still runs on its own.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -47,7 +50,11 @@ export function checkManifest(root, manifest, specsOnDisk) {
     return { errors, shared: shared.length, total: specsOnDisk.length };
 }
 
-if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href) {
+/**
+ * The CLI body. Called by the guard below and by check-test-isolation.mjs, which
+ * runs the unit and web isolation checks in one process.
+ */
+export async function run() {
     const root = process.cwd();
     const { listSpecs } = await import('./lib/list-unit-specs.mjs');
     const manifestPath = join(root, 'tests/unit/isolation.json');
@@ -76,4 +83,8 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href) {
         for (const s of unlisted) console.log(`  ${s}`);
     }
     console.log(`unit isolation OK (shared ${shared}, isolated ${total - shared}, of ${total} specs)`);
+}
+
+if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href) {
+    await run();
 }

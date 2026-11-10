@@ -1123,6 +1123,7 @@
     "tests/unit/tooling/reviewed-trailer-gate.spec.ts",
     "tests/unit/tooling/schema-doc-enum-resolution.spec.ts",
     "tests/unit/tooling/seed-client-access.spec.ts",
+    "tests/unit/tooling/seed-sql-gate.spec.ts",
     "tests/unit/tooling/small-text-contrast-gate.spec.ts",
     "tests/unit/tooling/status-literal-gate.spec.ts",
     "tests/unit/tooling/symbol-baseline.spec.ts",

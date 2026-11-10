@@ -54,7 +54,8 @@ to name. Commits with no staged `.ts`/`.tsx` skip the type-check entirely. Run
 the full suite once before pushing, not after every edit.
 
 That registry is the list; do not maintain a copy of it here. `npm run lint`
-(pre-push and CI) runs every gate, at both rungs.
+(and CI's `lint-gates` job, via `npm run lint:gates-full`) runs every gate, at both
+rungs. The pre-push hook runs no gate.
 
 ## Project structure
 
