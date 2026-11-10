@@ -95,7 +95,7 @@ Directory = suite; a spec's location alone decides which config runs it
 
 Choosing a home for a new spec:
 1. Frontend component/unit test? → **co-locate** beside the component as
-   `Foo.test.tsx` (or `__tests__/Foo.test.tsx`) under `app/` (R2). Never in `tests/`.
+   `Foo.test.tsx` (or in a `__tests__` directory beside it) under `app/` (R2). Never in `tests/`.
 2. Server-side, no browser: depends on real CF runtime semantics (Queue
    delivery, Durable Objects, workerd-only APIs)? Yes → `tests/workers/`
    (real workerd via vitest-pool-workers); no → `tests/unit/<domain>/`
@@ -126,8 +126,8 @@ markers — a capture with nowhere to go is caught over there, against the prose
 
 Rules: `tests/unit/<domain>/` dirs are named after the `server/api/` module (or
 service family) the specs exercise — never flat specs at the root. Frontend
-tests co-locate under `app/` (do not recreate `tests/web/unit/`). E2E is the
-single `tests/e2e/` (do not recreate `tests/web/e2e/` or `tests/integration/`).
+tests co-locate under `app/` (do not recreate a web test tree under `tests/`). E2E is the
+single `tests/e2e/` (do not recreate a second E2E tree or an integration tree).
 Domain dirs contain ONLY spec files; shared infra stays at
 `tests/unit/{db,mocks,setup-client}.ts` + `helpers/` + `stubs/` and
 `tests/{global-setup,seed-fixtures}.ts` + `helpers/` + `fixtures/` (fixtures
@@ -156,7 +156,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - JWT-based (ES256 / ECDSA P-256, HttpOnly cookie `__Host-inspector_token`). Multi-version keyring with `kid` header for safe rotation — see `server/lib/jwt-keyring.ts`.
 - Supports both Cookie (dashboard) and Bearer Header (API) token delivery.
 - PBKDF2-SHA256 password hashing (100k iterations, 16-byte salt). Legacy SHA-256 hashes auto-rehashed on login.
-- **SaaS login is portal-only.** When `APP_MODE=saas` (any topology, after silo-deconvergence 2026-05-29), `GET /login` and `GET /forgot-password` 302 to `${PORTAL_API_URL}/login` (resp. `/forgot-password`), and `POST /api/auth/login` returns HTTP 410 `LOGIN_MOVED_TO_PORTAL`. Reason: SaaS deploys share one core D1 holding users for many tenants and `users.email` is unique per-`(tenant_id, email)` (composite unique index in `schema/tenant.ts`), so a local form can't disambiguate the tenant. SaaS entry into core is exclusively via portal's `POST /api/account/handoff` → `GET /sso?code=` flow. Standalone is unchanged (single-tenant mapping is unambiguous).
+- **SaaS login is portal-only.** When `APP_MODE=saas` (any topology, after silo-deconvergence 2026-05-29), `GET /login` and `GET /forgot-password` 302 to `${PORTAL_API_URL}/login` (resp. `/forgot-password`), and `POST /api/auth/login` returns HTTP 410 `LOGIN_MOVED_TO_PORTAL`. Reason: SaaS deploys share one core D1 holding users for many tenants and `users.email` is unique per-`(tenant_id, email)` (composite unique index in `server/lib/db/schema/tenant/user.ts`), so a local form can't disambiguate the tenant. SaaS entry into core is exclusively via portal's `POST /api/account/handoff` → `GET /sso?code=` flow. Standalone is unchanged (single-tenant mapping is unambiguous).
 - **Switch workspace UI.** `MainLayout` renders a "Switch workspace" sidebar entry (desktop bottom + mobile drawer) whenever `branding.isSaas` is true and `PORTAL_API_URL` is set, pointing at `${PORTAL_API_URL}/company/switch`. Because the JWT carries a single `custom:tenantId`, this portal bounce is the only way to swap tenants without losing the session — portal SSOs back with the new tenant's cookie (overwrites the old one).
 
 ### Standalone Engine (Single-Tenant)

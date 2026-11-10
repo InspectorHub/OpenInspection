@@ -63,7 +63,7 @@ platform-rendered block in every message that carries a report link and on the
 report page itself; and the inspector-facing surface that pairs "opened" with
 delivery status in three states. **All TEN conditions in section 4 are now
 met** (the tenth was added on 2026-08-17 — see the correction block below), and the compile-time switch that had been holding the counter shut
-(`server/lib/report-views.gate.ts`) was deleted in the change that closed
+(its gate module) was deleted in the change that closed
 conditions 4, 5 and 6 — the same change, deliberately, because section 3.2 makes
 the disclosure load-bearing *inside* the balancing test rather than alongside
 it.
@@ -516,7 +516,7 @@ path.
 >
 > **AMENDMENT 3 — 2026-08-07 (later still).** Conditions **4**, **5** and **6**
 > moved from *unmet* to *met*, and the counter's compile-time kill switch
-> (`server/lib/report-views.gate.ts`) was deleted in the same change. Those two
+> (its gate module) was deleted in the same change. Those two
 > facts are one decision: section 3.2 makes the disclosure load-bearing INSIDE
 > the balancing test, so the release that lands the disclosure is precisely the
 > release in which the counter may run. Shipping them apart in either direction

@@ -1,10 +1,10 @@
 # Spike: TOC page numbers via Chrome link annotations + pdf-lib (Task 18)
 
 
-> ⚠️ The scratch artifact this spike names (`scripts/spike/toc-pdflib-spike.mjs`) was **deleted after the
-> experiment** — a spike's code is disposable, its verdict is not. It is cited
-> here so the measurement can be traced in git history, not because the file is
-> still on disk. `git log --diff-filter=D -- scripts/spike/toc-pdflib-spike.mjs` finds the removal.
+> ⚠️ The scratch artifact this spike names (a throwaway script under `scripts/`) was **deleted after the
+> experiment** and was never committed — a spike's code is disposable, its verdict
+> is not. It is described here so the measurement can be repeated, not because the
+> file is on disk.
 
 **Verdict: PASS ✅** — implement the two-pass pdf-lib approach (Task 19a).
 
@@ -14,7 +14,7 @@ annotations with a destination that pdf-lib can resolve to the target **page
 number**? (The two-pass TOC-page-number plan depends on this.)
 
 ## Method
-`scripts/spike/toc-pdflib-spike.mjs` (throwaway — never committed, no longer in
+The spike script (throwaway — never committed, no longer in
 the tree) renders a fixture that mirrors
 `app/components/portal/sections/report/ReportToc.tsx` — a TOC of `<a href="#id">`
 entries plus the reserved empty `.toc-pageref` slot, then tall `<h2 id>` sections

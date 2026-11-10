@@ -37,7 +37,7 @@ import { COURTESY_TRANSLATION_LOCALE, PublicReportResponseSchema } from '../lib/
  * Public, no-login portal endpoints (`/api/public/*`). Access is gated by the
  * persistent per-(recipient, order) portal token (a tokenized-link
  * model). The token is the credential; tenantId is resolved from it, NEVER from
- * the URL `:tenant` segment. See plan 2026-06-01-core-public-endpoints-c10-residual.
+ * the URL `:tenant` segment.
  */
 
 const reportRoute = createRoute(withMcpMetadata({
