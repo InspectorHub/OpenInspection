@@ -160,3 +160,74 @@ describe("InvoiceCard pay link", () => {
         expect(screen.queryByTestId("hub-pay-link-unavailable")).toBeNull();
     });
 });
+
+describe("InvoiceCard held booking deposit", () => {
+    function renderWith(amountCents: number | undefined, heldDeposit: { amountCents: number; paidAt: string } | null | undefined, requestableCents?: number) {
+        const Stub = createRoutesStub([
+            {
+                path: "/",
+                Component: () => (
+                    <InvoiceCard
+                        pill={{ tone: "monitor", label: "Unpaid" }}
+                        amountCents={amountCents}
+                        currency="USD"
+                        paid={false}
+                        sent={false}
+                        payUrl={null}
+                        hasServiceLines={false}
+                        paymentRequired={false}
+                        basePriceCents={amountCents}
+                        canManagePrice
+                        heldDeposit={heldDeposit}
+                        requestableCents={requestableCents}
+                        formatDate={() => "Nov 5, 2026"}
+                        onRequestPayment={() => {}}
+                    />
+                ),
+            },
+        ]);
+        render(<Stub initialEntries={["/"]} />);
+    }
+
+    it("offers the request button while a balance is owed", () => {
+        renderWith(45000, { amountCents: 9000, paidAt: "2026-11-05T15:00:00.000Z" }, 36000);
+        expect(screen.getByRole("button", { name: /request payment/i })).toBeTruthy();
+        expect(screen.queryByText(/nothing is left to collect/i)).toBeNull();
+    });
+
+    it("replaces the request button with a note when payments already cover the invoice", () => {
+        renderWith(45000, { amountCents: 45000, paidAt: "2026-11-05T15:00:00.000Z" }, 0);
+        expect(screen.queryByRole("button", { name: /request payment/i })).toBeNull();
+        expect(screen.getByText(/nothing is left to collect/i)).toBeTruthy();
+    });
+
+    it("shows nothing about a deposit when none was paid", () => {
+        renderWith(45000, null);
+        expect(screen.queryByTestId("hub-deposit-paid")).toBeNull();
+        expect(screen.queryByText(/balance due/i)).toBeNull();
+    });
+
+    it("says the deposit was paid, when, and what is left", () => {
+        renderWith(45000, { amountCents: 9000, paidAt: "2026-11-05T15:00:00.000Z" });
+        expect(screen.getByText("Deposit paid $90.00, most recently on Nov 5, 2026")).toBeTruthy();
+        expect(screen.getByText("Balance due $360.00")).toBeTruthy();
+    });
+
+    it("shows a zero balance when the deposit covers the whole amount, without calling it paid", () => {
+        renderWith(45000, { amountCents: 45000, paidAt: "2026-11-05T15:00:00.000Z" });
+        expect(screen.getByText("Deposit paid $450.00, most recently on Nov 5, 2026")).toBeTruthy();
+        expect(screen.getByText("Balance due $0.00")).toBeTruthy();
+        expect(screen.getByRole("button", { name: /request payment/i })).toBeTruthy();
+    });
+
+    it("never goes negative when the deposit exceeds a later, lower amount", () => {
+        renderWith(30000, { amountCents: 45000, paidAt: "2026-11-05T15:00:00.000Z" });
+        expect(screen.getByText("Balance due $0.00")).toBeTruthy();
+    });
+
+    it("states the deposit but no balance when the amount is redacted", () => {
+        renderWith(undefined, { amountCents: 9000, paidAt: "2026-11-05T15:00:00.000Z" });
+        expect(screen.getByText("Deposit paid $90.00, most recently on Nov 5, 2026")).toBeTruthy();
+        expect(screen.queryByText(/balance due/i)).toBeNull();
+    });
+});

@@ -198,6 +198,21 @@ describe('POST /book with a deposit configured', () => {
         expect(ledger).toHaveLength(0);
     });
 
+    it('the full-fee preset (100%) books and owes the whole price even with no Stripe keys in the environment', async () => {
+        // `FAKE_ENV` carries no Stripe keys. An owner who switches the preset on
+        // before connecting Stripe must still get a working booking page: the
+        // appointment is saved and the amount is owed, and only the later
+        // payment step can say it is unavailable.
+        await setTenantDeposit({ type: 'percent', percent: 100 });
+        const res = await book(buildApp(['insp-a']), [SVC_MAIN]);
+        expect(res.status).toBe(200);
+        expect((await bodyOf(res)).data.depositRequiredCents).toBe(45000);
+
+        const row = await db.select().from(inspections).where(eq(inspections.id, 'insp-a')).get();
+        expect(row!.depositRequiredCents).toBe(45000);
+        expect(await getHeldDepositCents(ledgerDb, TENANT_ID, 'insp-a')).toBe(0);
+    });
+
     it('freezes the amount, so repricing the service later does not move it', async () => {
         await setTenantDeposit({ type: 'percent', percent: 20 });
         await book(buildApp(['insp-a']), [SVC_MAIN]);

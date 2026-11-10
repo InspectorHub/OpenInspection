@@ -65,6 +65,7 @@ const ENV = {
     DB: {},
     STRIPE_SECRET_KEY: 'sk_test_1',
     STRIPE_PUBLISHABLE_KEY: 'pk_test_1',
+    STRIPE_WEBHOOK_SECRET: 'whsec_1',
 } as never;
 // `void p` did not even attach a catch, so a rejecting background promise was
 // an unhandled rejection outright. The helper settles both at teardown.
@@ -74,6 +75,8 @@ const CTX = makeExecutionContext().ctx as never;
 function buildApp() {
     const app = new OpenAPIHono<HonoConfig>();
     app.use('*', async (c, next) => {
+        // A self-hosted install: the environment holds the company's own keys.
+        c.set('profile', { envCredentialsAreCompanyOwn: true } as never);
         c.set('resolvedTenantId', TENANT as never);
         c.set('tenantId', TENANT);
         await next();
@@ -179,6 +182,29 @@ describe("POST '/api/public/inspections/{id}/deposit-intent' — replay does not
         await db.update(schema.inspections).set({ status: 'confirmed' })
             .where(eq(schema.inspections.id, INSPECTION));
         expect((await startDeposit()).status).toBe(404);
+        expect(createDepositPaymentIntent).not.toHaveBeenCalled();
+    });
+});
+
+describe("POST '/api/public/inspections/{id}/deposit-intent' - a deposit owed while Stripe is not connected", () => {
+    it('answers 503 STRIPE_NOT_CONFIGURED and starts nothing, so the booking page can say payment is unavailable', async () => {
+        const req = new Request(`https://acme.example.com/api/public/inspections/${INSPECTION}/deposit-intent`, {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+        });
+        const res = await buildApp().fetch(req, { DB: {} } as never, CTX);
+        expect(res.status).toBe(503);
+        expect(((await res.json()) as { error: { code: string } }).error.code).toBe('STRIPE_NOT_CONFIGURED');
+        expect(createDepositPaymentIntent).not.toHaveBeenCalled();
+        expect(await ledgerRows()).toHaveLength(0);
+    });
+
+    it('answers 503 and creates no intent when the webhook secret is missing (a payment could never be recorded)', async () => {
+        const req = new Request(`https://acme.example.com/api/public/inspections/${INSPECTION}/deposit-intent`, {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+        });
+        const env = { DB: {}, STRIPE_SECRET_KEY: 'sk_test_1', STRIPE_PUBLISHABLE_KEY: 'pk_test_1' } as never;
+        const res = await buildApp().fetch(req, env, CTX);
+        expect(res.status).toBe(503);
         expect(createDepositPaymentIntent).not.toHaveBeenCalled();
     });
 });

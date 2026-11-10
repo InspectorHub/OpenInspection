@@ -23,16 +23,24 @@ import { invoices } from '../lib/db/schema/invoice';
 import { orderPayments } from '../lib/db/schema/order-payment';
 import { users } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { logger } from '../lib/logger';
 import { safeISODate } from '../lib/date';
 import type { PaymentMethod } from '../lib/payment-method';
 import {
     recordPayment,
     recomputeInvoicePaymentState,
     getNetReceivedCents,
+    getOutstandingCents,
     seedLedgerFromInvoiceRecord,
 } from './payment-ledger.service';
 import type { AppendedPayment } from './payment-ledger.service';
 import { syncInspectionPaymentGate } from './invoice-payment-gate';
+
+/** What Stripe reports it took, and the intent id that makes a redelivery a no-op. */
+export interface CardSettlement {
+    amountCents: number;
+    providerRef: string;
+}
 
 /** Body of an operator-recorded offline payment. */
 export interface OfflinePaymentInput {
@@ -68,9 +76,37 @@ export async function markPaid(
     tenantId: string,
     source: 'oi' | 'qbo' = 'oi',
     method?: PaymentMethod,
+    cardSettlement?: CardSettlement,
 ): Promise<AppendedPayment | null> {
     const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
     if (!existing) throw Errors.NotFound('Invoice not found');
+    // A card payment that Stripe has already taken is recorded for exactly what
+    // Stripe took. The remainder arithmetic below would otherwise record less
+    // when the invoice changed between the charge being created and settling
+    // (another payment landed), or nothing at all on an invoice that is already
+    // paid: money charged and absent from the ledger. The provider reference
+    // makes a redelivery a no-op, and an overpayment is visible and refundable.
+    if (cardSettlement) {
+        await seedLedgerFromInvoiceRecord(db, tenantId, id);
+        const owed = await getOutstandingCents(db, tenantId, existing);
+        if (cardSettlement.amountCents > owed) {
+            // The charge was minted before another payment landed, or the invoice was already paid.
+            // The money is recorded as taken; the owner has to refund the excess in Stripe.
+            logger.warn('Stripe card payment exceeds the outstanding balance: recorded as an overpayment', {
+                invoiceId: id.slice(0, 8), tenantId: tenantId.slice(0, 8),
+                overpaidCents: cardSettlement.amountCents - owed,
+            });
+        }
+        return recordPayment(db, tenantId, {
+            invoiceId: id,
+            inspectionId: existing.inspectionId,
+            kind: 'balance',
+            amountCents: cardSettlement.amountCents,
+            method: 'card',
+            provider: 'stripe',
+            providerRef: cardSettlement.providerRef,
+        });
+    }
     // Idempotency: webhooks redeliver. A paid invoice stays paid with its
     // ORIGINAL timestamp — no double accounting, no date drift. Returning
     // null here is also what keeps a redelivery out of QuickBooks entirely,
@@ -84,7 +120,7 @@ export async function markPaid(
             .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
     }
 
-    const outstanding = existing.amountCents - await getNetReceivedCents(db, tenantId, id);
+    const outstanding = await getOutstandingCents(db, tenantId, existing);
     void source; // consumed by route handler to decide QBO sync
     if (outstanding > 0) {
         return recordPayment(db, tenantId, {
@@ -130,7 +166,7 @@ export async function recordOfflinePayment(
     // further payment would look like an overpayment. Give it the one row
     // its own record implies first.
     await seedLedgerFromInvoiceRecord(db, tenantId, id);
-    const outstanding = existing.amountCents - await getNetReceivedCents(db, tenantId, id);
+    const outstanding = await getOutstandingCents(db, tenantId, existing);
     if (!input.allowOverpayment && input.amountCents > outstanding) {
         // No figure in the message: it would have to be raw minor units,
         // and the surface asking the question is already showing the

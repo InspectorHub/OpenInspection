@@ -17,6 +17,7 @@ import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { PublicAgreementBodySchema } from '../../lib/validations/agreement-public.schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
 import { getDrizzle } from '../../lib/route-helpers';
+import { getOutstandingCents } from '../../services/payment-ledger.service';
 import { resolveAutomationCompanyName } from '../../services/automation/company-name';
 import { AGREEMENT_LANGUAGE_DISCLOSURE } from '../../lib/legal/agreement-language-disclosure';
 
@@ -99,6 +100,7 @@ const getCheckoutByTokenRoute = createRoute(withMcpMetadata({
                                 id: z.string(),
                                 amountCents: z.number().int(),
                                 amountPaidCents: z.number().int().nullable().describe('Cumulative amount received in cents; null when no figure was recorded'),
+                                balanceDueCents: z.number().int().describe('What the signer is still asked to pay: the total minus what the payment ledger has received, never below zero. The pay-intent route charges this same figure.'),
                                 status: z.enum(['paid', 'partial', 'unpaid']),
                             }).nullable().describe('Latest invoice for the inspection, or null'),
                             payment: z.object({
@@ -381,7 +383,7 @@ const agreementRoutes = createApiRouter()
                     progress: { signed: signedCount, total: signers.length },
                 },
                 invoice: invoiceRow && invoiceStatus // projection-allow: a literal of the invoice id, amounts, currency and status written on the next line, or null
-                    ? { id: invoiceRow.id, amountCents: invoiceRow.amountCents, amountPaidCents: invoiceRow.amountPaidCents ?? null, currency: invoiceRow.currency, status: invoiceStatus }
+                    ? { id: invoiceRow.id, amountCents: invoiceRow.amountCents, amountPaidCents: invoiceRow.amountPaidCents ?? null, balanceDueCents: await getOutstandingCents(db, tenantId, invoiceRow), currency: invoiceRow.currency, status: invoiceStatus }
                     : null,
                 payment: {
                     required: inspectionRow.paymentRequired === true,

@@ -24,6 +24,7 @@ import {
 } from '../../lib/validations/booking-profile.schema';
 import { hasDeclaredTenantTimeZone } from '../../lib/tz';
 import type { DepositPolicy } from '../../lib/billing/deposit-policy';
+import { companyStripeKeysComplete } from '../../lib/integrations/stripe-keys';
 
 /** The quoted deposit as the booking page reads it: the three fields of the policy and nothing else a stored value might carry. */
 const projectDepositPolicy = (policy: DepositPolicy | null | undefined) =>
@@ -159,6 +160,12 @@ bookingProfileRoutes.openapi(companyProfileRoute, async (c) => {
             // server froze, and only the server writes it.
             currency: config?.currency ?? 'USD',
             depositPolicy: projectDepositPolicy(config?.depositPolicy),
+            // Whether a Pay button could work, as a boolean and nothing more. A
+            // deposit quoted on a page that then answers 503 when the client
+            // presses Pay is worse than no quote, so the page asks first. Read
+            // from the company's STORED keys: this route resolves its company from
+            // the slug, so `c.env` here does not carry them.
+            paymentsAvailable: await companyStripeKeysComplete({ env: c.env, profile: c.var.profile, tenantId: tenantRow.id }), // projection-allow: a boolean only; never a key
             services: visible.map(s => ({
                 id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),
                 depositPolicy: projectDepositPolicy(s.depositPolicy),

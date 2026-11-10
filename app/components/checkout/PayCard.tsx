@@ -22,7 +22,7 @@ export function PayCard({
     portalToken,
 }: {
     state: StepState;
-    invoice: { id: string; amountCents: number; currency?: string; status: "paid" | "partial" | "unpaid" } | null;
+    invoice: { id: string; amountCents: number; balanceDueCents?: number | undefined; currency?: string; status: "paid" | "partial" | "unpaid" } | null;
     inspectionId: string;
     brandColor: string | null;
     justPaid: boolean;
@@ -62,14 +62,10 @@ export function PayCard({
             {state === "todo" && invoice && !justPaid && (
                 <PayPanel
                     inspectionId={inspectionId}
-                    // The invoice TOTAL, not what the payment ledger says is
-                    // still outstanding — the Stripe intent is minted
-                    // server-side from this same figure, so quoting less here
-                    // would show a price the payer is not charged. Charge and
-                    // display only move together, and moving them is
-                    // payment-collection behaviour with its own decisions to
-                    // make. See the matching note in InvoiceDisplay.
-                    amountCents={invoice.amountCents}
+                    // What is still owed (total minus what the payment ledger has
+                    // received); the pay-intent route charges this same figure.
+                    // An older server sends no balance: the whole total then.
+                    amountCents={invoice.balanceDueCents ?? invoice.amountCents}
                     currency={invoice.currency}
                     brandColor={brandColor}
                     companyName={companyName}
@@ -102,6 +98,8 @@ function PayPanel({
 }) {
     const [phase, setPhase] = useState<PayPhase>("idle");
     const [clientSecret, setClientSecret] = useState<string | null>(null);
+    // What the server actually minted the charge for. Wins over the page's own figure once known.
+    const [chargedCents, setChargedCents] = useState<number | null>(null);
     const [stripePromise, setStripePromise] = useState<Promise<StripeJs | null> | null>(null);
     const locale = useDisplayLocale();
     const sessionCurrency = useDisplayCurrency();
@@ -122,12 +120,13 @@ function PayPanel({
                 body: "{}",
             });
             const body = (await res.json().catch(() => ({}))) as {
-                data?: { clientSecret?: string; publishableKey?: string };
+                data?: { clientSecret?: string; publishableKey?: string; amountCents?: number };
                 error?: { code?: string };
             };
             if (res.ok && body.data?.clientSecret && body.data?.publishableKey) {
                 setStripePromise(loadStripe(body.data.publishableKey));
                 setClientSecret(body.data.clientSecret);
+                if (typeof body.data.amountCents === "number") setChargedCents(body.data.amountCents);
                 setPhase("ready");
                 return;
             }
@@ -142,11 +141,13 @@ function PayPanel({
             ? `${window.location.origin}${window.location.pathname}?redirect_status=succeeded`
             : "";
 
+    const shownCents = chargedCents ?? amountCents;
+
     return (
         <div className="rounded-xl border border-ih-border bg-ih-bg-muted p-4">
             <div className="flex items-center justify-between mb-3">
                 <span className="text-[13px] font-semibold text-ih-fg-1">{m.checkout_pay_heading()}</span>
-                <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{formatCurrency(amountCents, { locale, currency })}</span>
+                <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{formatCurrency(shownCents, { locale, currency })}</span>
             </div>
 
             {(phase === "idle" || phase === "loading") && (
@@ -156,7 +157,7 @@ function PayPanel({
                         {...pendingProps(phase === "loading", () => latch(startPayment))}
                         className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait ${PENDING_CLASS}`}
                     >
-                        {phase === "loading" ? m.checkout_pay_starting() : m.checkout_pay_button({ amount: formatCurrency(amountCents, { locale, currency }) })}
+                        {phase === "loading" ? m.checkout_pay_starting() : m.checkout_pay_button({ amount: formatCurrency(shownCents, { locale, currency }) })}
                     </button>
                     <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-ih-fg-2">
                         <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -173,7 +174,7 @@ function PayPanel({
                     stripe={stripePromise}
                     options={buildStripeElementsOptions({ clientSecret, brandColor, displayLocale: locale })}
                 >
-                    <CheckoutPayForm amountCents={amountCents} returnUrl={returnUrl} currency={currency} />
+                    <CheckoutPayForm amountCents={shownCents} returnUrl={returnUrl} currency={currency} />
                 </Elements>
             )}
 

@@ -536,7 +536,7 @@
       "apiWorker": 0
     },
     "app/routes/settings-booking.tsx": {
-      "dollarMethods": 15,
+      "dollarMethods": 16,
       "apiWorker": 0
     },
     "app/routes/settings-communication-template.tsx": {

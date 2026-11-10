@@ -20,7 +20,7 @@ const createPaymentIntent = vi.fn(
 
 vi.mock('stripe', () => {
     class FakeStripe {
-        paymentIntents = { create: createPaymentIntent };
+        paymentIntents = { create: createPaymentIntent, retrieve: async (id: string) => ({ id, status: "requires_payment_method" }) };
         static createFetchHttpClient() { return {}; }
         static createSubtleCryptoProvider() { return {}; }
     }
@@ -33,7 +33,7 @@ const { StripeService } = await import('../../../server/services/stripe.service'
 describe('StripeService.createPaymentIntent — currency forwarding', () => {
     beforeEach(() => createPaymentIntent.mockClear());
 
-    const invoice = { id: 'inv_1', amountCents: 50000, inspectionId: 'insp_1', status: 'sent' as const };
+    const invoice = { id: 'inv_1', amountCents: 50000, outstandingCents: 50000, inspectionId: 'insp_1', status: 'sent' as const };
 
     it('charges in the invoice snapshot currency, lowercased (CAD -> cad)', async () => {
         const svc = new StripeService('sk_test_x');

@@ -10,6 +10,12 @@
 export interface PayableInvoice {
     id: string;
     amountCents: number;
+    /**
+     * What is still owed (total minus net received, from the payment ledger).
+     * This, not `amountCents`, is what the card is charged: a deposit or a
+     * partial payment already received must not be collected a second time.
+     */
+    outstandingCents: number;
     inspectionId?: string | null;
     /** Derived status from InvoiceService.getStatus ('draft'|'sent'|'paid'|'partial'). */
     status?: string;
@@ -75,6 +81,9 @@ export function buildPaymentIntentParams(
     if (!Number.isInteger(invoice.amountCents) || invoice.amountCents <= 0) {
         throw new InvoiceNotPayableError('Invoice has no payable amount');
     }
+    if (!Number.isInteger(invoice.outstandingCents) || invoice.outstandingCents <= 0) {
+        throw new InvoiceNotPayableError('Nothing is outstanding on this invoice');
+    }
 
     const metadata: Record<string, string> = {
         kind: 'invoice',
@@ -84,7 +93,7 @@ export function buildPaymentIntentParams(
     if (invoice.inspectionId) metadata.inspectionId = invoice.inspectionId;
 
     return {
-        amount: invoice.amountCents,
+        amount: invoice.outstandingCents,
         currency: (ctx.currency ?? 'usd').toLowerCase(),
         metadata,
         description: `${ctx.descriptionPrefix ?? 'Invoice'} ${invoice.id}`,

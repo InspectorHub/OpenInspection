@@ -238,6 +238,7 @@ export async function loadInvoiceSection(
           inspectorName: "",
           lineItems: (d.lineItems ?? []).map((li) => ({ description: li.description, amount: li.amountCents / 100 })),
           total: d.amountCents / 100,
+          balanceDue: typeof d.balanceDueCents === "number" ? d.balanceDueCents / 100 : undefined,
           currency: d.currency,
         }
       : null;

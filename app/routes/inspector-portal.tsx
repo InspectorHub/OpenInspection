@@ -149,6 +149,10 @@ interface HubData extends HubPayload {
   // One order, several deliverables. Optional so an older payload still renders.
   reports?: ReportRow[];
   communication?: { delivered: number; needsAttention: number; unread: number; rulesActive: number };
+  /** A paid booking deposit still held against the order (display only); absent without the companyFinance capability. */
+  heldDeposit?: { amountCents: number; paidAt: string } | null | undefined;
+  /** Net money already received against what the client is billed; absent without the companyFinance capability. */
+  receivedCents?: number | undefined;
   /** Server-decided facts for the cancel and restore controls (a yes/no and a status, never an amount). */
   lifecycle: { moneyCollected: boolean; statusBeforeCancel: RestorableStatus | null; mayDelete: boolean };
 }
@@ -832,6 +836,12 @@ export default function InspectionHubPage() {
         inspectionPriceCents: inspection.price ?? 0,
       })
     : undefined;
+  // What a request would ask for: the billed total minus money already received (the
+  // server's ledger figure). Undefined whenever either side is redacted.
+  const requestableCents =
+    invoiceAmountCents !== undefined && typeof hub.receivedCents === "number"
+      ? Math.max(0, invoiceAmountCents - hub.receivedCents)
+      : undefined;
   const invoicePaid = hub.invoice?.status === "paid";
   // "sent" and "partial" both mean the request has gone out — show resend + link.
   const invoiceSent = hub.invoice?.status === "sent" || hub.invoice?.status === "partial";
@@ -1226,6 +1236,9 @@ export default function InspectionHubPage() {
           canManagePrice={isAdmin && canSeeMoney}
           canEditGate={canEditOrder && (access.canTurnGateOff || !inspection.paymentRequired)}
           canRequestPayment={access.canAct}
+          heldDeposit={hub.heldDeposit}
+          requestableCents={requestableCents}
+          formatDate={(iso) => formatInspectionDateTime(iso, undefined, displayTz, fmt)}
           onRequestPayment={() => paymentModal.setOpen(true)}
         />
 
@@ -1324,7 +1337,7 @@ export default function InspectionHubPage() {
       <RequestPaymentModal
         open={paymentModal.open}
         recipientEmail={peopleCard.client?.email ?? ""}
-        amountLabel={formatCents(invoiceAmountCents)}
+        amountLabel={formatCents(requestableCents ?? invoiceAmountCents, { currency: hub.invoice?.currency })}
         resend={invoiceSent}
         fetcher={paymentModal.fetcher}
         submitting={paymentModal.busy}

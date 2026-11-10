@@ -31,15 +31,10 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, portalToken, just
   const total = invoice.total;
   const isPaid = invoice.status === "paid";
   const isVoid = invoice.status === "void";
-  // The full total, deliberately, even when the payment ledger says part of it
-  // has already arrived. The Stripe intent is minted server-side from the
-  // invoice's own `amountCents`, so showing a reduced balance here without
-  // reducing the charge would quote a price the payer is not about to be
-  // charged — worse than quoting the whole thing. Moving the two together is
-  // payment-COLLECTION behaviour (partial-payment minimums, over/underpayment,
-  // what a second intent means for the first), which the ledger enables but
-  // does not decide; it needs its own plan. Same call in checkout's PayCard.
-  const balanceDue = isPaid ? 0 : total;
+  // What is still owed: the server's balance (total minus everything the payment ledger has
+  // received, a booking deposit included). It is the same figure the pay-intent route charges.
+  // A payload without it (an older server) falls back to the whole total.
+  const balanceDue = isPaid ? 0 : (invoice.balanceDue ?? total);
   const payable = !isPaid && !isVoid && balanceDue > 0;
   // IA-89 — Stripe has redirected back but the webhook has not settled the
   // invoice yet. This is a PRESENTATION state only: nothing is written, the
@@ -54,7 +49,7 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, portalToken, just
   // contradicted each other at the most trust-sensitive moment in the journey,
   // and the largest one was the wrong one.
   const settled = isPaid || processing;
-  const amountPaid = settled ? total : 0;
+  const amountPaid = settled ? total : Math.max(0, total - balanceDue);
   // Phase B — every amount on this document renders in the invoice's snapshot
   // currency, not the tenant's live setting. `money()` defaults to USD when absent.
   const cur = { currency: invoice.currency };
@@ -118,7 +113,7 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, portalToken, just
           <Row label={m.portal_invoice_subtotal()} value={money(subtotal, cur)} muted />
           {discountTotal < 0 && <Row label={m.portal_invoice_discount()} value={`−${money(Math.abs(discountTotal), cur)}`} muted tone="ok" />}
           <Row label={m.portal_invoice_total()} value={money(total, cur)} strong />
-          {settled && <Row label={m.portal_invoice_amount_paid()} value={`−${money(amountPaid, cur)}`} muted tone="ok" />}
+          {amountPaid > 0 && <Row label={m.portal_invoice_amount_paid()} value={`−${money(amountPaid, cur)}`} muted tone="ok" />}
           <div className="flex items-baseline justify-between pt-2 mt-1 border-t border-ih-border">
             <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-3">{settled ? m.portal_invoice_balance() : m.portal_invoice_balance_due()}</span>
             {processing ? (

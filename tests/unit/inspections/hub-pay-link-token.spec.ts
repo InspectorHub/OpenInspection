@@ -26,6 +26,12 @@ vi.mock('../../../server/lib/inspection/hub-lifecycle', () => ({
     hubLifecycleFor: async () => ({ moneyCollected: false, statusBeforeCancel: null, mayDelete: true }),
 }));
 
+// The held-deposit read has its own spec (held-deposit-summary.spec.ts); this one stubs the database away.
+vi.mock('../../../server/services/payment-ledger.service', () => ({
+    getHeldDepositSummary: async () => ({ cents: 9000, paidAt: new Date('2026-11-05T15:00:00.000Z') }),
+    getNetReceivedCents: async () => 0,
+}));
+
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INSP_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SLUG = 'acme';

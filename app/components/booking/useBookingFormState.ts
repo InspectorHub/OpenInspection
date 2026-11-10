@@ -109,15 +109,19 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
   // server runs. Shown before the client commits, because a charge discovered
   // after clicking Book is a chargeback and a review. The authoritative figure
   // comes back in the booking response and is what the payment step charges.
+  // Quoted only when a card can actually be taken: a "deposit is collected when
+  // you book" line above a Pay button that then fails is worse than no line. The
+  // booking itself is unaffected; the server records what is owed either way.
+  const paymentsAvailable = profile?.paymentsAvailable === true;
   const depositQuoteCents = useMemo(() => {
-    if (!profile) return 0;
+    if (!profile || !paymentsAvailable) return 0;
     return resolveOrderDeposit({
       tenant: profile.depositPolicy ?? null,
       lines: profile.services
         .filter((s) => selectedServices.has(s.id))
         .map((s) => ({ priceCents: s.price, policy: s.depositPolicy ?? null })),
     });
-  }, [selectedServices, profile]);
+  }, [selectedServices, profile, paymentsAvailable]);
 
   // What the SERVER froze, once the booking exists. Null until then; 0 means it
   // asked for nothing, and the payment step is not rendered at all.
@@ -290,6 +294,7 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     totalPrice,
     depositQuoteCents,
     depositDueCents,
+    paymentsAvailable,
     bookedInspectionId,
     currency: profile?.currency ?? "USD",
     needsTurnstile,

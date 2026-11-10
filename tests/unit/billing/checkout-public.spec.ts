@@ -153,6 +153,8 @@ describe('GET /api/public/checkout/:token (Track I-a Task 7)', () => {
         // and from a zero the reader could mistake for a settled balance.
         expect(d.invoice).toEqual({
             id: INV_ID, amountCents: 45000, amountPaidCents: null,
+            // Nothing received yet: the whole total is still owed.
+            balanceDueCents: 45000,
             currency: 'USD', status: expect.any(String),
         });
         expect(d.payment).toEqual({ required: true, paid: false });
