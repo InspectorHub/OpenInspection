@@ -73,7 +73,7 @@ export type StepUpAction = (typeof STEP_UP_ACTIONS)[number];
 export const STEP_UP_TTL_SECONDS = 300;
 export const STEP_UP_COOKIE_NAME = '__Host-step_up';
 export const STEP_UP_KV_PREFIX = 'stepup:';
-export const STEP_UP_LATEST_KV_PREFIX = 'stepup-latest:';
+const STEP_UP_LATEST_KV_PREFIX = 'stepup-latest:';
 
 interface StepUpRecord {
     userId: string;
@@ -118,7 +118,7 @@ export async function issueStepUpToken(kv: KVNamespace, binding: StepUpBinding):
  * before it is judged: a token presented for the wrong action or by the wrong
  * user is burned, not merely refused.
  */
-export async function consumeStepUpToken(kv: KVNamespace, token: string | undefined, expected: StepUpBinding): Promise<void> {
+async function consumeStepUpToken(kv: KVNamespace, token: string | undefined, expected: StepUpBinding): Promise<void> {
     const refuse = () => Errors.Forbidden('Re-enter your password to continue.', { stepUpRequired: true, action: expected.action });
     if (!token) throw refuse();
     const tokenHash = await hashToken(token);
@@ -149,7 +149,7 @@ export async function consumeStepUpToken(kv: KVNamespace, token: string | undefi
 }
 
 /** Cookie attributes for the step-up token: the session cookie's four, with the elevation's own lifetime. */
-export function stepUpCookieOptions() {
+function stepUpCookieOptions() {
     return {
         httpOnly: true,
         secure: true,

@@ -33,10 +33,10 @@ import { timingSafeEqual } from '../password';
 import type { StepUpBinding } from './step-up';
 
 export const EMAIL_CODE_TTL_SECONDS = 600;
-export const EMAIL_CODE_MAX_ATTEMPTS = 5;
-export const EMAIL_CODE_SENDS_PER_WINDOW = 3;
-export const EMAIL_CODE_KV_PREFIX = 'stepup-code:';
-export const EMAIL_CODE_SENT_KV_PREFIX = 'stepup-code-sent:';
+const EMAIL_CODE_MAX_ATTEMPTS = 5;
+const EMAIL_CODE_SENDS_PER_WINDOW = 3;
+const EMAIL_CODE_KV_PREFIX = 'stepup-code:';
+const EMAIL_CODE_SENT_KV_PREFIX = 'stepup-code-sent:';
 
 interface CodeRecord { hash: string; attempts: number; expiresAt: number }
 interface SentRecord { count: number; windowEnds: number }
@@ -48,7 +48,7 @@ function codeKey(b: Pick<StepUpBinding, 'userId' | 'action'>): string {
 }
 
 /** Six digits from the platform CSPRNG, without modulo bias. */
-export function generateEmailCode(): string {
+function generateEmailCode(): string {
     const limit = 4_294_000_000; // the largest multiple of 1,000,000 that fits in 32 bits
     const buf = new Uint32Array(1);
     do { crypto.getRandomValues(buf); } while (buf[0]! >= limit);
