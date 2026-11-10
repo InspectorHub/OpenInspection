@@ -49,7 +49,7 @@ export const repairRequestItems = sqliteTable('repair_request_items', {
   id: text('id').primaryKey(),
   tenantId: text('tenant_id').notNull(),
   repairRequestId: text('repair_request_id').notNull(),
-  // `unitId:sectionId:itemId` (`lib/finding-key.ts`; `_default` when the template
+  // `unitId:sectionId:itemId` (`packages/field-ui/src/shared/finding-key.ts`; `_default` when the template
   // has no units) — one item's entry in `inspection_results.data`, the same key
   // shape `cost_items.finding_key` points at. Also `addItem`'s idempotency key:
   // (repair_request_id, finding_key) is matched before insert, so re-toggling a
