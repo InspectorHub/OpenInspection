@@ -230,15 +230,19 @@ describe('POST /api/platform/collab-migrate', () => {
 });
 
 /** A namespace whose id parsing and purge can each be made to fail, to follow the route through its fallbacks. */
-interface PurgeNs { calls: string[]; idFromString(hex: string): string; get(id: string): { fetch(url: string, init?: RequestInit): Promise<Response> } }
-function purgeNs(label: string, opts: { parse?: 'throws'; fetch?: 'throws' | 'fails' } = {}): PurgeNs {
+interface PurgeNs { calls: string[]; tenants: Array<string | null>; idFromString(hex: string): string; get(id: string): { fetch(url: string, init?: RequestInit): Promise<Response> } }
+function purgeNs(label: string, opts: { parse?: 'throws'; fetch?: 'throws' | 'fails' | 'refuses' } = {}): PurgeNs {
     const calls: string[] = [];
+    const tenants: Array<string | null> = [];
     return {
         calls,
+        tenants,
         idFromString: (hex) => { if (opts.parse === 'throws') throw new Error('id is not from this namespace'); return `${label}:${hex}`; },
         get: (id) => ({
             fetch: async (url, init) => {
                 calls.push(`${init?.method ?? 'GET'} ${new URL(url).pathname} ${id}`);
+                tenants.push(new Headers(init?.headers).get('x-expected-tenant'));
+                if (opts.fetch === 'refuses') return Response.json({ error: 'wrong-tenant' }, { status: 403 });
                 if (opts.fetch === 'throws') throw new Error('unreachable');
                 return opts.fetch === 'fails' ? new Response('boom', { status: 500 }) : Response.json({ purged: true });
             },
@@ -275,6 +279,21 @@ describe('POST /api/platform/tenants/:slug/inspection-doc/purge', () => {
         expect(res.status).toBe(200);
         expect(await res.json()).toMatchObject({ data: { purged: true, durableObjectId: HEX, namespace: 'pinned' } });
         expect(pinned.calls).toEqual([`POST /purge p:${HEX}`]);
+        expect(legacy.calls).toEqual([]);
+    });
+
+    it('sends the tenant it resolved from the slug with the purge, so the object can check ownership', async () => {
+        const pinned = purgeNs('p');
+        await call(pinned, undefined);
+        expect(pinned.tenants).toEqual([TENANT]);
+    });
+
+    it('answers 403 and stops when the object says it belongs to another tenant: the other namespace is never tried', async () => {
+        const pinned = purgeNs('p', { fetch: 'refuses' });
+        const legacy = purgeNs('l');
+        const res = await call(pinned, legacy);
+        expect(res.status).toBe(403);
+        expect(await res.json()).toMatchObject({ success: false });
         expect(legacy.calls).toEqual([]);
     });
 

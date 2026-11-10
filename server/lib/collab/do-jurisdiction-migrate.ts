@@ -44,8 +44,9 @@
  * `x-portal-m2m` header (the HMAC checked by `requireServiceBinding`).
  * Known limits: old unpinned objects keep their content after the copy until their inspection is deleted (nothing else cleans
  * them); deleting an inspection clears both namespaces for its report ids, best effort; changing `DO_JURISDICTION` later orphans
- * every pinned object; an orphan whose report row is gone is removable only by id through the platform purge route, which checks
- * that the tenant slug exists but not that the object belongs to that tenant.
+ * every pinned object; an orphan whose report row is gone is removable only by id through the platform purge route, which makes the
+ * object check that it belongs to the tenant in the path (it refuses another tenant's object, or one with a document and no
+ * stored identity).
  *
  * Operator procedure (once per deployment that turns `DO_JURISDICTION` on):
  *   1. Deploy with `DO_JURISDICTION` set. New documents are created in the pinned namespace from then on; the old namespace
