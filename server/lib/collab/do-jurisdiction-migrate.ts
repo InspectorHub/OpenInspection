@@ -24,11 +24,35 @@
  * `database-row-unreadable` (one such row never stops the batch or the cursor). A dry run does not load the database, so these
  * conflicts appear only in a real run.
  *
+ * SWITCH ORDER (read before turning `DO_JURISDICTION` on). A pinned object is EMPTY until migrated, and on the first request for a
+ * report it rebuilds its document from the database with a NEW generation id. An unmigrated document that is opened therefore
+ * starts a new lineage, older local copies can be merged into it, and content that the direct write paths (photos, signatures)
+ * removed from the database can reappear.
+ * The engine has NO switch that stops editing (no maintenance mode; the suspended-tenant check does not cover a WebSocket upgrade).
+ * Keeping editors out is the operator's job, for example by taking the app offline at the edge for the window. A deploy usually
+ * restarts the Durable Objects and drops open editor sockets, and editors reconnect on their own (usually; untested here, so try it
+ * on staging first): a reconnect to a not-yet-migrated report creates exactly the object this order must avoid. So block traffic
+ * to the Worker; do not rely on telling people to stay out.
+ * Order: (1) the build must contain the lineage guard, live before any `replaceDerived`; (2) block traffic to the Worker;
+ * (3) deploy with `DO_JURISDICTION` set; (4) dry run to the end and compare the sum of `total` over all pages with the number of
+ * `inspection_results` rows that have `ydoc_state`; (5) `dryRun: false` until every document is migrated: per call, copied +
+ * alreadyThere + empty + replaced + entries in `conflicts` + entries in `skipped` + entries in `failed` equals that call's `total`
+ * (those three are lists; re-run a page with `failed`); (6) reopen. `replaceDerived` is only for rows reported `target-has-state` on
+ * a target that still carries the `derived-from-d1` marker; `restoreBackupFor` undoes one such completed replacement.
+ * The route answers 404 unless the deployment is the SaaS profile (`hasPortalIntegrationApi`); a standalone deployment runs
+ * `listCollabDocRefs`, `loadResultsBlobs` and `migrateCollabDocs` from its own maintenance script. Authorization is the signed
+ * `x-portal-m2m` header (the HMAC checked by `requireServiceBinding`).
+ * Known limits: old unpinned objects keep their content after the copy until their inspection is deleted (nothing else cleans
+ * them); deleting an inspection clears both namespaces for its report ids, best effort; changing `DO_JURISDICTION` later orphans
+ * every pinned object; an orphan whose report row is gone is removable only by id through the platform purge route, which checks
+ * that the tenant slug exists but not that the object belongs to that tenant.
+ *
  * Operator procedure (once per deployment that turns `DO_JURISDICTION` on):
  *   1. Deploy with `DO_JURISDICTION` set. New documents are created in the pinned namespace from then on; the old namespace
- *      stays bound as `INSPECTION_DOC_UNPINNED` and is read by this copy and by deletion.
+ *      stays bound as `INSPECTION_DOC_UNPINNED` and is read by this copy and by deletion. Traffic must already be blocked (see SWITCH ORDER);
+ *      keep it blocked until step 3 has finished.
  *   2. Page through once with `dryRun: true` (the default) and read the totals and `skipped`.
- *   3. Page through with `dryRun: false`. Then read every list in the combined result:
+ *   3. Page through with `dryRun: false` until every document is migrated, then reopen editing. Read every list in the combined result:
  *      - `copied` and `alreadyThere` (the target already holds exactly the same document) need nothing more.
  *      - `empty`: the old object holds no document, so there was nothing to copy.
  *      - `conflicts`: the row was left alone. Each entry carries both object ids, both sizes and a `reason`:
@@ -65,7 +89,7 @@
  *
  * Timing: an old object whose save alarm was armed before the deploy still runs it, and a save writes the old document's
  * projection to the database. That is harmless to the check (database and old document then agree), but an alarm that fires
- * between the check's database read and the import would leave the copy one save behind; wait a minute after deploying before
+ * between the check's database read and the import would leave the copy one save behind; wait a minute after deploying (the save alarm fires about one second after the last edit; a minute leaves room for retries) before
  * the real pass, and read `conflicts` after it.
  *
  * Not covered: `doc-lock-notify.ts` and `finding-key-migration.ts` address only the pinned `INSPECTION_DOC`, so a flush or a
