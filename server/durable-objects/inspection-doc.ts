@@ -49,7 +49,7 @@ import { followupResponse } from '../lib/collab/followup-patch';
 import { findingKeysFromTemplateSnapshot } from '@core/field-ui/shared/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
-import { PURGE_TENANT_HEADER, purgeAllowed, purgePathMatches } from './purge-path';
+import { PURGE_TENANT_HEADER, purgeAllowed, purgePathMatches, purgePrecondition } from './purge-path';
 import { CLOSE_REASON, CLOSE_REPORT_PUBLISHED, isDocLocked, lockDoc, refusedSocketResponse, unlockDoc, upgradeRefused } from './inspection-doc-lock';
 import { writeResultsProjection } from './inspection-doc-d1';
 import { importResponse, newestImportSeq, resolvePendingResponse } from './inspection-doc-import';
@@ -437,16 +437,16 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
         // Destruction. Called by TenantPurgeService for every report the tenant
         // owned, because this object is addressed by `${tenantId}:${reportId}`
-        // and so is reachable by name only if the caller knows the report ids —
-        // which is why the purge collects them BEFORE the cascade deletes them.
+        // and so is reachable by name only if the caller knows the report ids (the purge collects them BEFORE the cascade deletes them).
         //
         // `deleteAll` empties both the Y.Doc updates and the snapshot ring. The
         // in-memory `this.doc` is deliberately left alone: an object with live
         // sockets is an editing session in progress on a workspace being
         // destroyed, and there is nothing correct to show it. It writes nothing
-        // back — every persistence path in this class writes through storage
-        // that has just been emptied, and the object is evicted once idle.
+        // back: every write path goes through storage that has just been emptied.
         if (purgePathMatches(url.pathname) && req.method === 'POST') {
+            const refused = await purgePrecondition(req, () => this.ctx.getWebSockets().length > 0 || this.persistTimer !== null, async () => { const m = await this.ctx.storage.get([STORAGE_KEY, SNAPSHOTS_KEY]); return { ydoc: m.get(STORAGE_KEY), snapshots: m.get(SNAPSHOTS_KEY) }; }); // opt-in: only the verified source purge sets these headers
+            if (refused) return Response.json({ error: refused }, { status: 409 });
             const expectedTenant = req.headers.get(PURGE_TENANT_HEADER);
             if (expectedTenant !== null) {
                 const identity = await this.ctx.storage.get<PersistedIdentity>(IDENTITY_KEY);

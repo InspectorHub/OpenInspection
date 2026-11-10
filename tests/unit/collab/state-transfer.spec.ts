@@ -301,6 +301,13 @@ describe('handleStateTransfer', () => {
         expect(await res?.json()).toMatchObject({ identity: IDENTITY, derivedFromD1: true });
     });
 
+    it('exports whether the object was live when asked, judged before the flush (a purge relies on it)', async () => {
+        const idle = host(fakeStorage({ ydoc: resultsBytes(), identity: IDENTITY }));
+        expect(await (await handleStateTransfer(new Request('https://do.test/state-export'), '/state-export', idle))?.json()).toMatchObject({ live: false });
+        const busy = { ...host(fakeStorage({ ydoc: resultsBytes(), identity: IDENTITY })), live: () => true };
+        expect(await (await handleStateTransfer(new Request('https://do.test/state-export'), '/state-export', busy))?.json()).toMatchObject({ live: true });
+    });
+
     it('restores the backup of a replaced target: the document comes back, the marker is set again, and the backup is spent', async () => {
         const s = fakeStorage({ ydoc: resultsBytes(), identity: IDENTITY, 'derived-from-d1': true });
         const original = s.data.get('ydoc');

@@ -75,6 +75,25 @@ describe('InspectionDocDO purge', () => {
         expect(await storedKeys(stub)).toEqual([]);
     });
 
+    it('refuses an idle-only purge while a save is waiting (the object is live), and purges once it is idle', async () => {
+        await runInDurableObject(stub, (inst) => { Reflect.set(inst, 'persistTimer', setTimeout(() => undefined, 60_000)); });
+        const idleOnly = () => new Request('https://do.local/purge', { method: 'POST', headers: { 'x-purge-if-idle': '1' } });
+        const refused = await stub.fetch(idleOnly());
+        expect(refused.status).toBe(409);
+        expect(await refused.json()).toEqual({ error: 'live' });
+        expectSeededIntact(await storedKeys(stub));
+        await runInDurableObject(stub, (inst) => { clearTimeout(Reflect.get(inst, 'persistTimer')); Reflect.set(inst, 'persistTimer', null); });
+        expect((await stub.fetch(idleOnly())).status).toBe(200);
+        expect(await storedKeys(stub)).toEqual([]);
+    });
+
+    it('an unconditional purge still empties a live object (a workspace purge destroys open sessions on purpose)', async () => {
+        await runInDurableObject(stub, (inst) => { Reflect.set(inst, 'persistTimer', setTimeout(() => undefined, 60_000)); });
+        expect((await stub.fetch(post('/purge'))).status).toBe(200);
+        expect(await storedKeys(stub)).toEqual([]);
+        await runInDurableObject(stub, (inst) => { clearTimeout(Reflect.get(inst, 'persistTimer')); Reflect.set(inst, 'persistTimer', null); });
+    });
+
     it('does not purge on a path that only resembles the verb', async () => {
         const res = await stub.fetch(post('/purged'));
         expect(res.status).toBe(404);
