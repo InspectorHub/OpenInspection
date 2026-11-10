@@ -100,8 +100,14 @@ test.describe('the editor', () => {
         await EDITOR(page, 'editor-three-panes');
 
         await page.getByText('Roof covering').first().click();
-        await expect(page.getByText(/Satisfactory/i).first()).toBeVisible();
-        await page.getByText(/Satisfactory/i).first().click();
+        // The rating is a radiogroup whose options carry an accessible name but
+        // only SHOW the word when their box is wide enough (`hidden
+        // @min-[6.5rem]:inline`, otherwise the "SAT 1" abbreviation), so a text
+        // locator lands on a hidden span. Address the control, not its label.
+        const satisfactory = page.getByRole('radiogroup', { name: 'Rating' }).getByRole('radio', { name: 'Satisfactory' });
+        await expect(satisfactory).toBeVisible();
+        await satisfactory.click();
+        await expect(satisfactory).toBeChecked();
         await EDITOR(page, 'editor-rating-an-item');
     });
 });
