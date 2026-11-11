@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.10.0...field-ui-v0.10.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* **field-ui:** the editor's auto-advance fallback matches the server default ([fc14a58](https://github.com/InspectorHub/OpenInspection/commit/fc14a582a47480d49e40220fff568b90542ff6e1))
+* **field-ui:** the editor's auto-advance fallback matches the server default ([8ae84b5](https://github.com/InspectorHub/OpenInspection/commit/8ae84b54242d4d998734afc770e01edf1ce78af8))
+
 ## [0.10.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.9.0...field-ui-v0.10.0) (2026-11-10)
 
 
