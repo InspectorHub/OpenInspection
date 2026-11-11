@@ -153,7 +153,7 @@ export const Login2faResponseSchema = createApiResponseSchema(z.union([
  * Validation schema for the system initialization (Zero-Setup).
  */
 export const SetupSchema = z.object({
-    companyName: z.string().min(2, 'Company name is required').openapi({
+    companyName: z.string().trim().min(2, 'Company name is required').openapi({
         example: 'Acme Inspections',
         description: 'Inspection company name — shown on reports and booking pages as the tenant brand.',
     }),

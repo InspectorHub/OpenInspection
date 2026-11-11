@@ -201,7 +201,9 @@ describe('flush() — SMS branch (Track L)', () => {
         // Grant consent so delivery proceeds past the consent gate.
         const { logId } = await seedSmsLog({ contactId: 'c1' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
-        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+        // company_name is the tenant's own brand name, not the app name flush() is handed.
+        await db.insert(schema.tenantConfigs).values({ tenantId: TENANT, companyName: 'Acme', updatedAt: new Date() } as never);
+        await svc.flush(stubEmailFor, 'PlatformApp', 'https://acme.example.com', smsRuntime);
         // Status must be 'sent' — resolved template body was rendered and delivered.
         expect((await statusOf(logId))?.status).toBe('sent');
         expect(fakeSendMessage).toHaveBeenCalledTimes(1);
@@ -209,7 +211,8 @@ describe('flush() — SMS branch (Track L)', () => {
         // The resolved template body is 'Hi {{client_name}} — {{company_name}}';
         // after interpolation it must contain the client name and the tenant/company name.
         expect(call.body).toContain('Jane');   // client_name
-        expect(call.body).toContain('Acme');   // company_name (tenant name)
+        expect(call.body).toContain('Acme');   // company_name (tenant brand name)
+        expect(call.body).not.toContain('PlatformApp');
     });
 
     it('SP2: a body referencing review_url is refused as marketing, not sent', async () => {
@@ -383,7 +386,7 @@ describe('flush() — managed-send compliance gate (Task 8)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (svc as any).deliverSms(
             db2, { log: logs[0], automation: automationRow, inspection: inspRow, tenant: tenantRow },
-            smsRuntime, 'Acme', 'acme.example.com', { TWILIO_SHARED_MESSAGING_SERVICE_SID: 'MG_old' },
+            smsRuntime, 'acme.example.com', { TWILIO_SHARED_MESSAGING_SERVICE_SID: 'MG_old' },
         );
         const r = await statusOf(logId);
         expect(r?.status).toBe('skipped');
@@ -617,7 +620,7 @@ describe('managedSendAllowed — SMS quota gate (Task 10)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (svc as any).deliverSms(
             db2, { log: logs[0], automation: automationRow, inspection: inspRow, tenant: tenantRow },
-            smsRuntime, 'Acme', 'acme.example.com',
+            smsRuntime, 'acme.example.com',
             { MANAGED_SMS_MONTHLY_ALLOWANCE: '2' },
         );
         const r = await statusOf(logId);
@@ -653,7 +656,7 @@ describe('managedSendAllowed — SMS quota gate (Task 10)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (svc as any).deliverSms(
             db2, { log: logs[0], automation: automationRow, inspection: inspRow, tenant: tenantRow },
-            smsRuntime, 'Acme', 'acme.example.com',
+            smsRuntime, 'acme.example.com',
             { MANAGED_SMS_MONTHLY_ALLOWANCE: '2' },
         );
         expect((await statusOf(logId))?.status).toBe('sent');

@@ -1,10 +1,12 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { automationLogs, tenantConfigs } from '../../lib/db/schema';
 import { formatDateTime } from '../../lib/format';
 import { readTenantDisplay } from '../../lib/inspection/scheduled-date-display';
 import { logger } from '../../lib/logger';
 import { deliverAction } from '../../lib/automation-core';
 import { buildBaseTemplateVars } from './template-vars';
+import { resolveAutomationCompanyName } from './company-name';
+import { resolveInspectorName, resolveEventInspectorName } from './inspector-vars';
 import { createOiTemplateStore } from './template-store';
 import { automationClassId } from '../../lib/notifications/automation-classes';
 import { oiClock, isStaffRecipient } from './shared';
@@ -37,9 +39,16 @@ export interface TemplatedEmailDeps {
     /** Latest report_versions summary, memoized per inspection by the caller. */
     latestSummary: (inspectionId: string, tenantId: string) => Promise<string>;
     emailSvc: EmailService;
-    appName: string;
     appHost: string;
     appBaseUrl: string;
+}
+
+/** The `{{token}}` names either template source contains. Module level so the tenant-scoping baseline keys stay on `deliverTemplatedEmail`. */
+function tokensNamedIn(body: string, subject: string): Set<string> {
+    const names = new Set<string>();
+    for (const m of `${body}
+${subject}`.matchAll(/\{\{([a-z_]+)\}\}/g)) names.add(m[1] as string);
+    return names;
 }
 
 export async function deliverTemplatedEmail(
@@ -54,7 +63,7 @@ export async function deliverTemplatedEmail(
     deps: TemplatedEmailDeps,
 ): Promise<void> {
     const { log, automation, inspection, tenant } = ctx;
-    const { appName, appHost, appBaseUrl, emailSvc } = deps;
+    const { appHost, appBaseUrl, emailSvc } = deps;
     // SP2 — resolve the referenced email template (replaces the
     // embedded subject_template / body_template, since dropped from the table).
     // Skip fail-closed when the rule has no resolvable email template.
@@ -92,13 +101,17 @@ export async function deliverTemplatedEmail(
     // copy of this read while `scheduled_date` a few lines up went out raw.
     const display = await readTenantDisplay(db, inspection.tenantId);
 
+    // Name lookups (inspector, company) cost D1 reads, so they run only for a template that names the token.
+    const used = tokensNamedIn(bodySource, subjectSource);
     const vars: Record<string, string> = {
-        ...buildBaseTemplateVars(inspection, tenant, appName, appHost, display, {
+        ...buildBaseTemplateVars(inspection, tenant, used.has('company_name') ? await resolveAutomationCompanyName(db, inspection.tenantId) : '', appHost, display, {
             summary: automation?.trigger === 'report.amended'
                 ? await deps.latestSummary(inspection.id, inspection.tenantId)
                 : '',
         }),
-        inspector_name:   '',
+        inspector_name:   used.has('inspector_name')
+            ? await resolveInspectorName(db, inspection.tenantId, inspection.id)
+            : '',
         invoice_url:      `${appBaseUrl}/invoices`,
         payment_url:      `${appBaseUrl}/invoices`,
         // Spec 4D — event-related vars (populated below if log.eventId set)
@@ -117,7 +130,8 @@ export async function deliverTemplatedEmail(
     if (log.eventId && !log.eventId.startsWith('reminder:') && !log.eventId.startsWith('auto:')) {
         try {
             const { eventTypes, inspectionEvents } = await import('../../lib/db/schema');
-            const ev = await db.select().from(inspectionEvents).where(eq(inspectionEvents.id, log.eventId)).get();
+            const ev = await db.select().from(inspectionEvents)
+                .where(and(eq(inspectionEvents.id, log.eventId), eq(inspectionEvents.tenantId, inspection.tenantId))).get();
             if (ev) {
                 const et = await db.select().from(eventTypes).where(eq(eventTypes.id, ev.eventTypeId as string)).get();
                 vars.event_type_name    = (et?.name as string) ?? '';
@@ -128,6 +142,9 @@ export async function deliverTemplatedEmail(
                 vars.event_scheduled_at = ev.scheduledAt
                     ? formatDateTime(ev.scheduledAt as Date, display)
                     : '';
+                if (used.has('event_inspector_name')) {
+                    vars.event_inspector_name = await resolveEventInspectorName(db, inspection.tenantId, ev.inspectorId as string | null);
+                }
             }
         } catch (err) {
             logger.error('Failed to load event vars for automation log', { logId: log.id, eventId: log.eventId }, err instanceof Error ? err : undefined);

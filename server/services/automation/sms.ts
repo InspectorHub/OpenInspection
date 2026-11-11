@@ -45,7 +45,7 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
             ctx: { log: typeof automationLogs.$inferSelect; automation: typeof automations.$inferSelect;
                    inspection: FlushInspection; tenant: typeof tenants.$inferSelect },
             sms: SmsRuntime,
-            appName: string, appHost: string,
+            appHost: string,
             env?: ManagedSendGateEnv,
             quotaGuard?: PlanQuotaGuard,
         ): Promise<void> {
@@ -82,7 +82,6 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
                 // The rule lives here, so the class is resolved here.
                 ...(automationClassId(automation) ? { classId: automationClassId(automation)! } : {}),
                 sms,
-                appName,
                 appHost,
                 // Only a context-free caller (a test seam) omits it, and it then reads as self-hosted; the cron always passes the worker's.
                 env: env ?? {},
