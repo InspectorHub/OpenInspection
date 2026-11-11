@@ -36,7 +36,7 @@
  */
 import { and, asc, gt, isNull, ne, or, eq } from 'drizzle-orm';
 import { tenants } from '../../lib/db/schema';
-import { STARTER_CONTENT_VERSION } from '../../services/starter-content/content-version';
+import { STARTER_CONTENT_VERSION, NO_STARTER_CONTENT } from '../../services/starter-content/content-version';
 import { logger } from '../../lib/logger';
 import { TICK, db, type CronJob } from '../types';
 
@@ -48,6 +48,10 @@ import { TICK, db, type CronJob } from '../types';
  * written as the inequality alone would skip exactly the workspaces that have
  * never been swept, which are the ones this job exists for.
  *
+ * The third arm, `'none'`, is the stamp of a workspace its operator started
+ * without the bundled content: it is never offered any, whatever the release.
+ * Installing the content by hand replaces that stamp.
+ *
  * Exported for one reason: that NULL arm is a claim about SQL semantics, not
  * about this file, and the only way to check a claim about SQL is to ask a
  * database. `tests/unit/tooling/cron-content-sweep.spec.ts` runs this exact
@@ -56,7 +60,12 @@ import { TICK, db, type CronJob } from '../types';
  */
 export const behind = () => or(
     isNull(tenants.contentVersion),
-    ne(tenants.contentVersion, STARTER_CONTENT_VERSION),
+    and(
+        ne(tenants.contentVersion, STARTER_CONTENT_VERSION),
+        // A workspace its operator started empty is never behind: the choice
+        // not to have the bundled content outlives every release number.
+        ne(tenants.contentVersion, NO_STARTER_CONTENT),
+    ),
 );
 
 export const contentSeedSweepJob: CronJob = {

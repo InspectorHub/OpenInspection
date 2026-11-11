@@ -9,6 +9,10 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { and, eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/d1';
+import { tenants } from '../../lib/db/schema';
+import { NO_STARTER_CONTENT, STARTER_CONTENT_VERSION } from '../../services/starter-content/content-version';
 
 /**
  * Install the starter content this release ships that this workspace does not
@@ -84,6 +88,12 @@ app.openapi(installBundledContentRoute, async (c) => {
     // someone actually installs.
     const { seedStarterContent } = await import('../../services/starter-content.service');
     const data = await seedStarterContent(c.env.DB, tenantId);
+
+    // A workspace started without the bundled content carries a stamp that keeps the
+    // post-upgrade sweep away. Asking for the content here withdraws that choice, so the
+    // workspace receives later releases again. Only this workspace, only that stamp.
+    await drizzle(c.env.DB).update(tenants).set({ contentVersion: STARTER_CONTENT_VERSION })
+        .where(and(eq(tenants.id, tenantId), eq(tenants.contentVersion, NO_STARTER_CONTENT))).run();
 
     auditFromContext(c, 'data.import', 'starter_content', { metadata: { ...data } });
 

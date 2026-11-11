@@ -27,7 +27,7 @@
   "templates_delete_body": "Are you sure you want to delete this template? This cannot be undone.",
   "templates_empty_search": "No templates match your search.",
   "templates_empty_title": "Start with a template",
-  "templates_empty_body": "Your workspace ships with starter templates — but if you're migrating, bring your own.",
+  "templates_empty_body": "Create your own, import templates from another platform, or install the starter templates from Settings → Data.",
   "templates_empty_new": "+ New template",
   "templates_col_name": "Name",
   "templates_col_version": "Version",

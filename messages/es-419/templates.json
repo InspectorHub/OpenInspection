@@ -27,7 +27,7 @@
   "templates_delete_body": "¿Seguro que desea eliminar esta plantilla? Esta acción no se puede deshacer.",
   "templates_empty_search": "Ninguna plantilla coincide con su búsqueda.",
   "templates_empty_title": "Comience con una plantilla",
-  "templates_empty_body": "Su espacio de trabajo incluye plantillas iniciales — pero si está migrando, traiga las suyas.",
+  "templates_empty_body": "Cree las suyas, importe plantillas de otra plataforma o instale las plantillas iniciales desde Configuración → Datos.",
   "templates_empty_new": "+ Nueva plantilla",
   "templates_col_name": "Nombre",
   "templates_col_version": "Versión",

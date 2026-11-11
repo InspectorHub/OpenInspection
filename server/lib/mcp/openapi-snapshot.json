@@ -10856,6 +10856,11 @@
             "minLength": 6,
             "example": "change-me-6-chars-min",
             "description": "First-run setup code — must exactly equal the SETUP_CODE Worker secret. Any value >= 6 characters (no digit/charset constraint). Required: /setup fails closed when SETUP_CODE is unset."
+          },
+          "startEmpty": {
+            "type": "boolean",
+            "example": false,
+            "description": "Create the workspace with the owner account and no starter templates, canned comments, default agreement or services. Reference data (tags, rating systems, defect categories) still appears on first use; roles, default automations and the SMS disclosure are kept. Default false. The content can be installed later from Settings > Data."
           }
         },
         "required": [

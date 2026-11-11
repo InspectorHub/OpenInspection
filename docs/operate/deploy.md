@@ -111,6 +111,18 @@ First-run `/setup` is gated **solely** on the `SETUP_CODE` secret — the server
 
 Then visit `https://<your-worker>.workers.dev/setup` and enter that value to bootstrap your first admin account.
 
+By default a new workspace is given the starter content: sample inspection
+templates, canned comments, an agreement template and services. Tick **Start
+without the starter content** on the setup form (or send `"startEmpty": true` to
+`POST /api/auth/setup`) to create only the owner account instead, for example
+when you are about to load your own data. Role profiles and the default email
+automations are still created, because the People section and lifecycle emails
+need them. A workspace started this way is left alone by the post-upgrade
+content sweep; you can still add the starter content later from **Settings →
+Data → Install what's new**, after which later releases' content is delivered
+automatically again. Tags, rating systems and defect categories still appear
+the first time they are used.
+
 ### Publish the agent terms
 
 The agent portal is **off until the deployment publishes a document written for
