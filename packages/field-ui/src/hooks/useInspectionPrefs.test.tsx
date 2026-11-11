@@ -154,7 +154,7 @@ describe('useInspectionPrefs: IA-129, a failed save must not stand', () => {
 
     m.patches[0].resolve({ ok: false, error: 'nope' });
     await flush();
-    expect(h.latest().prefs.autoAdvance).toBe('always');
+    expect(h.latest().prefs.autoAdvance).toBe(DEFAULT_INSPECTION_PREFS.autoAdvance);
     expect(h.latest().saveFailed).toBe(true);
   });
 
@@ -170,7 +170,7 @@ describe('useInspectionPrefs: IA-129, a failed save must not stand', () => {
       h.latest().patch({ autoAdvance: 'off' });
     });
     await flush();
-    expect(h.latest().prefs.autoAdvance).toBe('always');
+    expect(h.latest().prefs.autoAdvance).toBe(DEFAULT_INSPECTION_PREFS.autoAdvance);
     expect(h.latest().saveFailed).toBe(true);
   });
 
