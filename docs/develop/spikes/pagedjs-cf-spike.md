@@ -1,10 +1,10 @@
 # Spike: Paged.js × Cloudflare Browser Run — TOC page numbers (Commercial PCA Phase O, Task 1)
 
 
-> ⚠️ The scratch artifact this spike names (`tests/e2e/report-toc-pagednumbers.spec.ts`) was **deleted after the
+> ⚠️ The scratch artifact this spike names (a throwaway Playwright spec under `tests/e2e/`) was **deleted after the
 > experiment** — a spike's code is disposable, its verdict is not. It is cited
 > here so the measurement can be traced in git history, not because the file is
-> still on disk. `git log --diff-filter=D -- tests/e2e/report-toc-pagednumbers.spec.ts` finds the removal.
+> still on disk. `git log --diff-filter=D --name-only -- tests/e2e` finds the removal.
 
 **Verdict: FALLBACK** — page-numbered TOC deferred. Ship the numberless clickable TOC + heading-derived PDF bookmarks (Phase O Tasks 2–6). Do not implement Tasks 7–9 until a follow-up resolves this GO.
 
@@ -76,7 +76,7 @@ CF integration (the actual deferred risk) is still unverified.
   handler-based approach is ever preferred.)
 - **`RENDER_VERSION` bumped `r5` → `r6`** in `server/lib/pdf.ts` (comment notes
   the gated Paged.js path; `generatePdfFromUrl` does NOT yet send the param).
-- **Client proof**: `tests/e2e/report-toc-pagednumbers.spec.ts` (Playwright,
+- **Client proof**: a throwaway spec, since deleted (Playwright,
   self-contained: `page.setContent` of a Letter-height fixture + Paged.js from
   `node_modules` via `addScriptTag`, no dev worker / D1 / CF). It waits on
   `data-paged-done`, asserts each `.toc-pageref::after` was rewritten into a

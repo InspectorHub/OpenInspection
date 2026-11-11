@@ -173,6 +173,21 @@ export async function ensureDocsAvailability(page: Page): Promise<void> {
     if (!res.ok()) {
         throw new Error(`docs fixture: availability PUT -> ${res.status()} ${await res.text()}`);
     }
+
+    // The OTHER half of `bookingOpen`: a declared company timezone. Hours are a
+    // wall clock, and a workspace still on the 'UTC' sentinel is "closed" even
+    // with hours (`bookingOpen = hourIds.length > 0 && hasDeclaredTenantTimeZone`
+    // in server/api/bookings/profile.ts), so the page rendered "Online booking
+    // isn't open yet" and the booking walk never found its first step. The seed
+    // leaves the zone undeclared on purpose; a real operator sets one in
+    // Settings > Company, which is what this does, through the same endpoint.
+    const tz = await page.request.post('/api/admin/branding', {
+        headers: await authedWriteHeaders(page),
+        data: { defaultTimezone: 'America/New_York' },
+    });
+    if (!tz.ok()) {
+        throw new Error(`docs fixture: timezone POST -> ${tz.status()} ${await tz.text()}`);
+    }
 }
 
 /**

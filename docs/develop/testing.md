@@ -41,8 +41,8 @@ Collection is enforced in **both** directions, by two gates rather than one:
 ### Choosing a home for a new spec
 
 1. **Frontend component / loader / hook test?** → **co-locate** it beside the
-   thing it tests as `Foo.test.tsx` (or `__tests__/Foo.test.tsx`) under `app/`.
-   Never put a web test in `tests/`. The retired `tests/web/` tree does not come
+   thing it tests as `Foo.test.tsx` (or in a `__tests__` directory beside it) under `app/`.
+   Never put a web test in `tests/`. The retired web test tree under `tests/` does not come
    back.
 2. **Server-side, no browser.** Does it depend on real Cloudflare runtime
    semantics — Queue delivery, Durable Objects, `workerd`-only APIs?
@@ -69,8 +69,8 @@ any) runs it — so read its output rather than a list copied into this page.
   `tests/unit/*.spec.ts` are rejected — a unit spec must live in a **domain
   directory** named after the `server/api/` module or service family it
   exercises (`tests/unit/auth/`, `tests/unit/inspections/`, …).
-- **These directories must not exist:** `tests/web/unit`, `tests/web/e2e`,
-  `tests/integration`. Frontend co-locates under `app/`; E2E is the single
+- **These directories must not exist:** a web unit tree, a web E2E tree and
+  an integration tree under `tests/`. Frontend co-locates under `app/`; E2E is the single
   `tests/e2e/`.
 - **`tests/workers/` stays flat** until a family reaches ~5 specs, then gets a
   domain dir (`tests/workers/mcp/` is the precedent).
@@ -211,7 +211,7 @@ tests/
   three entries, not a bigger manifest. The exempt files are skipped by the module-state rules as a whole, so
   `EXEMPT_STATE_PINS` records how many top-level state statements each has: a new cache in one fails
   `lint:unit-isolation` until someone reads it and updates the number. A spec that imports the worker entry
-  (`workers/app`) or installs a fake API app loader is never shared. Both isolation gates also print, without
+  (`workers/app.ts`) or installs a fake API app loader is never shared. Both isolation gates also print, without
   failing, any spec the rules accept but the manifest does not list, so a manifest that fell behind is visible.
 - **The generated message catalogue is loaded by Node, not transformed per file.** `vitest.api.config.ts`
   lists `app/paraglide/` and `packages/field-ui/src/i18n/generated/` under `test.server.deps.external`

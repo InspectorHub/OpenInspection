@@ -1,10 +1,10 @@
 # Commercial PCA Phase W — Task 1 spike decision (`docx`-on-Workers GO/FALLBACK gate)
 
 
-> ⚠️ The scratch artifact this spike names (`server/lib/_spike-docx-import.ts`) was **deleted after the
-> experiment** — a spike's code is disposable, its verdict is not. It is cited
-> here so the measurement can be traced in git history, not because the file is
-> still on disk. `git log --diff-filter=D -- server/lib/_spike-docx-import.ts` finds the removal.
+> ⚠️ The scratch artifact this spike names (a throwaway module under `server/lib/`) was **deleted after the
+> experiment** and was never committed — a spike's code is disposable, its verdict
+> is not. It is described here so the measurement can be repeated, not because the
+> file is on disk.
 
 Plan: `2026-06-26-commercial-pca-phase-w-plan.md`, Task 1 (not tracked in this
 repository, so not a resolvable link from here).
@@ -78,7 +78,7 @@ Headroom at baseline: `3072 − 2658 = 414 KiB` (13.5%).
 
 **Measured impact of actually including `docx` in the module graph:**
 Rather than estimate from the raw npm package size, forced a real measurement:
-temporarily added a throwaway file (`server/lib/_spike-docx-import.ts` —
+temporarily added a throwaway file (a throwaway module under `server/lib/` —
 never committed, not present in the tree) importing the classes Task 2+ will
 actually use
 (`Document, Packer, Paragraph, HeadingLevel, TableOfContents, Table, TableRow,
@@ -134,7 +134,7 @@ before Phase W is considered production-ready.
 - `tests/workers/word-export-spike.spec.ts` — kept as a permanent regression guard
   (real-workerd proof that `docx` + R2 keep working as the dependency updates).
 - `docs/develop/spikes/word-export-spike.md` — this file (moved from
-  `scripts/spike/` — see `docs/README.md` for why spike write-ups live under
+  the scripts directory — see `docs/README.md` for why spike write-ups live under
   `docs/develop/spikes/` rather than beside the scripts that produced them).
 - No production code was added. `server/index.ts` and all other application
   files are unchanged from before this spike (the Gate B throwaway import was
