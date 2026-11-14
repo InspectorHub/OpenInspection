@@ -40,6 +40,7 @@ beforeEach(async () => {
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
     await seedRoleProfiles(asD1Db(db), T, new Date(1));
+    await db.insert(schema.tenantConfigs).values({ tenantId: T, companyName: 'Acme Brand', updatedAt: new Date() } as never);
 });
 
 describe('SP2 delivery characterization — Report Ready output unchanged after decoupling', () => {
@@ -92,7 +93,7 @@ describe('SP2 delivery characterization — Report Ready output unchanged after 
             },
         } as unknown as EmailService);
 
-        await svc.flush(emailFor, 'Acme Inspections', 'https://app.example.com');
+        await svc.flush(emailFor, 'PlatformApp', 'https://app.example.com');
 
         // Build the expected var map — must match buildBaseTemplateVars exactly.
         // delivery.ts derives appHost via new URL(appBaseUrl).host = 'app.example.com'.
@@ -105,7 +106,9 @@ describe('SP2 delivery characterization — Report Ready output unchanged after 
             // fallback pair — 'en-US' and the UTC sentinel.
             scheduled_date:       'Jun 1, 2026',
             report_url:           reportUrl(appHost, 'acme', inspId),
-            company_name:         'Acme Inspections',
+            // The tenant's own brand name (tenant_configs.company_name, seeded above),
+            // not the app name flush() is handed.
+            company_name:         'Acme Brand',
             // Extra vars delivery adds for the email path — harmless for Report Ready
             // since the template doesn't reference them, but they must be present so
             // interpolate() produces the same result for any future template that does.

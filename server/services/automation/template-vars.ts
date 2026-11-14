@@ -14,7 +14,7 @@ import type { FlushInspection } from './shared';
  *   property_address = inspection.propertyAddress
  *   scheduled_date   = inspection.date
  *   report_url       = reportUrl(appHost, tenant.slug, inspection.id)
- *   company_name     = appName
+ *   company_name     = the tenant's brand name (resolveAutomationCompanyName)
  *
  * This collapses that duplication ONCE. Both callers spread the result and then
  * add their channel-specific extras (email: inspector_name / invoice_url /
@@ -31,7 +31,8 @@ import type { FlushInspection } from './shared';
 export function buildBaseTemplateVars(
     inspection: FlushInspection,
     tenant: typeof tenants.$inferSelect,
-    appName: string,
+    /** The sending company's brand name (`resolveAutomationCompanyName`), never the deployment's app name. */
+    companyName: string,
     appHost: string,
     /** Workspace locale + timezone; see `server/lib/tenant-display.ts`. */
     display: ScheduledDateDisplay,
@@ -46,7 +47,7 @@ export function buildBaseTemplateVars(
         property_address: inspection.propertyAddress,
         scheduled_date:   formatScheduledDate(inspection.date, display),
         report_url:       reportUrl(appHost, tenant.slug, inspection.id),
-        company_name:     appName,
+        company_name:     companyName,
         summary:          extra?.summary ?? '',
     };
 }

@@ -4,10 +4,14 @@ import type { InspectionPrefs } from '../data-source-types';
 
 export type { InspectionPrefs };
 
-/** What the editor behaves like until the tenant's own preferences arrive (or when the host has no preference store). */
+/**
+ * What the editor behaves like until the tenant's own preferences arrive (or when the host has no preference store).
+ * Each value equals the server default, so a failed or offline load behaves like a tenant that never changed a setting
+ * (for example `autoAdvance` is `keyboard`: tapping a rating does not advance, the number keys do).
+ */
 export const DEFAULT_INSPECTION_PREFS: InspectionPrefs = {
     cloneDefault:       'rating_notes',
-    autoAdvance:        'always',
+    autoAdvance:        'keyboard',
     autoAdvanceDelayMs: 200,
     pinnedTagIds:       [],
     requireDefectFields: 'none',

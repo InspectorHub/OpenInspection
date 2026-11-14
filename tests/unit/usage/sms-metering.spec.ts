@@ -151,7 +151,7 @@ describe('SMS metering in deliverSms', () => {
         const db = makeDbStub();
         const ctx = makeCtx();
 
-        await (svc as any).deliverSms(db, ctx, smsMock, 'Acme', 'acme.example.com');
+        await (svc as any).deliverSms(db, ctx, smsMock, 'acme.example.com');
 
         expect(record).toHaveBeenCalledTimes(1);
         expect(record).toHaveBeenCalledWith(TENANT_ID, 'sms', expect.stringMatching(/^\d{4}-\d{2}$/));
@@ -163,7 +163,7 @@ describe('SMS metering in deliverSms', () => {
         const db = makeDbStub();
         const ctx = makeCtx();
 
-        await (svc as any).deliverSms(db, ctx, smsMock, 'Acme', 'acme.example.com');
+        await (svc as any).deliverSms(db, ctx, smsMock, 'acme.example.com');
 
         expect(record).not.toHaveBeenCalled();
     });

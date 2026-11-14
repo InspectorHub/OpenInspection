@@ -385,7 +385,7 @@ unavailable) and fail closed — collaborative editing simply does not engage.
 ## What was retired (#181)
 
 Per-field CAS write endpoints (`PATCH /:id/items/:itemId`, `POST /:id/results/merge`),
-`server/lib/field-version.ts`, the diff3 + conflict services, the bespoke offline
+the field-version helper, the diff3 + conflict services, the bespoke offline
 queue (`app/lib/offline/*`, `useOfflineQueue`/`useOfflineWrite`), the conflict UI
 (`ConflictModal`/`LiveConflictModal`/`conflict-resolver`), and the
 `inspection_conflicts` table. Yjs supersedes all of them.

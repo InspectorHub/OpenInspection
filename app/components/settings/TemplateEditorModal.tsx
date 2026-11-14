@@ -280,8 +280,8 @@ export function TemplateEditorModal({
             rows={isEmail ? 8 : 5}
             placeholder={
               isEmail
-                ? "Hi {{inspector_name}}, your report for {{address}} is ready."
-                : "Hi {{name}}, your report is ready: {{link}}"
+                ? "Hi {{client_name}}, your report for {{property_address}} is ready."
+                : "Hi {{client_name}}, your report is ready: {{report_url}}"
             }
             className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 resize-y focus:outline-none focus:border-ih-primary"
           />
@@ -326,9 +326,14 @@ export function TemplateEditorModal({
                   </p>
                 )}
                 {previewData.html && (
-                  <div
-                    className="text-[12px] text-ih-fg-1 prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ __html: previewData.html }}
+                  // ds-allow: email surface — the body is shown on white in both themes because
+                  // real email clients render light. The empty sandbox grants nothing: no scripts,
+                  // no same-origin, no forms, no popups; the body never enters this document.
+                  <iframe
+                    title={m.email_preview_iframe_title()}
+                    srcDoc={previewData.html}
+                    sandbox=""
+                    className="w-full h-[320px] rounded border border-ih-border bg-white"
                   />
                 )}
               </div>

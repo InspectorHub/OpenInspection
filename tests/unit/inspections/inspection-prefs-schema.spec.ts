@@ -1,8 +1,24 @@
 import { describe, it, expect } from 'vitest';
+import { createFakePrefs } from '../../../packages/field-ui/src/testing/fake-data-source';
 import { InspectionPrefsSchema, InspectionPrefsPatchSchema, DEFAULT_INSPECTION_PREFS } from '../../../server/lib/validations/inspection-prefs.schema';
 import { DEFAULT_AGENT_REPAIR_ACCESS, resolveAgentRepairAccess } from '../../../server/lib/people/agent-repair-access';
 import { resolveReportLinkTtl } from '../../../server/lib/report-link-ttl';
 import { DEFAULT_INSPECTION_PREFS as FIELD_UI_DEFAULT_PREFS } from '../../../packages/field-ui/src/hooks/useInspectionPrefs';
+
+describe('client defaults match the server (authority: the schema default)', () => {
+    const base = { cloneDefault: 'rating_notes', autoAdvanceDelayMs: 200, pinnedTagIds: [] };
+    it('the editor hook fallback autoAdvance equals the value the schema applies when the field is missing', () => {
+        const r = InspectionPrefsSchema.safeParse(base);
+        expect(r.success).toBe(true);
+        if (r.success) expect(FIELD_UI_DEFAULT_PREFS.autoAdvance).toBe(r.data.autoAdvance);
+    });
+    it('the server DEFAULT_INSPECTION_PREFS and the editor fallback agree on autoAdvance', () => {
+        expect(FIELD_UI_DEFAULT_PREFS.autoAdvance).toBe(DEFAULT_INSPECTION_PREFS.autoAdvance);
+    });
+    it('the fake prefs store used in editor tests starts from the same autoAdvance', async () => {
+        expect((await createFakePrefs().load()).autoAdvance).toBe(DEFAULT_INSPECTION_PREFS.autoAdvance);
+    });
+});
 
 describe('InspectionPrefsSchema', () => {
     it('accepts a valid prefs object and defaults autoAdvance to keyboard (B-18)', () => {

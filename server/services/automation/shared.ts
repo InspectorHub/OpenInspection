@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import type { Clock } from '../../lib/automation-core';
+import { escapeHtml } from '../email/html-helpers';
 
 /**
  * Shared base + module-level helpers for the AutomationService mixin chain.
@@ -24,6 +25,15 @@ export const SMS_DISCLOSURE_V1 =
 
 export function interpolate(template: string, vars: Record<string, string>): string {
     return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');
+}
+
+/**
+ * `interpolate` for an HTML body: each substituted VALUE is escaped, the
+ * author's own markup is not. Use it for the body of an email only; subjects
+ * and text messages are plain text and go through `interpolate`.
+ */
+export function interpolateHtml(template: string, vars: Record<string, string>): string {
+    return template.replace(/\{\{(\w+)\}\}/g, (_, key) => escapeHtml(vars[key] ?? '').replace(/'/g, '&#39;'));
 }
 
 export interface TriggerContext {
@@ -165,7 +175,7 @@ export interface HasDeliverSms {
         ctx: { log: typeof import('../../lib/db/schema').automationLogs.$inferSelect; automation: typeof automations.$inferSelect;
                inspection: FlushInspection; tenant: typeof import('../../lib/db/schema').tenants.$inferSelect },
         sms: import('./sms').SmsRuntime,
-        appName: string, appHost: string,
+        appHost: string,
         env?: import('../../lib/sms/managed-send-gate').ManagedSendGateEnv,
         quotaGuard?: import('../../features/plan-quota/guard').PlanQuotaGuard,
     ): Promise<void>;
