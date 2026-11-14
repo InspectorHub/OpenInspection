@@ -26,6 +26,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Unused API routes that no client called: `PUT /api/event-types/:id`, `DELETE /api/event-types/:id`, `POST /api/event-types/seed`, `GET /api/events/upcoming`, `GET /api/calendar/connections/:id/calendars`, `GET /api/inspections/{id}/full`, `GET /api/inspections/{id}/sign-status`, the `statusFlags` object on dashboard rows, `POST /api/auth/setup/skip` and `POST /api/auth/onboarding/flag`. Missing default event types are filled in by `POST /api/admin/data/install-bundled-content`; the signed state of an inspection is still returned as `signedByClient` by the inspection read.
 * The unreachable `feature-disabled` page and its translation strings.
 
+## [2.7.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.6.0...openinspection-v2.7.0) (2026-11-14)
+
+
+### Features
+
+* **collab:** add a verified purge of the old Durable Objects after the jurisdiction migration ([a63eb7d](https://github.com/InspectorHub/OpenInspection/commit/a63eb7da2dc3de51ad740b5e61fd4fdd8f022f4c))
+
+
+### Bug Fixes
+
+* **automation:** escape substituted values in HTML email bodies and sandbox the template preview ([b47b8e9](https://github.com/InspectorHub/OpenInspection/commit/b47b8e9e6e776ce6cb133b234a5d761c99ed61b2))
+* **automation:** fill inspector and company names in messages and preview ([f8c3b67](https://github.com/InspectorHub/OpenInspection/commit/f8c3b678980e5a61eaa35ef66416b79c65a54271))
+* **automation:** keep the tenant-scoping baseline keys stable when naming tokens ([8c84eb2](https://github.com/InspectorHub/OpenInspection/commit/8c84eb2de572eb1ff2dddcd8888beb5aa6781a7c))
+* **automation:** render inspector and company names in queued messages and give the template preview sample values ([3a905ba](https://github.com/InspectorHub/OpenInspection/commit/3a905bad65ef43c43f3c6423185f242e24f08e64))
+* **collab:** close the review findings on the post-migration purge ([f4898a1](https://github.com/InspectorHub/OpenInspection/commit/f4898a1e1df131e3b784dd4e0a9a196e0ffd13a7))
+* **deps:** close minimatch and hono advisories ([3b03520](https://github.com/InspectorHub/OpenInspection/commit/3b03520ff403f801b7c2fb69f160d57b4cfc3d33))
+* **deps:** close minimatch and hono Dependabot advisories ([38c4c17](https://github.com/InspectorHub/OpenInspection/commit/38c4c171eab5a5e979adb2da85ac5dc53cec7c78))
+* **field-ui:** the editor's auto-advance fallback matches the server default ([fc14a58](https://github.com/InspectorHub/OpenInspection/commit/fc14a582a47480d49e40220fff568b90542ff6e1))
+* **field-ui:** the editor's auto-advance fallback matches the server default ([8ae84b5](https://github.com/InspectorHub/OpenInspection/commit/8ae84b54242d4d998734afc770e01edf1ce78af8))
+* **templates:** close the review findings on the unwrap migration ([eac6833](https://github.com/InspectorHub/OpenInspection/commit/eac68330bdc42a321560dd0aeb83d11c82f79232))
+* **templates:** store template schemas as JSON objects ([8ac3b88](https://github.com/InspectorHub/OpenInspection/commit/8ac3b88ca2cf6f6c5a4d538d8d92143e964695bb))
+* **templates:** store template schemas as JSON objects and unwrap the ones stored as text ([1f42985](https://github.com/InspectorHub/OpenInspection/commit/1f429854dd6b521ec41a06a58a530cf1c9a736a5))
+
 ## [2.6.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.5.0...openinspection-v2.6.0) (2026-11-10)
 
 
