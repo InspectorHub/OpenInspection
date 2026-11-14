@@ -49,7 +49,7 @@ import { followupResponse } from '../lib/collab/followup-patch';
 import { findingKeysFromTemplateSnapshot } from '@core/field-ui/shared/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
-import { PURGE_TENANT_HEADER, purgeAllowed, purgePathMatches, purgePrecondition } from './purge-path';
+import { PURGE_IF_IDLE_HEADER, PURGE_TENANT_HEADER, purgeAllowed, purgePathMatches, purgePrecondition } from './purge-path';
 import { CLOSE_REASON, CLOSE_REPORT_PUBLISHED, isDocLocked, lockDoc, refusedSocketResponse, unlockDoc, upgradeRefused } from './inspection-doc-lock';
 import { writeResultsProjection } from './inspection-doc-d1';
 import { importResponse, newestImportSeq, resolvePendingResponse } from './inspection-doc-import';
@@ -454,6 +454,16 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                 const holdsData = [...(await this.ctx.storage.list({ limit: 2 })).keys()].some((k) => k !== GEN_KEY);
                 const verdict = purgeAllowed(expectedTenant, identity?.tenantId ?? null, holdsData);
                 if (verdict !== 'ok') return Response.json({ error: verdict }, { status: 403 });
+            }
+            // Liveness re-checked LAST, immediately before the delete — but only for the idle-opt-in purge,
+            // the one the verified source purge sends: an unconditional purge deliberately destroys objects
+            // whose editors are still connected. purgePrecondition probes liveness first, but four awaited
+            // storage reads sit between that probe and the delete below; the workerd input gate should hold
+            // other inputs across those awaits, and this re-check makes "live is the last thing tested before
+            // deleteAll" hold by construction instead of by platform guarantee. The delete is irreversible;
+            // the probe is cheap.
+            if (req.headers.get(PURGE_IF_IDLE_HEADER) === '1' && (this.ctx.getWebSockets().length > 0 || this.persistTimer !== null)) {
+                return Response.json({ error: 'live' }, { status: 409 });
             }
             await this.ctx.storage.deleteAlarm();
             await this.ctx.storage.deleteAll();

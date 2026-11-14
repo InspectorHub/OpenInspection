@@ -17,8 +17,9 @@
  * answers 403 and nothing is deleted (reported as `kept`).
  *
  * Idempotent: an old object that already holds no document is `alreadyPurged`. A dry run reports what a real run would try
- * (`wouldPurge`) without addressing any object. Nothing in the report or its log line carries document content or tenant
- * names; rows are identified by the row id.
+ * (`wouldPurge`) without addressing any object, and a MISSING `dryRun` is a dry run: only an explicit `false` ever addresses an
+ * object, so a maintenance script that calls this function with an empty options object cannot trigger a real purge. Nothing in
+ * the report or its log line carries document content or tenant names; rows are identified by the row id.
  *
  * Operating order: migrate, verify the migration report, THEN purge (dry run first). See docs/operate/durable-object-jurisdiction.md.
  */
@@ -102,7 +103,7 @@ export async function purgeMigratedSources<Id>(
     refs: CollabDocRef[],
     from: DocNamespace<Id>,
     to: DocNamespace<Id>,
-    opts: { dryRun: boolean },
+    opts: { dryRun?: boolean },
 ): Promise<PurgeReport> {
     const report: PurgeReport = { total: refs.length, purged: 0, alreadyPurged: 0, wouldPurge: 0, kept: [], keptByReason: {}, failed: [], rows: [] };
     const keep = (rowId: string, reason: KeptReason) => {
@@ -113,7 +114,7 @@ export async function purgeMigratedSources<Id>(
     const fail = (rowId: string, reason: FailedReason) => { report.failed.push({ rowId, reason }); report.rows.push({ rowId, outcome: 'failed', reason }); };
     for (const { rowId, tenantId, inspectionId, reportId } of refs) {
         if (!reportId) { keep(rowId, 'no-report-id'); continue; }
-        if (opts.dryRun) { report.wouldPurge++; report.rows.push({ rowId, outcome: 'wouldPurge' }); continue; }
+        if (opts.dryRun !== false) { report.wouldPurge++; report.rows.push({ rowId, outcome: 'wouldPurge' }); continue; }
         // Failure texts are fixed codes: an exception message could carry object or tenant detail.
         let stage: FailedReason = 'source-export-failed';
         try {

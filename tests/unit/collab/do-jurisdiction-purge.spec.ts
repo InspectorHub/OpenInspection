@@ -68,6 +68,18 @@ describe('purgeMigratedSources', () => {
         expect(hasDoc(from, N1)).toBe(true);
     });
 
+    it('a missing dryRun is a dry run: an empty options object addresses no object (fail-closed default)', async () => {
+        // A maintenance script that calls the exported function with no options must not
+        // get an irreversible purge out of an undefined flag.
+        const { from, to } = await migrated();
+        const out = await purgeMigratedSources([ref('t1', 'r1')], from, to, {});
+        expect(out).toMatchObject({ total: 1, wouldPurge: 1, purged: 0, kept: [], failed: [] });
+        expect(sums(out)).toBe(out.total);
+        expect(from.calls).toEqual([]);
+        expect(to.calls).toEqual([]);
+        expect(hasDoc(from, N1)).toBe(true);
+    });
+
     it('keeps the old object when the pinned target is live', async () => {
         const { from, to } = await migrated({ liveFor: [N1] });
         const out = await purgeMigratedSources([ref('t1', 'r1')], from, to, { dryRun: false });

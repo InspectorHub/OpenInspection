@@ -292,6 +292,22 @@ describe('POST /api/platform/collab-migrate', () => {
             expect(JSON.stringify(lines[0]?.[1])).not.toMatch(new RegExp(`${TENANT}:|results|ydoc`));
         });
 
+        it('records the acting platform admin by id alone, never the e-mail address', async () => {
+            const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+            await migrateAll();
+            // A signed header WITH an actor: the only shape in which platformActor exists.
+            const res = await buildApp().request('/api/platform/collab-migrate', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json', [M2M_HEADER]: await signM2mHeader(KEY_ENV, { platformAdminId: 'admin-1', email: 'staff@example.com' }) },
+                body: JSON.stringify({ purgeSource: true, dryRun: true }),
+            }, { ...KEY_ENV, DB: {}, INSPECTION_DOC: to, INSPECTION_DOC_UNPINNED: from });
+            expect(res.status).toBe(200);
+            const lines = info.mock.calls.filter(([m]) => m === 'collab purge batch');
+            expect(lines).toHaveLength(1);
+            expect(lines[0]?.[1]).toMatchObject({ actor: 'admin-1' });
+            expect(JSON.stringify(lines[0]?.[1])).not.toContain('staff@example.com');
+        });
+
         it('stays inside the subrequest budget at the largest batch', async () => {
             await migrateAll();
             await run({ dryRun: false, limit: 10 });

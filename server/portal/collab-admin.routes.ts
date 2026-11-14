@@ -91,11 +91,13 @@ api.post('/collab-migrate', requireServiceBinding, async (c) => {
         if (purgeSource) {
             const purge = await purgeMigratedSources(refs, namespaces.legacy, namespaces.pinned, { dryRun });
             const purgeActor = c.get('platformActor');
+            // The actor is the platform admin id alone: the record carries "row ids and reason codes only", and the
+            // e-mail is personal data the batch line has no use for.
             logger.info('collab purge batch', {
                 cursor: cursor ?? null, nextCursor, limit, dryRun,
                 total: purge.total, purged: purge.purged, alreadyPurged: purge.alreadyPurged, wouldPurge: purge.wouldPurge,
                 kept: purge.kept.length, keptByReason: purge.keptByReason, failed: purge.failed.length,
-                rows: purge.rows.map(({ rowId, outcome, reason }) => ({ rowId, outcome, ...(reason ? { reason } : {}) })), ...(purgeActor ? { actor: purgeActor } : {}),
+                rows: purge.rows.map(({ rowId, outcome, reason }) => ({ rowId, outcome, ...(reason ? { reason } : {}) })), ...(purgeActor ? { actor: purgeActor.platformAdminId } : {}),
             });
             return c.json({ success: true, data: { ...purge, nextCursor, dryRun, purgeSource: true } });
         }
