@@ -11,7 +11,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { createTestDb, setupSchema } from '../db';
 import { toD1Binding } from '../helpers/d1-binding';
 import * as schema from '../../../server/lib/db/schema';
-import type { HonoConfig } from '../../../server/types/hono';
+import type { AppEnv, HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
 import statutoryDetailsRoutes from '../../../server/api/inspections/statutory-details';
 import { resolveProducibleStatutoryForm } from '../../../server/services/statutory/producible';
@@ -58,7 +58,9 @@ describe('statutory readers and a wrapped snapshot', () => {
             if (err instanceof AppError) return c.json({ success: false }, err.status as 404);
             return c.json({ success: false, thrown: String(err) }, 500);
         });
-        const res = await app.request(`/api/inspections/${id}/statutory-details`, {}, { DB: d1 } as never);
+        // Only DB is bound for this route; cast through unknown rather than `as never` so the
+        // cast names the type it produces instead of erasing it.
+        const res = await app.request(`/api/inspections/${id}/statutory-details`, {}, { DB: d1 } as unknown as AppEnv);
         return res.status;
     }
 

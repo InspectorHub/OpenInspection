@@ -33,8 +33,10 @@ describe('inspection create: template copy', () => {
             id: T1, slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(fixture.db), T1, new Date(1));
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        svc = new InspectionCoreService(testD1.binding, undefined, new ScopedDB(fixture.db as any, T1));
+        // The fixture's better-sqlite3 drizzle handle has the same shape as the D1 one ScopedDB takes;
+        // cast through unknown rather than `any` to keep the no-`as any` invariant for new test code.
+        svc = new InspectionCoreService(testD1.binding, undefined, new ScopedDB(
+            fixture.db as unknown as ConstructorParameters<typeof ScopedDB>[0], T1));
     });
 
     const addTemplate = (id: string, storedText: string) =>

@@ -235,7 +235,7 @@ export class InspectionResultsService extends InspectionSubService {
      * items, or otherwise tailors the report structure for one job without
      * touching the source template row. Validation happens upstream at the
      * Zod boundary, so by the time we land here `snapshot` is a parsed v2
-     * schema object; we stringify on the way to D1.
+     * schema object; the JSON-mode column serialises it on write.
      */
     async updateTemplateSnapshot(id: string, tenantId: string, snapshot: unknown) {
         const db = this.getDrizzle();

@@ -100,6 +100,11 @@ describe('templates.schema unwrap migration on real D1', () => {
         expect(await schemaOf('inner-array')).toBe(JSON.stringify('[1,2,3]'));
         expect(await schemaOf('not-json')).toBe('plain text, not JSON');
         expect(after.object).toBe((before.object ?? 0) + 2);
+        // The dry-run gate from the migration plan (3.4): the before/after shape counts
+        // printed above are also ASSERTED. Rows are conserved — the migration rewrites
+        // wrapped rows in place, it never adds or drops one.
+        expect((after.object ?? 0) + (after.text ?? 0) + (after.invalid ?? 0))
+            .toBe((before.object ?? 0) + (before.text ?? 0) + (before.invalid ?? 0));
     });
 
     it('is idempotent: a second run changes nothing', async () => {

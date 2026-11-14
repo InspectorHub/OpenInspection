@@ -135,6 +135,51 @@ with your data intact, and the column stays until the situation is resolved.
 
 ---
 
+## This release unwraps double-encoded template schemas
+
+Older writer code stored some template documents in `templates.schema` as a JSON
+string literal wrapping the document instead of the document itself. The new code
+reads both shapes, writes only documents, and the migration
+`0009_templates_schema_unwrap.sql` rewrites the wrapped rows in place.
+
+It touches **one column of one table**. Inspection snapshots
+(`inspections.template_snapshot`), signed report versions, their content hashes
+and signatures are deliberately **not** backfilled: those rows are append-only
+evidence, and every reader already handles both shapes.
+
+The migration is idempotent and guarded — a row it cannot confidently unwrap
+(triple-wrapped, inner value not an object, invalid JSON) is left exactly as it
+was, and the run does not abort on it.
+
+### Verify the count gate, before and after
+
+The migration reports what it did only as row counts. Run this before upgrading
+and again after, and put the two outputs side by side:
+
+```bash
+npx wrangler d1 execute DB --remote --command      "SELECT CASE WHEN json_valid(schema) THEN json_type(schema) ELSE 'invalid' END AS shape,
+              COUNT(*) AS n FROM templates GROUP BY 1"
+```
+
+Read the pair like this:
+
+- **before: a zero `text` count** means your database was never affected — the
+  migration will be a no-op. That is a fine outcome; the gate exists so you know
+  it, not so you hope it.
+- **after: `object` should have grown by the number of confidently-unwrappable
+  rows** — at most the `text` count you saw before, and never by more.
+- **`text` shrinking by less than the before-count** is expected whenever the
+  leftover rows are ones the migration must not touch. Compare them with
+  `SELECT id FROM templates WHERE json_type(schema)='text'` if you want the list.
+- **a `0` total** means the query is wrong or you ran it against the wrong
+  database. An empty answer is a failure of the check, not a pass of it.
+- **`invalid` must not change.** A row that is not valid JSON was never stored by
+  the application and the migration must not touch it; if the count moved,
+  something else wrote to that column and you should restore from the backup
+  you took in [Before upgrading](#before-upgrading).
+
+---
+
 ## Upgrading across a rebuilt baseline
 
 **Do this before `npm run db:migrate:remote` or `npm run deploy`, not after.**
