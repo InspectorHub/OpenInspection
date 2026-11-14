@@ -2,7 +2,7 @@
   "packages/field-ui/src/editor/FieldEditor.tsx": 2186,
   "app/routes/inspector-portal.tsx": 1418,
   "scripts/verify-statutory-render.mjs": 1283,
-  "server/durable-objects/inspection-doc.ts": 1017,
+  "server/durable-objects/inspection-doc.ts": 1027,
   "server/services/inspection/inspection-report.service.ts": 949,
   "app/routes/inspections.tsx": 936,
   "packages/field-ui/src/shared/results-doc.ts": 927,

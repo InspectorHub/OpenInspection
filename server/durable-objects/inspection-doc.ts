@@ -49,7 +49,7 @@ import { followupResponse } from '../lib/collab/followup-patch';
 import { findingKeysFromTemplateSnapshot } from '@core/field-ui/shared/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
-import { PURGE_TENANT_HEADER, purgeAllowed, purgePathMatches } from './purge-path';
+import { PURGE_IF_IDLE_HEADER, PURGE_TENANT_HEADER, purgeAllowed, purgePathMatches, purgePrecondition } from './purge-path';
 import { CLOSE_REASON, CLOSE_REPORT_PUBLISHED, isDocLocked, lockDoc, refusedSocketResponse, unlockDoc, upgradeRefused } from './inspection-doc-lock';
 import { writeResultsProjection } from './inspection-doc-d1';
 import { importResponse, newestImportSeq, resolvePendingResponse } from './inspection-doc-import';
@@ -437,16 +437,16 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
         // Destruction. Called by TenantPurgeService for every report the tenant
         // owned, because this object is addressed by `${tenantId}:${reportId}`
-        // and so is reachable by name only if the caller knows the report ids —
-        // which is why the purge collects them BEFORE the cascade deletes them.
+        // and so is reachable by name only if the caller knows the report ids (the purge collects them BEFORE the cascade deletes them).
         //
         // `deleteAll` empties both the Y.Doc updates and the snapshot ring. The
         // in-memory `this.doc` is deliberately left alone: an object with live
         // sockets is an editing session in progress on a workspace being
         // destroyed, and there is nothing correct to show it. It writes nothing
-        // back — every persistence path in this class writes through storage
-        // that has just been emptied, and the object is evicted once idle.
+        // back: every write path goes through storage that has just been emptied.
         if (purgePathMatches(url.pathname) && req.method === 'POST') {
+            const refused = await purgePrecondition(req, () => this.ctx.getWebSockets().length > 0 || this.persistTimer !== null, async () => { const m = await this.ctx.storage.get([STORAGE_KEY, SNAPSHOTS_KEY]); return { ydoc: m.get(STORAGE_KEY), snapshots: m.get(SNAPSHOTS_KEY) }; }); // opt-in: only the verified source purge sets these headers
+            if (refused) return Response.json({ error: refused }, { status: 409 });
             const expectedTenant = req.headers.get(PURGE_TENANT_HEADER);
             if (expectedTenant !== null) {
                 const identity = await this.ctx.storage.get<PersistedIdentity>(IDENTITY_KEY);
@@ -454,6 +454,16 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                 const holdsData = [...(await this.ctx.storage.list({ limit: 2 })).keys()].some((k) => k !== GEN_KEY);
                 const verdict = purgeAllowed(expectedTenant, identity?.tenantId ?? null, holdsData);
                 if (verdict !== 'ok') return Response.json({ error: verdict }, { status: 403 });
+            }
+            // Liveness re-checked LAST, immediately before the delete — but only for the idle-opt-in purge,
+            // the one the verified source purge sends: an unconditional purge deliberately destroys objects
+            // whose editors are still connected. purgePrecondition probes liveness first, but four awaited
+            // storage reads sit between that probe and the delete below; the workerd input gate should hold
+            // other inputs across those awaits, and this re-check makes "live is the last thing tested before
+            // deleteAll" hold by construction instead of by platform guarantee. The delete is irreversible;
+            // the probe is cheap.
+            if (req.headers.get(PURGE_IF_IDLE_HEADER) === '1' && (this.ctx.getWebSockets().length > 0 || this.persistTimer !== null)) {
+                return Response.json({ error: 'live' }, { status: 409 });
             }
             await this.ctx.storage.deleteAlarm();
             await this.ctx.storage.deleteAll();

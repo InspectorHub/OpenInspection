@@ -16,18 +16,25 @@ import { logger } from '../lib/logger';
 import { requireServiceBinding } from './service-binding-guard';
 import { collabNamespaces } from '../lib/collab/collab-namespaces';
 import { DEFAULT_BATCH, MAX_BATCH, listCollabDocRefs, loadResultsBlobs, migrateCollabDocs, restoreDerivedBackup } from '../lib/collab/do-jurisdiction-migrate';
+import { purgeMigratedSources } from '../lib/collab/do-jurisdiction-purge';
 import { inspectionResults } from '../lib/db/schema';
 import { PURGE_TENANT_HEADER } from '../durable-objects/purge-path';
 
 const api = new Hono<HonoConfig>();
 
-/** `dryRun` is TRUE unless the caller says otherwise, and a replacement can never be asked for in a dry run. */
+/**
+ * `dryRun` is TRUE unless the caller says otherwise, and a replacement can never be asked for in a dry run. `purgeSource` turns
+ * the batch into the verified removal of already-copied old objects (it copies nothing, so it cannot be combined with `replaceDerived`).
+ */
 const BatchSchema = z.object({
     cursor:         z.string().min(1).max(200).optional(),
     limit:          z.number().int().min(1).max(MAX_BATCH).default(DEFAULT_BATCH),
     dryRun:         z.boolean().default(true),
     replaceDerived: z.boolean().default(false),
-}).strict().refine((b) => !(b.replaceDerived && b.dryRun), { message: 'replaceDerived needs dryRun: false' });
+    purgeSource:    z.boolean().default(false),
+}).strict()
+    .refine((b) => !(b.replaceDerived && b.dryRun), { message: 'replaceDerived needs dryRun: false' })
+    .refine((b) => !(b.purgeSource && b.replaceDerived), { message: 'purgeSource cannot be combined with replaceDerived' });
 
 /** Undo one replacement. Nothing else may ride along: a restore is never combined with a batch. */
 const RestoreSchema = z.object({ restoreBackupFor: z.string().min(1).max(200) }).strict();
@@ -35,7 +42,8 @@ const RestoreSchema = z.object({ restoreBackupFor: z.string().min(1).max(200) })
 /**
  * POST /api/platform/collab-migrate
  * One batch of the copy from the pre-pinning collab namespace into the pinned one. Resumable (`cursor` in, `nextCursor` out),
- * idempotent, and it never changes the source. A body of `{ restoreBackupFor: <row id> }` instead undoes one replacement.
+ * idempotent, and it never changes the source. With `purgeSource: true` the same paging instead removes the old objects of
+ * documents whose copy is verified (see do-jurisdiction-purge.ts); it copies nothing. A body of `{ restoreBackupFor: <row id> }` instead undoes one replacement.
  * Procedure and counters: server/lib/collab/do-jurisdiction-migrate.ts.
  */
 api.post('/collab-migrate', requireServiceBinding, async (c) => {
@@ -73,13 +81,26 @@ api.post('/collab-migrate', requireServiceBinding, async (c) => {
     }
     const parsed = BatchSchema.safeParse(raw);
     if (!parsed.success) return c.json({ success: false, error: { message: 'Invalid input' } }, 400);
-    const { cursor, limit, dryRun, replaceDerived } = parsed.data;
+    const { cursor, limit, dryRun, replaceDerived, purgeSource } = parsed.data;
 
     if (!namespaces?.legacy) {
         return c.json({ success: false, error: { message: 'Nothing to migrate: Durable Object jurisdiction pinning is not on' } }, 409);
     }
     try {
         const { refs, nextCursor } = await listCollabDocRefs(c.env.DB, { limit, after: cursor ?? null });
+        if (purgeSource) {
+            const purge = await purgeMigratedSources(refs, namespaces.legacy, namespaces.pinned, { dryRun });
+            const purgeActor = c.get('platformActor');
+            // The actor is the platform admin id alone: the record carries "row ids and reason codes only", and the
+            // e-mail is personal data the batch line has no use for.
+            logger.info('collab purge batch', {
+                cursor: cursor ?? null, nextCursor, limit, dryRun,
+                total: purge.total, purged: purge.purged, alreadyPurged: purge.alreadyPurged, wouldPurge: purge.wouldPurge,
+                kept: purge.kept.length, keptByReason: purge.keptByReason, failed: purge.failed.length,
+                rows: purge.rows.map(({ rowId, outcome, reason }) => ({ rowId, outcome, ...(reason ? { reason } : {}) })), ...(purgeActor ? { actor: purgeActor.platformAdminId } : {}),
+            });
+            return c.json({ success: true, data: { ...purge, nextCursor, dryRun, purgeSource: true } });
+        }
         // One query for the whole batch: what the database holds, so a copy that would take a direct write away is refused.
         const blobs = dryRun ? new Map() : await loadResultsBlobs(c.env.DB, refs);
         const report = await migrateCollabDocs(refs, namespaces.legacy, namespaces.pinned, { dryRun, replaceDerived, databaseBlob: (rowId) => blobs.get(rowId) ?? null });

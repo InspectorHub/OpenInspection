@@ -14,6 +14,7 @@ import { getDrizzle } from '../lib/route-helpers';
 import { resolvePrimaryReportId } from '../lib/inspection/reports';
 import { r2Delete } from '../lib/r2/objects';
 import { loadFrozenFileKeys } from '../lib/report-snapshot';
+import { normalizeStoredJson } from '../lib/stored-json';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 
 /**
@@ -213,7 +214,7 @@ if (tpl.version <= fromVersion) {
 }
 
 await db.update(inspections)
-    .set({ templateSnapshot: tpl.schema, templateSnapshotVersion: tpl.version })
+    .set({ templateSnapshot: normalizeStoredJson(tpl.schema) ?? tpl.schema, templateSnapshotVersion: tpl.version })
     .where(and(
         eq(inspections.tenantId, tenantId),
         eq(inspections.id, id),

@@ -37,11 +37,64 @@ NC='\033[0m'
 
 FAILED=0
 
+# quiet() captures a step's output in a temp file; an interrupted hook (Ctrl-C
+# during a cold type-check) must not leave that file behind on disk. It is
+# removed on exit and on the common terminating signals; the normal-path rm
+# inside quiet() makes the double removal harmless.
+_q_log=''
+# Exit-only trap cleans up on every normal end; the signal traps also EXIT (code 130), because a
+# caught signal otherwise leaves the hook running its later stages after Ctrl-C killed only the
+# current step — the opposite of what the person pressing Ctrl-C asked for.
+trap 'rm -f "$_q_log" 2>/dev/null' 0
+trap 'rm -f "$_q_log" 2>/dev/null; exit 130' 1 2 3 15
+
 # printf, not echo: POSIX sh echo does not interpret \n or \033 escapes
 # (they printed literally under Git Bash), and %b expands them portably.
 pass() { printf '  ✓  %b\n' "$1"; }
 fail() { printf '  ✗  %b\n' "$1"; FAILED=1; }
 step() { printf '\n  →  %b\n' "$1"; }
+
+# Run a step quietly; on failure print its output, so a failed hook explains itself in the log
+# (background commits, agent runs and CI-less logs show nothing else, and re-running a cold
+# type-check just to read its errors costs minutes). A passing step stays silent. Keeps the exit code.
+# Output is capped at 80 lines: up to 80 are printed whole; a longer one shows the first 40 and the last 40
+# (a compiler lists its errors first, a bundler prints the real error after its progress lines), with the
+# omitted count and the command to re-run between them. Lines longer than 300 characters are cut and SAY so:
+# a silent cut would hide the tail of a long stack line.
+_q_show() {
+    awk '{ if (length($0) > 300) print substr($0, 1, 300) " …[cut at 300 chars]"; else print }' | sed 's/^/     /'
+}
+quiet() {
+    # A templated mktemp name is unique; the predictable fallback is created with a private
+    # umask so other local users cannot read the captured output.
+    _q_log=$(mktemp "${TMPDIR:-/tmp}/hook-quiet.XXXXXXXX" 2>/dev/null) || {
+        _q_log="${TMPDIR:-/tmp}/hook-quiet.$$"
+        _q_um=$(umask); umask 077
+        : > "$_q_log" 2>/dev/null || _q_log=""
+        umask "$_q_um"
+    }
+    if [ -z "$_q_log" ]; then
+        # Nowhere to capture: run the step visibly rather than silently skip the check.
+        "$@"
+        return $?
+    fi
+    "$@" > "$_q_log" 2>&1
+    _q_rc=$?
+    if [ "$_q_rc" -ne 0 ]; then
+        _q_lines=$(grep -c '' "$_q_log")
+        printf '     ── %s  (exit %s) ──\n' "$*" "$_q_rc"
+        if [ "$_q_lines" -le 80 ]; then
+            _q_show < "$_q_log"
+        else
+            head -n 40 "$_q_log" | _q_show
+            printf '     … %s line(s) omitted; re-run: %s\n' "$((_q_lines - 80))" "$*"
+            tail -n 40 "$_q_log" | _q_show
+        fi
+        printf '\033[0m'  # a cut line may leave a colour sequence open
+    fi
+    rm -f "$_q_log"
+    return "$_q_rc"
+}
 
 # Wall-clock per stage, machine-greppable:  [timing] <stage> <seconds>s  and a final
 # [timing] total <seconds>s  (printed on the failure path too). `date +%s` is whole
@@ -131,7 +184,7 @@ elif [ -z "$CONFIG_STAGED" ] && [ -z "$(echo "$TS_STAGED" | grep -vE '^(server|t
     # `type-check:tests` runs `tsc -b tsconfig.api.json` first, so it subsumes
     # the api pass rather than adding a second one; the extra cost is the tests
     # program alone (587 files, ~16s warm, capped at 1024 MB).
-    if npm run type-check:tests > /dev/null 2>&1; then
+    if quiet npm run type-check:tests; then
         pass "Type check passed (tsc, api + tests programs — staged TS confined to server/ and tests/)"
     else
         fail "Type check failed  →  npm run type-check:tests"
@@ -140,14 +193,14 @@ else
     GEN_OK=1
     GEN_NOTE=""
     if needs_paraglide; then
-        if npm run i18n:compile:cached > /dev/null 2>&1; then
+        if quiet npm run i18n:compile:cached; then
             GEN_NOTE="${GEN_NOTE}, regenerated messages"
         else
             GEN_OK=0
         fi
     fi
     if [ "$GEN_OK" -eq 1 ] && needs_typegen; then
-        if npx react-router typegen > /dev/null 2>&1; then
+        if quiet npx react-router typegen; then
             GEN_NOTE="${GEN_NOTE}, regenerated route types"
         else
             GEN_OK=0
@@ -186,18 +239,18 @@ else
     TESTS_STAGED=$(echo "$TS_STAGED" | grep -E '^tests/' || true)
     staged_tests_ok() {
         [ -z "$TESTS_STAGED" ] && return 0
-        npm run type-check:tests > /dev/null 2>&1
+        quiet npm run type-check:tests
     }
 
     if [ "$GEN_OK" -eq 0 ]; then
         fail "Type generation failed  →  npm run type-check"
     elif [ "$APP_ONLY" -eq 1 ]; then
-        if npm run type-check:app > /dev/null 2>&1 && staged_tests_ok; then
+        if quiet npm run type-check:app && staged_tests_ok; then
             pass "Type check passed (tsc, app pass only — no staged server/ changes${GEN_NOTE})"
         else
             fail "Type check failed  →  npm run type-check"
         fi
-    elif npm run type-check:app > /dev/null 2>&1 && npm run type-check:api > /dev/null 2>&1 && staged_tests_ok; then
+    elif quiet npm run type-check:app && quiet npm run type-check:api && staged_tests_ok; then
         pass "Type check passed (tsc${GEN_NOTE})"
     else
         fail "Type check failed  →  npm run type-check"

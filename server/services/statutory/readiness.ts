@@ -1,6 +1,7 @@
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { templates, users } from '../../lib/db/schema';
+import { normalizeStoredObject } from '../../lib/stored-json';
 import { r2Keys } from '../../lib/r2-keys';
 import { versionForInspection } from '../../lib/statutory/form-registry';
 import type { StatutoryFormVersion } from '../../lib/statutory/form-registry';
@@ -63,7 +64,7 @@ export interface StatutoryReadiness {
 
 /** The `statutoryForm` declaration a platform-supplied template carries. */
 function declaredFormId(schema: unknown): string | null {
-    const declaration = (schema as { statutoryForm?: { formId?: unknown } } | null)?.statutoryForm;
+    const declaration = (normalizeStoredObject(schema) as { statutoryForm?: { formId?: unknown } } | null)?.statutoryForm;
     const formId = declaration?.formId;
     return typeof formId === 'string' && formId.length > 0 ? formId : null;
 }

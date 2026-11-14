@@ -23,6 +23,7 @@ import { ContactService } from './contact.service';
 import { listRequests, getRequest, type ListFilter } from './inspection-request/request-read';
 import { ALL_INSPECTIONS, type InspectionScope } from '../lib/inspection/visibility';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
+import { normalizeStoredJson } from '../lib/stored-json';
 
 export interface CreateRequestInput {
     clientName:      string;
@@ -168,7 +169,7 @@ export class InspectionRequestService {
                 inspectorId:              input.inspectorId ?? null,
                 propertyAddress:          input.propertyAddress,
                 templateId:               s.templateId,
-                templateSnapshot:         tpl ? tpl.schema : null,
+                templateSnapshot:         tpl ? (normalizeStoredJson(tpl.schema) ?? tpl.schema) : null,
                 templateSnapshotVersion:  tpl ? tpl.version : 1,
                 date:                     input.scheduledAt,
                 status:                   INSPECTION_STATUS.REQUESTED,
@@ -262,7 +263,7 @@ export class InspectionRequestService {
             tenantId,
             propertyAddress:          req.propertyAddress,
             templateId:               sub.templateId,
-            templateSnapshot:         tpl.schema,
+            templateSnapshot:         normalizeStoredJson(tpl.schema) ?? tpl.schema,
             templateSnapshotVersion:  tpl.version,
             date:                     req.scheduledAt.toISOString(),
             status:                   INSPECTION_STATUS.REQUESTED,

@@ -19,10 +19,11 @@ patched release. This page says how those are handled, and records the one that 
    once passed an install and a lockfile check and still made the linter fail at start-up (see the entry below).
 5. An alert that cannot be closed yet stays open and is tracked here.
 
-## Open alert: minimatch, GHSA-g3hv-75wg-m249 (CVE-2026-118764), alert 71
+## Open alert: minimatch, GHSA-g3hv-75wg-m249 (CVE-2026-118764), alert 72
 
 - **Advisory:** `minimatch` before 11.0.1 (potential denial of service in glob-part expansion); first patched release 11.0.1.
-- **Status:** open and tracked. It cannot close yet, because the development-time lint toolchain below declares ranges
+- **Status:** open and tracked (checked 2026-11-10: alert 72, state open, medium severity, development scope, opened
+  2026-11-05). It cannot close yet, because the development-time lint toolchain below declares ranges
   that stop before minimatch 11.
 
 ### Fixed: the exceljs chain (production dependencies)

@@ -161,8 +161,8 @@ describe('GET /api/inspections/{id} revisionStatus (real app)', () => {
     expect(inspection.templateSnapshot).toStrictEqual(statutorySnapshot('REI 7-6'));
   });
 
-  // The editor's own writes (`updateTemplateSnapshot`, `switchRatingSystem`) stringify the snapshot before
-  // handing it to a JSON column, so such a row reads back as a JSON-encoded string.
+  // Snapshots written by older code (copied from a wrapped template row, or saved by the old editor path) were
+  // stored as a JSON string literal, so such a row reads back as a JSON-encoded string. Current writers store objects.
   const encodeLikeTheEditor = (snapshot: unknown) => JSON.stringify(snapshot) as never;
 
   it('returns the snapshot as an object after the editor saved it through the template-snapshot route', async () => {

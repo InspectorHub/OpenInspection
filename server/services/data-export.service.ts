@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { inspections, templates, agreements } from '../lib/db/schema';
+import { normalizeStoredJson } from '../lib/stored-json';
 import { logger } from '../lib/logger';
 import { zipSync } from 'fflate';
 import { streamZipToR2 } from '../lib/zip-to-r2';
@@ -41,7 +42,8 @@ export class DataExportService {
     async buildZip(tenantId: string): Promise<{ buffer: Uint8Array; manifest: ExportManifest }> {
         const d = drizzle(this.db);
         const insps = await d.select().from(inspections).where(eq(inspections.tenantId, tenantId)).all();
-        const tpls  = await d.select().from(templates).where(eq(templates.tenantId, tenantId)).all();
+        const tpls  = (await d.select().from(templates).where(eq(templates.tenantId, tenantId)).all())
+            .map((t) => ({ ...t, schema: normalizeStoredJson(t.schema) ?? t.schema }));
         const agrs  = await d.select().from(agreements).where(eq(agreements.tenantId, tenantId)).all();
 
         // 1. Enumerate every photo object for the tenant.
@@ -119,7 +121,8 @@ export class DataExportService {
     ): Promise<ExportManifest> {
         const d = drizzle(this.db);
         const insps = await d.select().from(inspections).where(eq(inspections.tenantId, tenantId)).all();
-        const tpls  = await d.select().from(templates).where(eq(templates.tenantId, tenantId)).all();
+        const tpls  = (await d.select().from(templates).where(eq(templates.tenantId, tenantId)).all())
+            .map((t) => ({ ...t, schema: normalizeStoredJson(t.schema) ?? t.schema }));
         const agrs  = await d.select().from(agreements).where(eq(agreements.tenantId, tenantId)).all();
 
         const photos: PhotoEntry[] = [];

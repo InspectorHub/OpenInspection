@@ -12,6 +12,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 
 import { and, eq } from 'drizzle-orm';
 import { templates } from '../../lib/db/schema';
+import { normalizeStoredJson } from '../../lib/stored-json';
 
 /** The service's `drizzle(env.DB)` handle. Named so these signatures do not
  *  silently narrow to the schema-less default and reject their only caller. */
@@ -40,7 +41,8 @@ export async function insertLocalTemplate(
         id,
         tenantId,
         name,
-        schema,
+        // A string document would be stored as a string literal; keep the stored shape an object.
+        schema: normalizeStoredJson(schema) ?? schema,
         createdAt: now,
     };
     await db.insert(templates).values(row);

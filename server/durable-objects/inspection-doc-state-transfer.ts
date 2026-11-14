@@ -61,6 +61,8 @@ export interface StateExport {
     derivedFromD1?: boolean;
     /** The lineage id of the document (see `inspection-doc-generation.ts`); null from an object that stored none. It travels with the bytes. */
     gen:            string | null;
+    /** Present on an answer from the object itself: whether sockets were open or changes were waiting to be stored when it was asked (judged before the flush). */
+    live?:          boolean;
 }
 
 /** A restore point as it arrives: any field may be missing or wrong, `parseStateImport` checks it. */
@@ -321,8 +323,9 @@ export interface TransferHost {
 /** Answers the two transfer verbs, or null when `pathname` is not one of them. */
 export async function handleStateTransfer(req: Request, pathname: string, host: TransferHost): Promise<Response | null> {
     if (pathname.endsWith('/state-export') && req.method === 'GET') {
+        const live = host.live();
         await host.flush();
-        return Response.json(await exportStoredState(host.storage, host.keys));
+        return Response.json({ ...await exportStoredState(host.storage, host.keys), live });
     }
     if (pathname.endsWith('/state-backup') && req.method === 'GET') return readBackup(host);
     if (pathname.endsWith('/state-restore-backup') && req.method === 'POST') return restoreBackup(host);

@@ -48,6 +48,7 @@
  * Passing now would make the header read `current` forever, including for a
  * form whose report has since been corrected.
  */
+import { normalizeStoredObject } from '../../lib/stored-json';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, desc, isNotNull } from 'drizzle-orm';
 import { createApiRouter } from '../../lib/openapi-router';
@@ -239,7 +240,7 @@ app.openapi(statutoryOfferRoute, async (c) => {
         .get();
     if (!inspection) throw Errors.NotFound('Inspection not found');
 
-    const snapshot = inspection.templateSnapshot as (TemplateSchemaV2 & {
+    const snapshot = normalizeStoredObject(inspection.templateSnapshot) as (TemplateSchemaV2 & {
         statutoryForm?: StatutoryFormDeclaration;
     }) | null;
     const declaration = snapshot?.statutoryForm;
@@ -306,7 +307,7 @@ app.openapi(addInstanceRoute, async (c) => {
         .get();
     if (!inspection) throw Errors.NotFound('Inspection not found');
 
-    const declaration = (inspection.templateSnapshot as {
+    const declaration = (normalizeStoredObject(inspection.templateSnapshot) as {
         statutoryForm?: StatutoryFormDeclaration;
     } | null)?.statutoryForm;
     if (!declaration) throw Errors.NotFound('This inspection produces no statutory form');

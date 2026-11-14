@@ -101,3 +101,19 @@ describe('DataExportService.buildZip — photo bytes', () => {
         );
     });
 });
+
+describe('DataExportService.buildZip - templates.json shape', () => {
+    it('writes every template schema as a document, including rows an older writer wrapped in a string', async () => {
+        const made = createTestDb();
+        const doc = { schemaVersion: 2, title: 'T', sections: [] };
+        made.sqlite.prepare('INSERT INTO tenants (id, slug, status, deployment_mode, tier, created_at) VALUES (?,?,?,?,?,?)')
+            .run(TENANT, 'exp', 'active', 'shared', 'free', Date.now());
+        const insert = made.sqlite.prepare('INSERT INTO templates (id, tenant_id, name, version, schema, created_at) VALUES (?,?,?,?,?,?)');
+        insert.run('plain', TENANT, 'Plain', 1, JSON.stringify(doc), Date.now());
+        insert.run('wrapped', TENANT, 'Wrapped', 1, JSON.stringify(JSON.stringify(doc)), Date.now());
+        const { buffer } = await new DataExportService(d1For(made.sqlite), makeR2([])).buildZip(TENANT);
+        const rows = JSON.parse(strFromU8(unzipSync(buffer)['templates.json'])) as { id: string; schema: unknown }[];
+        expect(rows).toHaveLength(2);
+        for (const r of rows) expect(r.schema).toStrictEqual(doc);
+    });
+});

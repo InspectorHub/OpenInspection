@@ -4,8 +4,10 @@
  * A pinned namespace mints different ids from the unpinned one for the same name (see do-jurisdiction.ts), so each document's
  * stored state is exported from the old object and imported into the new one. Which documents exist is read from the database
  * (rows that carry stored collab state); object names are derived from the row's tenant and report, never from input. The old
- * object is never changed or deleted by this tool. It is asked to export, and `state-export` first stores whatever its open
+ * object is never changed or deleted by THIS copy. It is asked to export, and `state-export` first stores whatever its open
  * sockets have sent (a persist), so an object with live editors does write its own storage and database row before answering.
+ * Removing the old objects is a separate, explicit, verified step that runs only after the copy is verified
+ * (do-jurisdiction-purge.ts, `purgeSource: true` on the same route); until it runs, the old object keeps its content.
  *
  * How it is run: `POST /api/platform/collab-migrate` (server/portal/collab-admin.routes.ts), on a deployment that exposes the
  * platform integration seam. It takes the same signed `x-portal-m2m` header as the other platform calls (see lib/m2m-auth.ts).
@@ -42,8 +44,8 @@
  * The route answers 404 unless the deployment is the SaaS profile (`hasPortalIntegrationApi`); a standalone deployment runs
  * `listCollabDocRefs`, `loadResultsBlobs` and `migrateCollabDocs` from its own maintenance script. Authorization is the signed
  * `x-portal-m2m` header (the HMAC checked by `requireServiceBinding`).
- * Known limits: old unpinned objects keep their content after the copy until their inspection is deleted (nothing else cleans
- * them); deleting an inspection clears both namespaces for its report ids, best effort; changing `DO_JURISDICTION` later orphans
+ * Known limits: old unpinned objects keep their content after the copy until the separate purge step has run for them (see
+ * do-jurisdiction-purge.ts) or their inspection is deleted; deleting an inspection clears both namespaces for its report ids, best effort; changing `DO_JURISDICTION` later orphans
  * every pinned object; an orphan whose report row is gone is removable only by id through the platform purge route, which makes the
  * object check that it belongs to the tenant in the path (it refuses another tenant's object, or one with a document and no
  * stored identity).
@@ -84,6 +86,9 @@
  *      before the marker existed.
  *   5. Until `conflicts`, `skipped` and `failed` are empty or resolved, the old objects are the only copy of that history: leave
  *      them. Deletes keep reaching them through the old namespace either way.
+ *   6. Only after every document is migrated and verified, remove the old objects: page through with `purgeSource: true` and
+ *      `dryRun: true` first, then with `dryRun: false`. It copies nothing and deletes an old object only when the pinned object is
+ *      not live and holds exactly the same document; anything else is reported as `kept` with a reason and left untouched.
  *
  * A legacy object that never stored its identity is copied with the identity the database row supplies; a stored identity is
  * kept, with the row's report id filled in when it has none, and only after it agrees with the row.
@@ -223,7 +228,7 @@ interface ImportedBody { replaced?: ReplacedTarget | null }
 const sizeOf = (ydoc: string | null): number => (ydoc ? base64ToBytes(ydoc).length : 0);
 
 /** The identity the copy carries: the stored one with the row's report id filled in, or the row's own. Null when they disagree. */
-function copiedIdentity(stored: TransferIdentity | null, ref: { tenantId: string; inspectionId: string; reportId: string }): TransferIdentity | null {
+export function copiedIdentity(stored: TransferIdentity | null, ref: { tenantId: string; inspectionId: string; reportId: string }): TransferIdentity | null {
     if (!stored) return { tenantId: ref.tenantId, inspectionId: ref.inspectionId, reportId: ref.reportId };
     if (stored.tenantId !== ref.tenantId || stored.inspectionId !== ref.inspectionId) return null;
     if (stored.reportId != null && stored.reportId !== ref.reportId) return null;

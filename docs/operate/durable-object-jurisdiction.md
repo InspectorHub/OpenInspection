@@ -28,12 +28,13 @@ A pinned object starts **empty** and, on the first request for a report, rebuild
 **The engine has no switch that stops editing.** There is no maintenance mode, and the tenant-suspension check does not cover a WebSocket upgrade. Keeping editors out is something you arrange yourself, for example by taking the app offline at your edge for the window, or by not deploying while anyone has a report open. Deploying usually restarts the Durable Objects and drops open editor sockets; the editor reconnects on its own after a close (with a backoff), and a reconnect to a not-yet-migrated report creates the empty-then-rebuilt object this order is meant to avoid. So block traffic to the Worker for the window; do not rely on telling people to stay out. This is Cloudflare's usual behaviour plus the client's reconnect logic, not something this repository tests: try the whole order once on a staging deployment before production.
 
 1. **Make sure the build contains the lineage guard** (`docs/concepts/collab-editing.md`, "Lineage guard"). It must be live before any `replaceDerived` pass.
-2. **Block traffic to the Worker** (see above) and keep it blocked until step 7.
+2. **Block traffic to the Worker** (see above) and keep it blocked until step 8.
 3. **Deploy with `DO_JURISDICTION` set.** The old namespaces stay bound as `INSPECTION_DOC_UNPINNED` and `TENANT_PRESENCE_UNPINNED`. Wait a minute (see "Timing" below).
 4. **Dry run.** Page through the migration with `dryRun: true` (the default) until `nextCursor` is `null`. Nothing is written. `total` is per call: add up `total` over all pages and compare it with the number of `inspection_results` rows that have `ydoc_state`.
 5. **Real run.** Page through with `"dryRun": false` until every document is migrated. Per call, `copied + alreadyThere + empty + replaced + (number of entries in conflicts) + (number in skipped) + (number in failed)` must equal that call's `total` (`conflicts`, `skipped` and `failed` are lists in the response, not counts; `wouldCopy` appears only on a dry run). If any list is not empty: `conflicts` and `skipped` as described under "Conflicts"; `failed`: fix the cause and run the same page again (re-running a whole page is safe).
 6. **`replaceDerived` is the exception, not a step.** Use `"replaceDerived": true` only for rows reported as `target-has-state` on a target that still has the `derived-from-d1` marker. `restoreBackupFor` undoes one such completed replacement (`replaced`). Neither is a way to fix a document that someone edited.
-7. **Reopen.** Only now let traffic and editing back in.
+7. **Verify, then purge the old objects** (a separate step, see "Removing the old objects"). The copy leaves the old objects holding the personal data in their original region. The order is: migrate (step 5), verify the migration report (`conflicts`, `skipped` and `failed` empty or resolved), then, with traffic still blocked, page through the purge with `purgeSource: true, dryRun: true`, then with `dryRun: false`.
+8. **Reopen.** Only now let traffic and editing back in. A document edited after you reopen no longer equals its old copy and would be reported `target-differs`: this route never purges that old object, so the purge (step 7) must be finished before this step.
 
 The migration routes exist only on the SaaS profile (`APP_MODE=saas`, `getDeploymentProfile(env).hasPortalIntegrationApi`). On a standalone (non-saas) deployment they answer 404; run the functions from a maintenance script instead (see "Copying existing documents"). Steps 4 and 5 then mean running `listCollabDocRefs` and `migrateCollabDocs` the same way.
 
@@ -47,6 +48,8 @@ The migration routes exist only on the SaaS profile (`APP_MODE=saas`, `getDeploy
 | same, `dryRun: false` | Per document: read the database blob, export from the old object (no document: `empty`), check the old document against the database (a difference is `source-differs-from-database`), then import. The import itself refuses a target that is not empty with a 409 and merges nothing; only after that refusal is the target's stored document compared with the source (base64 string equality): equal is `alreadyThere`, different is a `conflicts` row with the target's reason. | The counters and lists; one `collab migrate batch` log line per call. |
 | same, `dryRun: false, replaceDerived: true` | Replaces a database-built target with the old document, keeping the displaced document as `replaced-derived-backup`. | `replaced`; one audit line with both ids and SHA-256 sums. |
 | `{ "restoreBackupFor": "<rowId>" }` | Undoes one completed replacement: puts the displaced document back. | `{ restored: true }`, or 404 (no such document or no backup) / 409 / 502 with the reason. |
+| same, `purgeSource: true, dryRun: true` | Lists the rows (same paging). Addresses no object and deletes nothing. | `total`, `wouldPurge`, `kept` (`no-report-id` only). |
+| same, `purgeSource: true, dryRun: false` | Per document: export the old object (no document: `alreadyPurged`), export the pinned object, and delete the OLD object only when every check in "Removing the old objects" passes. | `purged`, `alreadyPurged`, `kept` with a reason, `failed`; one `collab purge batch` log line per call. |
 | `POST /api/platform/tenants/:slug/inspection-doc/purge` with `{ "durableObjectId": "<64 hex>" }` | Empties one object by its Cloudflare id, only if the object belongs to the tenant in the path. Tries the pinned namespace, then the old one. | `namespace: "pinned"` or `"legacy"`. Errors: 400 invalid body; 403 the object stores another tenant's identity, or holds a document but no identity; 404 unknown tenant slug or an id neither namespace recognises; 502 a recognised id whose clear failed. |
 
 Authorization on both routes is the signed `x-portal-m2m` header (`requireServiceBinding` verifies the HMAC; `server/lib/m2m-auth.ts`). Both answer 404 on a deployment without the platform API (see above). The migration route answers 409 when pinning is off, and restore and purge answer 503 when the collaborative-document namespaces are not bound.
@@ -101,7 +104,7 @@ documented in `server/lib/m2m-auth.ts`). A standalone (non-saas) deployment has 
 from your own maintenance script with the two namespaces.
 
 Body: `{ "cursor"?: string, "limit"?: 1-10 (default 5), "dryRun"?: boolean (default true), "replaceDerived"?: boolean (default false) }`,
-or `{ "restoreBackupFor": "<rowId>" }` to undo one replacement (below). Every report names each row it handled by `rowId`
+or `{ "restoreBackupFor": "<rowId>" }` to undo one replacement (below). Add `"purgeSource": true` for the removal step in "Removing the old objects" instead of a copy. Every report names each row it handled by `rowId`
 (the `inspection_results` row id, also the cursor), with its outcome, in `rows`; conflicts and skipped entries carry it too.
 
 1. Page through once with the default `dryRun: true`. It touches no object. Read `total`, `wouldCopy` and `skipped`.
@@ -121,12 +124,41 @@ or `{ "restoreBackupFor": "<rowId>" }` to undo one replacement (below). Every re
 | `skipped` | `no-report-id`: no object name can be derived. `identity-mismatch`: the object's stored identity names another tenant, inspection or report than the row. | Investigate. Never guessed at. |
 | `failed` | A transport or storage error, named. | Fix the cause and run again. |
 
-The old object is never changed or deleted by the copy. It is asked to export, and an export first stores whatever the
+The old object is never changed or deleted by the copy (removing it is the separate step in "Removing the old objects"). It is asked to export, and an export first stores whatever the
 object's open sockets have sent, so an old object that still has live editors writes its own storage and database row
 before it answers. Nothing is merged: an import into a target that already holds anything is refused.
 
 Two code paths address only the pinned namespace, so a flush or a finding-key rename never reaches an old, unpinned
 object: `doc-lock-notify.ts` and `finding-key-migration.ts` under `server/lib/`.
+
+### Removing the old objects
+
+The copy leaves each old (unpinned) object as it was, so it keeps the document, and the personal data in it, in its original region. Removing it is a separate request, `POST /api/platform/collab-migrate` with `"purgeSource": true`, so that nothing is deleted by accident while copying. Run it only after the copy is verified, and run the dry run first. The order is: **migrate, verify, then purge**.
+
+Body: `{ "purgeSource": true, "cursor"?, "limit"?: 1-10 (default 5), "dryRun"?: boolean (default true) }`. It cannot be combined with `replaceDerived` or `restoreBackupFor` (400). It copies nothing. A dry run touches no object and deletes nothing: it only counts the rows a real run would examine (`wouldPurge`) and reports rows with no report id as `kept`. `wouldPurge` means only "has a report id and has not been judged yet": a real run may keep any of those rows.
+
+**Block traffic first.** A real run exports each old object before checking it, and an export first stores whatever that object's open sockets have sent, so a live old object is still flushed (its own storage and its database row are written) before the purge refuses it. Keep traffic blocked for the whole purge, as for the copy.
+
+A real run deletes the old object of a document only when **all** of these hold, each judged from the objects themselves:
+
+- the old object holds a document, its stored identity (if it has one) agrees with the database row, and it is not live;
+- the pinned object holds exactly the same document bytes as the old one, and every restore point of the old object, unchanged (so nothing in the old object is lost; the pinned object may hold more);
+- the pinned object is not live (no open sockets, nothing waiting to be stored), carries the stored identity of the same document, was not merely rebuilt from the database, and, when the old object recorded a lineage id, carries the same one.
+
+The delete is the existing purge verb sent to the **old** object only, with the row's tenant as the expected tenant: the object compares it with the identity it stored and refuses another tenant's object, or a document with no stored identity (a 403, reported as `kept`). The delete is a compare-and-delete: the route sends the SHA-256 of the old document it read, and the object deletes only if its stored document still has that digest (otherwise 409 and the row is kept as `source-changed`); the digest of the restore points is compared the same way, so a restore point taken in between also keeps the object. A precondition header that is present but malformed is refused with 409 `bad-precondition` and the row is reported `failed`. It also asks the object to refuse while it is live (open sockets or a save waiting, answered 409 and reported as `kept` with `source-live`), so an object that became live after it was read is not deleted. The pinned object is never sent a delete. A read error is never treated as safe: it is `failed` and nothing is deleted.
+
+Every row ends in one of these, and `purged + alreadyPurged + wouldPurge + (number of entries in kept) + (number in failed)` equals the call's `total`:
+
+| Field | Meaning | Action |
+|---|---|---|
+| `purged` | The old object was emptied. | None. |
+| `alreadyPurged` | The old object holds nothing at all: no document, no stored identity, no restore points (an earlier run, or nothing was stored). Running the same pages again reports this, not an error. | None. |
+| `kept` | Left untouched, with a `reason` per entry (counts per reason in `keptByReason`). | See below. |
+| `failed` | A read or the delete failed, with a fixed code (`source-export-failed`, `target-export-failed`, `purge-failed`, `malformed-export` for an answer of an unexpected shape, `error`). No detail is returned. | Fix the cause and run the same page again. |
+
+`kept` reasons: `no-report-id` (no object name can be derived); `identity-mismatch` (the old object stores another tenant, inspection or report than the row); `source-live` (the old object has open sockets or changes waiting); `source-changed` (the old document changed between the read and the delete); `target-empty` (the document was not copied yet: migrate first); `target-differs` (the pinned object changed since the copy, for example because the document was edited after traffic was reopened, or the copy did not complete; this route never purges such an old object, so purge (step 7) before you reopen (step 8), or decide by hand); `target-live`; `target-identity-mismatch`; `target-derived` (the pinned object was only built from the database); `target-lineage-differs` (the pinned object started a new history); `target-snapshots-differ` (the pinned object lacks, or holds a changed, restore point of the old object); `source-partial` (the old object has no document but still holds an identity or restore points: look at it by hand); `source-not-attributable` (the object refused the delete because it holds a document with no stored identity, or another tenant's). Nothing is written for a kept row. After fixing the cause, run the page again.
+
+Each call writes one `collab purge batch` log line with the counters and, per row, the row id, outcome and reason; it carries no document content and no tenant or report names. A call is at most three object requests per document plus one database query. Two things on the old object are not part of an export and are deleted with it: the published-report lock marker and `replaced-derived-backup`. The lock marker is derived again from the database on every upgrade, so deleting it has no effect. Purging cannot be undone: an emptied object's editing history and restore points are gone, and the pinned object's copy is the only one left (it holds the restore points the copy carried).
 
 ### Conflicts
 
@@ -207,7 +239,7 @@ Consequences for an operator:
 
 ## Known limits
 
-- **Old objects keep their content.** The copy never changes or deletes the old (unpinned) object. After migration it still holds the document, and the personal data in it, until its inspection is deleted. Nothing else cleans it. If your retention or data-residency obligations require the old copies to be gone, plan for it: after the copy is verified, delete the inspections you no longer need (a delete clears both namespaces), or purge the old objects one at a time with the single-object purge using ids from your logs. Record that you did so.
+- **Old objects keep their content until you purge them.** The copy never changes or deletes the old (unpinned) object, so after migration it still holds the document, and the personal data in it, in its original region. Removing them is the separate verified step in "Removing the old objects" (`purgeSource: true`): run it after the copy is verified, dry run first, and record that you did. An old object that holds a document but never stored its identity is refused by the object (`source-not-attributable`) and stays; so does one whose pinned twin is live or has changed (`kept`). Deleting an inspection also clears both namespaces for its report ids. Edits after reopening (step 8) make the pinned object differ from the old one (`target-differs`), and this route never purges that old object: purge (step 7) before you reopen. The delete itself is guarded: the object refuses it while it has open sockets or a save waiting, and it compares the digest of its stored document and of its restore points with what the purge read, so a change between the read and the delete keeps the object. What the purge cannot do is stop a socket that connects to an old object AFTER it was emptied from storing its in-memory document again, and the export that precedes every check flushes a live old object before it is refused; keep traffic away from the old namespace (nothing in the engine addresses it after pinning other than deletes and this tooling).
 - **Deleting an inspection** clears both the pinned and the unpinned namespace for the report ids it owns, best effort (see "Deleting").
 - **Changing `DO_JURISDICTION` later orphans every pinned object.** The same name yields a different id in a different jurisdiction (and in none). Do not change the value after objects exist; moving to another value needs the same copy procedure from scratch, and the tooling copies from the unpinned namespace only. The worker cannot warn you: it keeps no record of the value it ran with before, and adding such a record would be extra state to maintain. An accidental change therefore shows up only as documents that open empty and rebuild from the database. Keep the value in version control and review any change to it as a data move.
 - **Standalone deployments have no platform routes.** Both answer 404 outside the SaaS profile; run the migration functions from a maintenance script (see "Copying existing documents"). The single-object purge route is likewise unavailable there.
@@ -230,3 +262,4 @@ Only your deployment can show these; the test suite cannot, because the local ru
 4. Delete a test inspection and confirm both the pinned and the old object for its report are empty (the delete's audit
    entry reports `collabPurge: "ok"`).
 5. Check that the single-object purge answers with a `namespace` for an id taken from your logs.
+6. After the purge step, page through once more with `purgeSource: true, dryRun: false`: every document should report `alreadyPurged` and `kept` should be empty. For one document, confirm in the Cloudflare dashboard that the old object holds no data.

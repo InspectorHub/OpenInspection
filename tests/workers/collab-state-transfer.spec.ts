@@ -94,7 +94,7 @@ describe('InspectionDocDO state transfer', () => {
     it('exporting an object with no state returns nulls rather than failing', async () => {
         const res = await stub('src-empty').fetch(url('state-export'));
         const out = await res.json<{ gen: string }>();
-        expect(out).toEqual({ ydoc: null, identity: null, snapshots: [], derivedFromD1: false, gen: out.gen });
+        expect(out).toEqual({ ydoc: null, identity: null, snapshots: [], derivedFromD1: false, gen: out.gen, live: false });
         expect(out.gen).toMatch(/^[A-Za-z0-9_-]{8,64}$/); // every object names its history, even an empty one
     });
 
