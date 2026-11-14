@@ -202,7 +202,9 @@ if [ "$BUNDLE_RC" -eq 0 ]; then
     hook_exit 0
 else
     fail "Bundle size gate failed — ${BUNDLE_LINE:-run node scripts/check-bundle-size.mjs}"
-    printf '%s\n' "$BUNDLE_OUT" | tail -n 30 | cut -c1-300 | sed 's/^/     /'
+    # A cut line may leave a colour sequence open; the cut is marked, not silent.
+    printf '%s\n' "$BUNDLE_OUT" | tail -n 30 | awk '{ if (length($0) > 300) print substr($0, 1, 300) " …[cut at 300 chars]"; else print }' | sed 's/^/     /'
+    printf '\033[0m'
     printf '\n%b\n' "${RED}Pre-push checks failed. Fix the errors before pushing.${NC}"
     hook_exit 1
 fi

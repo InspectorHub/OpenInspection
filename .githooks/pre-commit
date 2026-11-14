@@ -37,6 +37,17 @@ NC='\033[0m'
 
 FAILED=0
 
+# quiet() captures a step's output in a temp file; an interrupted hook (Ctrl-C
+# during a cold type-check) must not leave that file behind on disk. It is
+# removed on exit and on the common terminating signals; the normal-path rm
+# inside quiet() makes the double removal harmless.
+_q_log=''
+# Exit-only trap cleans up on every normal end; the signal traps also EXIT (code 130), because a
+# caught signal otherwise leaves the hook running its later stages after Ctrl-C killed only the
+# current step — the opposite of what the person pressing Ctrl-C asked for.
+trap 'rm -f "$_q_log" 2>/dev/null' 0
+trap 'rm -f "$_q_log" 2>/dev/null; exit 130' 1 2 3 15
+
 # printf, not echo: POSIX sh echo does not interpret \n or \033 escapes
 # (they printed literally under Git Bash), and %b expands them portably.
 pass() { printf '  ✓  %b\n' "$1"; }
@@ -48,20 +59,36 @@ step() { printf '\n  →  %b\n' "$1"; }
 # type-check just to read its errors costs minutes). A passing step stays silent. Keeps the exit code.
 # Output is capped at 80 lines: up to 80 are printed whole; a longer one shows the first 40 and the last 40
 # (a compiler lists its errors first, a bundler prints the real error after its progress lines), with the
-# omitted count and the command to re-run between them.
+# omitted count and the command to re-run between them. Lines longer than 300 characters are cut and SAY so:
+# a silent cut would hide the tail of a long stack line.
+_q_show() {
+    awk '{ if (length($0) > 300) print substr($0, 1, 300) " …[cut at 300 chars]"; else print }' | sed 's/^/     /'
+}
 quiet() {
-    _q_log=$(mktemp 2>/dev/null) || _q_log="${TMPDIR:-/tmp}/hook-quiet.$$"
+    # A templated mktemp name is unique; the predictable fallback is created with a private
+    # umask so other local users cannot read the captured output.
+    _q_log=$(mktemp "${TMPDIR:-/tmp}/hook-quiet.XXXXXXXX" 2>/dev/null) || {
+        _q_log="${TMPDIR:-/tmp}/hook-quiet.$$"
+        _q_um=$(umask); umask 077
+        : > "$_q_log" 2>/dev/null || _q_log=""
+        umask "$_q_um"
+    }
+    if [ -z "$_q_log" ]; then
+        # Nowhere to capture: run the step visibly rather than silently skip the check.
+        "$@"
+        return $?
+    fi
     "$@" > "$_q_log" 2>&1
     _q_rc=$?
     if [ "$_q_rc" -ne 0 ]; then
         _q_lines=$(grep -c '' "$_q_log")
         printf '     ── %s  (exit %s) ──\n' "$*" "$_q_rc"
         if [ "$_q_lines" -le 80 ]; then
-            cut -c1-300 < "$_q_log" | sed 's/^/     /'
+            _q_show < "$_q_log"
         else
-            head -n 40 "$_q_log" | cut -c1-300 | sed 's/^/     /'
+            head -n 40 "$_q_log" | _q_show
             printf '     … %s line(s) omitted; re-run: %s\n' "$((_q_lines - 80))" "$*"
-            tail -n 40 "$_q_log" | cut -c1-300 | sed 's/^/     /'
+            tail -n 40 "$_q_log" | _q_show
         fi
         printf '\033[0m'  # a cut line may leave a colour sequence open
     fi
