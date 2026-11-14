@@ -308,6 +308,9 @@
     "readdir-glob": {
       "minimatch": "^11.0.1"
     },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.1"
+    },
     "unzipper": "^0.12.5",
     "ip-address": ">=10.5.1",
     "fast-uri": "^3.1.8",

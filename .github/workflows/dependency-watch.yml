@@ -3,8 +3,9 @@ name: "Dependency watch"
 # A weekly look at whether the tools that hold an older minimatch (see docs/develop/dependency-policy.md) now accept a patched one.
 # scripts/check-minimatch-upstream.mjs reads package-lock.json and asks https://registry.npmjs.org; it needs no install and no secrets.
 # Exit codes: 0 not ready (green); 10 READY (every holder admits a patched minimatch) and 11 DONE (no holder remains) fail this run
-# with an ::error:: annotation and a summary line, which is the signal to try the upgrade, remove the nested overrides and close the
-# alert; 2 means the watch itself failed; any other code (including 1, a crash of the runtime) is reported as an error, not as the signal.
+# with an ::error:: annotation and a summary line, which is the signal to try the upgrade and remove the scoped overrides
+# (the advisory itself is already closed); 2 means the watch itself failed; any other code (including 1, a crash of the
+# runtime) is reported as an error, not as the signal.
 
 on:
   schedule:
