@@ -227,6 +227,77 @@ describe('POST /api/platform/collab-migrate', () => {
         expect(out).toMatchObject({ replaced: 1, copied: 3 });
         expect(out.conflicts.map((c) => c.reason)).toEqual(['target-edited']);
     });
+
+    describe('purgeSource', () => {
+        interface PurgeTotals { total: number; purged: number; alreadyPurged: number; wouldPurge: number; dryRun: boolean; purgeSource: boolean; nextCursor: string | null; kept: Array<{ rowId: string; reason: string }>; failed: unknown[] }
+        const purgeData = async (res: Response) => ((await res.json()) as { data: PurgeTotals }).data;
+        const migrateAll = async () => { await post(buildApp(), '/api/platform/collab-migrate', { dryRun: false, limit: 10 }, env()); from.calls.length = 0; to.calls.length = 0; };
+        const run = (body: object) => post(buildApp(), '/api/platform/collab-migrate', { purgeSource: true, ...body }, env());
+        const sourceHolds = (r: string) => from.stores.get(collabDocName(TENANT, r))?.has('ydoc') ?? false;
+
+        it('is strict: it cannot be combined with replaceDerived or restoreBackupFor, and needs the signed header', async () => {
+            expect((await run({ replaceDerived: true, dryRun: false })).status).toBe(400);
+            expect((await run({ restoreBackupFor: 'row-1' })).status).toBe(400);
+            expect((await run({ purgeSource: 'yes' })).status).toBe(400);
+            expect((await post(buildApp(), '/api/platform/collab-migrate', { purgeSource: true, dryRun: false }, env(), false)).status).toBe(403);
+            expect((await post(buildApp(), '/api/platform/collab-migrate', { purgeSource: true, dryRun: false }, { INSPECTION_DOC: to })).status).toBe(409);
+            expect(from.calls).toEqual([]);
+        });
+
+        it('is a dry run by default: it counts and addresses no object, whatever has been copied', async () => {
+            await migrateAll();
+            const out = await purgeData(await run({}));
+            expect(out).toMatchObject({ dryRun: true, purgeSource: true, wouldPurge: 5, purged: 0, nextCursor: null });
+            expect(from.calls).toEqual([]);
+            expect(to.calls).toEqual([]);
+            expect(['r1', 'r2', 'r3', 'r4', 'r5'].every(sourceHolds)).toBe(true);
+        });
+
+        it('purges only what has been copied: before the copy every row is kept and every old object survives', async () => {
+            const out = await purgeData(await run({ dryRun: false, limit: 10 }));
+            expect(out.purged).toBe(0);
+            expect(out.kept.map((k) => k.reason)).toEqual(Array(5).fill('target-empty'));
+            expect(['r1', 'r2', 'r3', 'r4', 'r5'].every(sourceHolds)).toBe(true);
+        });
+
+        it('after the copy it purges the old objects across pages, sums to the total, and a repeat reports them already purged', async () => {
+            vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+            await migrateAll();
+            const first = await purgeData(await run({ dryRun: false, limit: 3 }));
+            expect(first).toMatchObject({ total: 3, purged: 3, nextCursor: 'row-3' });
+            const second = await purgeData(await run({ dryRun: false, limit: 3, cursor: 'row-3' }));
+            expect(second).toMatchObject({ total: 2, purged: 2, nextCursor: null });
+            expect(['r1', 'r2', 'r3', 'r4', 'r5'].some(sourceHolds)).toBe(false);
+            expect([...to.stores.values()].every((m) => m.has('ydoc'))).toBe(true);
+            const again = await purgeData(await run({ dryRun: false, limit: 10 }));
+            expect(again).toMatchObject({ total: 5, purged: 0, alreadyPurged: 5, failed: [] });
+        });
+
+        it('keeps the old object of a target that was edited after the copy, and purges the rest', async () => {
+            await migrateAll();
+            to.stores.get(collabDocName(TENANT, 'r2'))?.set('ydoc', docBytes('edited after the copy'));
+            const out = await purgeData(await run({ dryRun: false, limit: 10 }));
+            expect(out).toMatchObject({ purged: 4 });
+            expect(out.kept).toEqual([{ rowId: 'row-2', reason: 'target-differs' }]);
+            expect(sourceHolds('r2')).toBe(true);
+        });
+
+        it('writes one audit line per batch with row ids, outcomes and reasons, and nothing that names a tenant or holds content', async () => {
+            const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+            await migrateAll();
+            await run({ dryRun: false, limit: 2 });
+            const lines = info.mock.calls.filter(([m]) => m === 'collab purge batch');
+            expect(lines).toHaveLength(1);
+            expect(lines[0]?.[1]).toMatchObject({ dryRun: false, limit: 2, total: 2, purged: 2, rows: [{ rowId: 'row-1', outcome: 'purged' }, { rowId: 'row-2', outcome: 'purged' }] });
+            expect(JSON.stringify(lines[0]?.[1])).not.toMatch(new RegExp(`${TENANT}:|results|ydoc`));
+        });
+
+        it('stays inside the subrequest budget at the largest batch', async () => {
+            await migrateAll();
+            await run({ dryRun: false, limit: 10 });
+            expect(from.calls.length + to.calls.length + 1).toBeLessThanOrEqual(40);
+        });
+    });
 });
 
 /** A namespace whose id parsing and purge can each be made to fail, to follow the route through its fallbacks. */
