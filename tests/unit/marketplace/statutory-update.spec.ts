@@ -103,7 +103,7 @@ describe('updating an installed catalogue template', () => {
         const r = await svc.updateTemplateImport('stat-2', 'u1');
         const fresh = await testDb.select().from(schema.templates)
             .where(eq(schema.templates.id, r.newLocalId)).get();
-        const stored = JSON.parse(fresh!.schema as string) as { statutoryForm?: { formId?: string } };
+        const stored = fresh!.schema as { statutoryForm?: { formId?: string } };
         expect(stored.statutoryForm?.formId).toBe('zz_unpublished_form');
     });
 });

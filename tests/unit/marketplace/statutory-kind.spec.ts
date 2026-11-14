@@ -103,7 +103,7 @@ describe('importing a kind=statutory catalogue entry', () => {
         // The declaration is what the produce path reads from the inspection's
         // snapshot. An import that dropped it would install a template that
         // looks right and produces nothing.
-        const stored = JSON.parse(locals[0]!.schema as string) as { statutoryForm?: { formId?: string } };
+        const stored = locals[0]!.schema as { statutoryForm?: { formId?: string } };
         expect(stored.statutoryForm?.formId).toBe('zz_unpublished_form');
 
         const [marker] = await testDb.select().from(tenantLibraryImports).all();

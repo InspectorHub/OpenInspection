@@ -3,6 +3,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and, desc, sql, like } from 'drizzle-orm';
 import { templates, inspections, services, reports, marketplaceLibraries, tenantLibraryImports } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { normalizeStoredJson } from '../lib/stored-json';
 import { TemplateSchemaV2Schema } from '../lib/validations/template.schema';
 import { readImportMarkers, retirementOf } from './template/import-markers';
 
@@ -356,7 +357,7 @@ export class TemplateService {
             tenantId,
             name,
             version: 1,
-            schema: JSON.stringify(validated),
+            schema: validated,
             propertyType: mirror.propertyType,
             commercialSubtype: mirror.commercialSubtype,
             createdAt: new Date(),
@@ -374,20 +375,19 @@ export class TemplateService {
         const db = this.getDrizzle();
         const existing = await this.getTemplate(id, tenantId);
 
-        let nextSchema = existing.schema as string;
+        let nextSchema: unknown = normalizeStoredJson(existing.schema) ?? existing.schema; // heals a double-encoded row
         let mirror: { propertyType: string | null; commercialSubtype: string | null } | null = null;
         if (schema !== undefined) {
             const validated = this.validateSchema(schema);
-            nextSchema = JSON.stringify(validated);
+            nextSchema = validated;
             mirror = deriveTemplateMirrorColumns(validated);
         }
 
         const updateData: {
             name: string;
-            schema: string;
+            schema: unknown;
             version: number;
-            propertyType?: string | null;
-            commercialSubtype?: string | null;
+            propertyType?: string | null; commercialSubtype?: string | null;
             defaultProfileId?: string | null;
         } = {
             name: name ?? (existing.name as string),

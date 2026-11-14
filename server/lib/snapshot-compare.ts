@@ -11,6 +11,7 @@
  * canonicalised once, and the list of differing part names is a by-product of that same pass, never a second one.
  */
 import { canonical } from './report-freeze';
+import { normalizeStoredJson } from './stored-json';
 
 type Json = Record<string, unknown>;
 
@@ -53,6 +54,14 @@ export function compareSnapshots(stored: string, fresh: string): SnapshotCompari
     const old = parse(stored);
     const now = parse(fresh);
     if (!old || !now) return { same: false, differs: ['(unreadable)'] };
+    // The inspection's template snapshot is stored either as the document or, in rows older code wrote, as a string
+    // wrapping it. Both are the same content, so compare the document.
+    for (const side of [old, now]) {
+        const inspection = side.inspection;
+        if (isObject(inspection) && typeof inspection.templateSnapshot === 'string') {
+            inspection.templateSnapshot = normalizeStoredJson(inspection.templateSnapshot) ?? inspection.templateSnapshot;
+        }
+    }
     if (!('presentation' in old)) {
         delete old.schemaVersion;
         delete now.schemaVersion;

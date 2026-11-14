@@ -129,7 +129,7 @@ export async function seedStarterContent(
             tenantId,
             name:      t.name,
             version:   1,
-            schema:    JSON.stringify(t.schema),
+            schema:    t.schema,
             createdAt: new Date(),
         }));
         await batchInsert(d, templates, rows);

@@ -325,7 +325,7 @@ export class StandaloneProvider implements IntegrationProvider {
                     tenantId,
                     name: 'My Inspection Template (Blank)',
                     version: 1,
-                    schema: JSON.stringify({ title: 'My Inspection Template (Blank)', sections: [] }),
+                    schema: { title: 'My Inspection Template (Blank)', sections: [] },
                     createdAt: now,
                 });
 

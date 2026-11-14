@@ -60,6 +60,7 @@ import {
 import { utcMidnightOf } from './inspection-date';
 import { PUBLISHED_FORM_VERSIONS } from './forms';
 import type { StatutoryFormDeclaration } from '@core/field-ui/shared/statutory-declaration';
+import { normalizeStoredObject } from '../stored-json';
 
 export type RevisionStatus =
     /** Nothing to say: this template produces the revision this inspection needs. */
@@ -212,7 +213,7 @@ export function revisionStatusForInspection(input: {
     versions?: readonly StatutoryFormVersion[];
     warnWindowDays?: number;
 }): RevisionStatus | null {
-    const declaration = (input.snapshot as { statutoryForm?: StatutoryFormDeclaration } | null)
+    const declaration = (normalizeStoredObject(input.snapshot) as { statutoryForm?: StatutoryFormDeclaration } | null)
         ?.statutoryForm;
     if (!declaration || typeof declaration.revision !== 'string') return null;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(input.inspectionDate)) return null;

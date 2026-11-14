@@ -137,3 +137,22 @@ describe('compareSnapshots - cost and the log', () => {
     expect(compareSnapshots(json(base()), json(withNull))).toEqual({ same: false, differs: ['extra'] });
   });
 });
+
+describe('compareSnapshots and the template snapshot storage shape', () => {
+    // Older code stored the inspection's template snapshot as a JSON string literal, current code stores the
+    // document. The same template is the same content either way.
+    const doc = { schemaVersion: 2, sections: [{ id: 's1', items: [] }] };
+    const withSnapshot = (templateSnapshot: unknown) => {
+        const o = base();
+        return json({ ...o, inspection: { ...o.inspection, templateSnapshot } });
+    };
+
+    it('reads a wrapped template snapshot and an object one as the same report', () => {
+        expect(compareSnapshots(withSnapshot(JSON.stringify(doc)), withSnapshot(doc))).toEqual({ same: true, differs: [] });
+    });
+    it('control: a real change in the template snapshot still differs, in either shape', () => {
+        const changed = { ...doc, sections: [] };
+        expect(differingSnapshotKeys(withSnapshot(JSON.stringify(doc)), withSnapshot(changed))).toEqual(['inspection.templateSnapshot']);
+        expect(differingSnapshotKeys(withSnapshot(doc), withSnapshot(JSON.stringify(changed)))).toEqual(['inspection.templateSnapshot']);
+    });
+});
