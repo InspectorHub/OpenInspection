@@ -13,10 +13,10 @@
  * runtime), which exits 1, is never mistaken for one:
  *   0    not ready: at least one holder does not admit a patched minimatch, or could not be checked. A failed
  *        fetch prints UNKNOWN and never counts as admitting: the answer fails closed to "not ready".
- *   10   READY: every holder's latest release admits a patched minimatch. Remove the overrides and close the alert
- *        (docs/develop/dependency-policy.md says how).
- *   11   DONE: no package depending on a minimatch older than 11.0.1 remains in the lockfile. Close the alert and
- *        delete this watch and its workflow.
+ *   10   READY: every holder's latest release admits a patched minimatch. The advisory is already closed, so this
+ *        signals that the remaining scoped overrides can be removed (docs/develop/dependency-policy.md says how).
+ *   11   DONE: no package depending on a minimatch older than 11.0.1 remains in the lockfile. Delete this watch
+ *        and its workflow; there is nothing left to track.
  *   2    the watch itself failed (unreadable lockfile, an unexpected error): the message on the last line says which.
  *   Anything else is a failure of the runtime, not an answer.
  *
@@ -193,11 +193,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         console.log(table(results));
         console.log(`\n[minimatch-watch] ${summary.admits} of ${summary.holders} holder(s) admit minimatch >= 11.0.1 in their latest release; ${summary.unknown} unknown.`);
         if (summary.done) {
-            console.log('[minimatch-watch] DONE: no package depending on a minimatch older than 11.0.1 remains in the lockfile. Close the alert and delete this watch and its workflow.');
+            console.log('[minimatch-watch] DONE: no package depending on a minimatch older than 11.0.1 remains in the lockfile. Delete this watch and its workflow.');
             process.exit(11);
         }
         if (summary.ready) {
-            console.log('[minimatch-watch] READY: every holder admits a patched minimatch. Remove the overrides and close the alert (docs/develop/dependency-policy.md).');
+            console.log('[minimatch-watch] READY: every holder admits a patched minimatch. Remove the remaining scoped overrides (docs/develop/dependency-policy.md).');
             process.exit(10);
         }
         console.log('[minimatch-watch] not ready: at least one holder does not admit a patched minimatch, or could not be checked.');
