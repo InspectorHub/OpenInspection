@@ -13,7 +13,10 @@
  *   - tenant-bound     -- the tenant comes from the verified session, never the client
  *   - single-use       -- consuming it deletes it, including when the check then fails
  *   - short-lived      -- five minutes, enforced by the KV TTL and again by the stored expiry
- *   - never in a body  -- delivered in a `__Host-` HttpOnly cookie; the JSON reply carries no secret
+ *   - never in a body for a browser -- delivered in a `__Host-` HttpOnly cookie; the JSON reply
+ *     carries no secret. A native client (Node/Electron) has no cookie jar, so when the request
+ *     carries a native identity the same single token is ALSO returned in the JSON body and
+ *     accepted from the `X-Step-Up-Token` header. The cookie path is unchanged.
  *
  * State is one KV entry per token (TENANT_CACHE, the same single-use pattern as
  * the agent sign-in code): the key is the SHA-256 of the token, so reading the
@@ -64,7 +67,6 @@ import type { TotpService } from '../../services/totp.service';
 /** Every action that may demand a step-up. Adding an action is a code change on purpose. */
 export const STEP_UP_ACTIONS = [
     'data-export-start',
-    'data-export-download',
     'data-import-apply',
     'data-import-revert',
 ] as const;
@@ -72,6 +74,8 @@ export type StepUpAction = (typeof STEP_UP_ACTIONS)[number];
 
 export const STEP_UP_TTL_SECONDS = 300;
 export const STEP_UP_COOKIE_NAME = '__Host-step_up';
+/** Native clients (Node/Electron) have no cookie jar; they carry the token in this header instead. */
+export const STEP_UP_HEADER_NAME = 'X-Step-Up-Token';
 export const STEP_UP_KV_PREFIX = 'stepup:';
 const STEP_UP_LATEST_KV_PREFIX = 'stepup-latest:';
 
@@ -172,15 +176,21 @@ export function setStepUpCookie(c: Context<HonoConfig>, token: string): void {
  * its own `requireRole(...)`; the elevation proves a recent password, not authority.
  *
  * Needs the JWT middleware to have run (user + tenantId). Without a session it
- * answers 401 even when a valid token cookie is presented. The cookie is
- * cleared on the way out whether the check passes or not.
+ * answers 401 even when a valid token is presented. A browser carries the token
+ * in the `__Host-step_up` cookie; a native client (which has no cookie jar)
+ * carries the same token in the `X-Step-Up-Token` header. The cookie is cleared
+ * on the way out whether the check passes or not.
  */
 export function requireStepUp(action: StepUpAction): MiddlewareHandler<HonoConfig> {
     return async (c, next) => {
         const user = c.get('user');
         const tenantId = c.get('tenantId');
         if (!user?.sub || !tenantId) throw Errors.Unauthorized();
-        const token = getCookie(c, STEP_UP_COOKIE_NAME);
+        // Native clients have no cookie jar, so accept the header too. The header wins when
+        // both are present (a native client may still echo a stale cookie); an empty header
+        // falls back to the cookie, so a proxy injecting a blank value cannot force a 403.
+        // The browser path is unchanged. The token value is identical and single-use either way.
+        const token = c.req.header(STEP_UP_HEADER_NAME) || getCookie(c, STEP_UP_COOKIE_NAME);
         deleteCookie(c, STEP_UP_COOKIE_NAME, { path: '/', secure: true });
         await consumeStepUpToken(c.env.TENANT_CACHE, token, { userId: user.sub, tenantId, action });
         await next();
@@ -190,7 +200,6 @@ export function requireStepUp(action: StepUpAction): MiddlewareHandler<HonoConfi
 /** What the person is being asked to confirm, in words, for the emailed code. */
 export const STEP_UP_ACTION_LABELS: Record<StepUpAction, string> = {
     'data-export-start': 'start a company data export',
-    'data-export-download': 'download a company data export',
     'data-import-apply': 'apply a company data import',
     'data-import-revert': 'undo a company data import',
 };

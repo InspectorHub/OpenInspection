@@ -21,12 +21,16 @@ export const StepUpRequestSchema = z.object({
     }),
 });
 
-/** What the caller learns from a successful step-up. The token itself travels only in an HttpOnly cookie. */
+/** What the caller learns from a successful step-up. For a browser the token travels only in an HttpOnly cookie; a native client (no cookie jar) also receives the same single token in `data.token`. */
 export const StepUpResponseSchema = z.object({
     success: z.boolean().openapi({ example: true }).describe('True when the elevation was granted.'),
     data: z.object({
         action: z.enum(STEP_UP_ACTIONS).describe('The action the elevation is good for.'),
         expiresAt: z.string().openapi({ example: '2026-01-01T00:05:00.000Z' }).describe('When the elevation lapses if it is not used (ISO 8601).'),
+        token: z.string().optional().openapi({
+            example: 'a-one-time-elevation-token',
+            description: 'The single-use elevation token. Present only for native clients, which have no cookie jar; browsers receive it in the HttpOnly Set-Cookie header instead. Send it back in the X-Step-Up-Token header.',
+        }),
     }).describe('The granted elevation.'),
 }).openapi('StepUpResponse');
 

@@ -20033,12 +20033,11 @@
             "type": "string",
             "enum": [
               "data-export-start",
-              "data-export-download",
               "data-import-apply",
               "data-import-revert"
             ],
             "example": "data-export-start",
-            "description": "The single sensitive action the emailed code is for. One of: data-export-start, data-export-download, data-import-apply, data-import-revert."
+            "description": "The single sensitive action the emailed code is for. One of: data-export-start, data-import-apply, data-import-revert."
           }
         },
         "required": [
@@ -20748,12 +20747,11 @@
             "type": "string",
             "enum": [
               "data-export-start",
-              "data-export-download",
               "data-import-apply",
               "data-import-revert"
             ],
             "example": "data-export-start",
-            "description": "The single sensitive action the elevation is for. The token that comes back is accepted for this action only. One of: data-export-start, data-export-download, data-import-apply, data-import-revert."
+            "description": "The single sensitive action the elevation is for. The token that comes back is accepted for this action only. One of: data-export-start, data-import-apply, data-import-revert."
           },
           "password": {
             "type": "string",
@@ -20783,7 +20781,7 @@
       }
     },
     "summary": "Re-enter credentials to authorise one sensitive action",
-    "description": "Verifies the signed-in user's password again, and their TOTP or recovery code when two-factor authentication is on. On success, sets an HttpOnly cookie holding a token that is valid for the named action only, for the same user only, once, for five minutes. The token is never returned in the response body. An owner with no password (federated sign-up only) sends the code emailed by POST /api/auth/step-up/email-code as emailCode instead of a password. That is a weaker factor than a password (it proves control of the mailbox), accepted by explicit decision, and it is refused for any account that has a password. An upstream identity provider own two-factor is not re-challenged here; the engine asks for TOTP only when the account has it on in this engine."
+    "description": "Verifies the signed-in user's password again, and their TOTP or recovery code when two-factor authentication is on. On success, sets an HttpOnly cookie holding a token that is valid for the named action only, for the same user only, once, for five minutes. For a browser the token is never returned in the response body. A native client (which has no cookie jar) also receives the same single token in the response body and sends it back in the X-Step-Up-Token header; the cookie is still set and the browser path is unchanged. An owner with no password (federated sign-up only) sends the code emailed by POST /api/auth/step-up/email-code as emailCode instead of a password. That is a weaker factor than a password (it proves control of the mailbox), accepted by explicit decision, and it is refused for any account that has a password. An upstream identity provider own two-factor is not re-challenged here; the engine asks for TOTP only when the account has it on in this engine."
   },
   {
     "operationId": "submitReport",

@@ -77,6 +77,8 @@ describe('step-up re-authentication', () => {
     /** Runs inside the recovery-code check, after the list is read and before it is written back. */
     let raceHook: (() => Promise<void>) | null;
     let profile: { mode: string; loginRedirectBase: string | null } | null;
+    /** When true the request carries a native bearer identity (no cookie jar). */
+    let nativeClient: boolean;
 
     function buildApp() {
         const app = new OpenAPIHono<HonoConfig>();
@@ -86,6 +88,7 @@ describe('step-up re-authentication', () => {
                 c.set('tenantId', session.tenantId);
                 c.set('userRole', (session.role ?? 'owner') as never);
             }
+            if (nativeClient) c.set('nativeClient', true);
             if (profile) c.set('profile', profile as never);
             c.set('services', {
                 totp: {
@@ -138,6 +141,14 @@ describe('step-up re-authentication', () => {
         }, env());
     }
 
+    /** Present the token in the native-client header, the way a Node/Electron client without a cookie jar does. */
+    async function useHeaderToken(token: string | null) {
+        return buildApp().request('/protected', {
+            method: 'POST',
+            ...(token ? { headers: { 'X-Step-Up-Token': token } } : {}),
+        }, env());
+    }
+
     async function mint(action: StepUpAction = ACTION): Promise<string> {
         const res = await stepUp({ action, password: PASSWORD });
         expect(res.status).toBe(200);
@@ -158,6 +169,7 @@ describe('step-up re-authentication', () => {
         protectedHits = 0;
         raceHook = null;
         profile = null;
+        nativeClient = false;
         vi.mocked(verifyPassword).mockClear();
         const hash = await hashPassword(PASSWORD);
         await testDb.insert(tenants).values([
@@ -197,6 +209,27 @@ describe('step-up re-authentication', () => {
             expect(JSON.parse(entry.value)).toMatchObject({ userId: OWNER, tenantId: TENANT, action: ACTION });
         });
 
+        it('for a native client ALSO returns the single-use token in the body (no cookie jar); the cookie is still set', async () => {
+            nativeClient = true;
+            const res = await stepUp({ action: ACTION, password: PASSWORD });
+            expect(res.status).toBe(200);
+            const body = await res.json() as { data: { token?: string } };
+            const cookieToken = tokenFrom(res);
+            expect(typeof body.data.token).toBe('string');
+            expect(body.data.token).toBe(cookieToken); // the same single token, not a second one
+            expect(res.headers.get('set-cookie')).toContain(`${STEP_UP_COOKIE_NAME}=`); // browser path unchanged
+        });
+
+        it('a browser response carries NO token in the body (positive control: native does)', async () => {
+            nativeClient = false;
+            const res = await stepUp({ action: ACTION, password: PASSWORD });
+            const text = await res.text();
+            expect(JSON.parse(text).data.token).toBeUndefined();
+            nativeClient = true;
+            const nativeRes = await stepUp({ action: ACTION, password: PASSWORD });
+            expect((await nativeRes.json() as { data: { token?: string } }).data.token).toBeTruthy();
+        });
+
         it('refuses a wrong password with 401, no cookie and no stored token', async () => {
             const res = await stepUp({ action: ACTION, password: 'nope' });
             expect(res.status).toBe(401);
@@ -226,6 +259,15 @@ describe('step-up re-authentication', () => {
             const res = await stepUp({ action: 'delete-everything', password: PASSWORD });
             expect(res.status).toBe(400);
             expect(kv.store.size).toBe(0);
+        });
+
+        it('refuses the removed data-export-download action: there is no download link to protect', async () => {
+            const res = await stepUp({ action: 'data-export-download', password: PASSWORD });
+            expect(res.status).toBe(400);
+            expect(kv.store.size).toBe(0);
+            nativeClient = true;
+            const nativeRes = await stepUp({ action: 'data-export-download', password: PASSWORD });
+            expect(nativeRes.status).toBe(400);
         });
 
         it('refuses a caller with no session with 401', async () => {
@@ -373,6 +415,22 @@ describe('step-up re-authentication', () => {
             const token = await mint();
             const res = await useToken(token);
             expect(res.status).toBe(200);
+            expect(protectedHits).toBe(1);
+        });
+
+        it('lets a native client present the minted token in the X-Step-Up-Token header (no cookie jar)', async () => {
+            const token = await mint();
+            nativeClient = true;
+            const res = await useHeaderToken(token);
+            expect(res.status).toBe(200);
+            expect(protectedHits).toBe(1);
+        });
+
+        it('a header token is still single-use and action-scoped, like the cookie', async () => {
+            const token = await mint();
+            nativeClient = true;
+            expect((await useHeaderToken(token)).status).toBe(200);
+            expect((await useHeaderToken(token)).status).toBe(403); // replay refused
             expect(protectedHits).toBe(1);
         });
 

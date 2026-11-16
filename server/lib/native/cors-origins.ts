@@ -11,9 +11,11 @@ export const NATIVE_APP_ORIGINS: readonly string[] = ['capacitor://localhost', '
  * What the native app needs on top of the baseline API CORS policy: it sends the
  * idempotency and version-handshake headers, and reads the upgrade verdict and the
  * response Date back (Date is not a CORS-safelisted header, so a WebView cannot read it otherwise).
+ * X-Step-Up-Token carries a step-up elevation for native clients that run in a WebView;
+ * a Node/Electron main-process fetch sends no Origin and never needs this preflight.
  */
 export const nativeCorsHeaders = {
-    allowHeaders: ['Idempotency-Key', 'X-Client-Version', 'X-Client-Platform'],
+    allowHeaders: ['Idempotency-Key', 'X-Client-Version', 'X-Client-Platform', 'X-Step-Up-Token'],
     exposeHeaders: ['X-Client-Upgrade', 'Date'],
 } as const;
 

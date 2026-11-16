@@ -34,13 +34,13 @@ const stepUpRoute = createRoute(withMcpMetadata({
     path: '/step-up',
     operationId: 'stepUpReauthenticate',
     summary: 'Re-enter credentials to authorise one sensitive action',
-    description: 'Verifies the signed-in user\'s password again, and their TOTP or recovery code when two-factor authentication is on. On success, sets an HttpOnly cookie holding a token that is valid for the named action only, for the same user only, once, for five minutes. The token is never returned in the response body. An owner with no password (federated sign-up only) sends the code emailed by POST /api/auth/step-up/email-code as emailCode instead of a password. That is a weaker factor than a password (it proves control of the mailbox), accepted by explicit decision, and it is refused for any account that has a password. An upstream identity provider own two-factor is not re-challenged here; the engine asks for TOTP only when the account has it on in this engine.',
+    description: 'Verifies the signed-in user\'s password again, and their TOTP or recovery code when two-factor authentication is on. On success, sets an HttpOnly cookie holding a token that is valid for the named action only, for the same user only, once, for five minutes. For a browser the token is never returned in the response body. A native client (which has no cookie jar) also receives the same single token in the response body and sends it back in the X-Step-Up-Token header; the cookie is still set and the browser path is unchanged. An owner with no password (federated sign-up only) sends the code emailed by POST /api/auth/step-up/email-code as emailCode instead of a password. That is a weaker factor than a password (it proves control of the mailbox), accepted by explicit decision, and it is refused for any account that has a password. An upstream identity provider own two-factor is not re-challenged here; the engine asks for TOTP only when the account has it on in this engine.',
     tags: ['auth'],
     // Owner only: every action in STEP_UP_ACTIONS is an owner action. Widen this together with the action that needs it.
     middleware: [requireRole('owner')],
     request: { body: { content: { 'application/json': { schema: StepUpRequestSchema.describe('The action to elevate for plus the credentials re-entered.') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: StepUpResponseSchema } }, description: 'Elevation granted; the token is in the Set-Cookie header' },
+        200: { content: { 'application/json': { schema: StepUpResponseSchema } }, description: 'Elevation granted; the token is in the Set-Cookie header (and in the body for native clients)' },
         400: { description: 'Invalid input' },
         401: { description: 'Not signed in, or the credentials are wrong' },
         403: { description: 'Only an owner can step up' },
@@ -129,7 +129,12 @@ app.openapi(stepUpRoute, async (c) => {
     const { token, expiresAt } = await issueStepUpToken(c.env.TENANT_CACHE, binding);
     setStepUpCookie(c, token);
     auditFromContext(c, 'auth.step_up_granted', 'user', { entityId: me.id, metadata: { action, method } });
-    return c.json({ success: true, data: { action, expiresAt: expiresAt.toISOString() } }, 200);
+    // A native client has no cookie jar, so hand it the same single token in the body. The cookie
+    // is still set and the browser response still carries no secret.
+    return c.json({
+        success: true,
+        data: { action, expiresAt: expiresAt.toISOString(), ...(c.get('nativeClient') ? { token } : {}) },
+    }, 200);
 });
 app.openapi(emailCodeRoute, async (c) => {
     const { action } = c.req.valid('json');
