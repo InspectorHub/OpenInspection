@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertSafeJson, MAX_JSON_DEPTH, parseJsonStrict, type JsonValue } from '../../../server/lib/data-package/safe-json';
+import { assertSafeJson, MAX_JSON_DEPTH, parseJsonStrict, type JsonValue } from '@core/data-package';
 
 const BS = String.fromCharCode(92);
 const esc = (hex: string): string => `${BS}u${hex}`;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createNdjsonEncoder, DEFAULT_MAX_NDJSON_ROWS, encodeNdjsonRow, MAX_NDJSON_LINE_BYTES, readNdjson } from '../../../server/lib/data-package/ndjson';
-import type { JsonObject, JsonValue } from '../../../server/lib/data-package/safe-json';
+import { createNdjsonEncoder, DEFAULT_MAX_NDJSON_ROWS, encodeNdjsonRow, MAX_NDJSON_LINE_BYTES, readNdjson } from '@core/data-package';
+import type { JsonObject, JsonValue } from '@core/data-package';
 import { collect, prng, rejectsWithCode, streamOf, text } from './helpers';
 
 const read = (bytes: Uint8Array, chunks?: number[], options?: Parameters<typeof readNdjson>[1]) => collect(readNdjson(streamOf(bytes, chunks), options));

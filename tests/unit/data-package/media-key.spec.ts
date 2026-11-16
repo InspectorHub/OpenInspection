@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { entryNameProblem } from '../../../server/lib/data-package/entry-name';
-import { keyProblem, mapKeyToEntryName } from '../../../server/lib/data-package/media-key';
+import { entryNameProblem } from '@core/data-package';
+import { keyProblem, mapKeyToEntryName } from '@core/data-package';
 import { prng } from './helpers';
 
 const BS = String.fromCharCode(92);

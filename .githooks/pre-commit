@@ -146,7 +146,8 @@ CONFIG_STAGED=$(echo "$STAGED" | grep -E '^(tsconfig|package\.json|package-lock\
 #    staged changes do reach it, or when its output is missing (fresh clone, after
 #    a clean). `npm run type-check` still runs both unconditionally — that is what
 #    CI's verify gate uses, and what the failure messages below point developers at.
-#    (The api tier never needed either: tsconfig.api.json includes server/** alone.)
+#    (The api tier never needed either: tsconfig.api.json includes server/** plus
+#     the shared package trees, none of which are paraglide/route generated.)
 needs_paraglide() {
     [ -d app/paraglide ] || return 0
     [ -d packages/field-ui/src/i18n/generated ] || return 0
@@ -207,8 +208,9 @@ else
         fi
     fi
     timing "type-gen"
-    # The api program includes server/** plus three package trees (see its `include`:
-    # packages/api-types, packages/offline-package and packages/field-ui/src/shared), so
+    # The api program includes server/** plus four package trees (see its `include`:
+    # packages/api-types, packages/offline-package, packages/data-package and
+    # packages/field-ui/src/shared), so
     # staged changes confined to app/ workers/ and the REST of packages/ cannot affect
     # it. That pass was being run anyway: 11s warm, and 152s when its build-info had
     # gone cold — paid on every front-end commit for a program the commit cannot reach.
@@ -219,7 +221,7 @@ else
     #
     # Config changes (tsconfig, package.json, vite/react-router config) still run
     # BOTH, because those can move either program's inputs.
-    API_INPUTS='^(server/|packages/api-types/|packages/offline-package/|packages/field-ui/src/shared/)'
+    API_INPUTS='^(server/|packages/api-types/|packages/offline-package/|packages/data-package/|packages/field-ui/src/shared/)'
     APP_ONLY=0
     if [ -z "$CONFIG_STAGED" ] && [ -z "$(echo "$TS_STAGED" | grep -E "$API_INPUTS")" ]; then
         APP_ONLY=1

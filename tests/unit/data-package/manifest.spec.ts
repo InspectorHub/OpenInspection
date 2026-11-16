@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { generateChecksums, parseChecksums } from '../../../server/lib/data-package/checksums';
-import { assertRootChecksums, FORMAT_VERSION, MAX_MANIFEST_BYTES, parseManifest, serializeManifest, type Manifest } from '../../../server/lib/data-package/manifest';
-import { MIN_MEDIA_INDEX_ROW_BYTES } from '../../../server/lib/data-package/media-index';
-import { dataFileName } from '../../../server/lib/data-package/shard';
+import { generateChecksums, parseChecksums } from '@core/data-package';
+import { assertRootChecksums, FORMAT_VERSION, MAX_MANIFEST_BYTES, parseManifest, serializeManifest, type Manifest } from '@core/data-package';
+import { MIN_MEDIA_INDEX_ROW_BYTES } from '@core/data-package';
+import { dataFileName } from '@core/data-package';
 import { text } from './helpers';
 
 const goldenText = readFileSync(new URL('../../fixtures/data-package/v1-manifest.json', import.meta.url), 'utf8');

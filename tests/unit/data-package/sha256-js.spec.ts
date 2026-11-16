@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Sha256Js } from '../../../server/lib/data-package/sha256-js';
+import { Sha256Js } from '@core/data-package';
 import { prng, randomBytes } from './helpers';
 
 async function reference(bytes: Uint8Array): Promise<string> {

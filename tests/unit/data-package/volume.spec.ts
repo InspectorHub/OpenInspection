@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertEntryName, assertNoDuplicateEntryNames, assertNoPrefixCollisions, ZIP_MAX_BYTES, ZIP_MAX_ENTRIES, classifyPackageEntry, entryNameProblem, mediaVolumeName,
   parseVolumeName, VolumePlanner, zipEntryOverhead,
-} from '../../../server/lib/data-package/volume';
+} from '@core/data-package';
 import { prng } from './helpers';
 
 describe('entry names', () => {

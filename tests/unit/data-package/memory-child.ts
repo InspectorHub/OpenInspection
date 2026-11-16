@@ -2,10 +2,10 @@
  * Child process for memory.spec.ts. Run as `node --max-old-space-size=N --import tsx memory-child.ts <scenario>`.
  * An out-of-memory kill exits non-zero without printing; a clean run prints one JSON line.
  */
-import { MAX_CHECKSUM_ENTRIES, MAX_CHECKSUMS_BYTES, parseChecksums, sha256OfStream } from '../../../server/lib/data-package/checksums';
-import { MediaIndexWriter, verifyMediaIndex } from '../../../server/lib/data-package/media-index';
-import { parseManifest } from '../../../server/lib/data-package/manifest';
-import { readNdjson } from '../../../server/lib/data-package/ndjson';
+import { MAX_CHECKSUM_ENTRIES, MAX_CHECKSUMS_BYTES, parseChecksums, sha256OfStream } from '../../../packages/data-package/src/checksums';
+import { MediaIndexWriter, verifyMediaIndex } from '../../../packages/data-package/src/media-index';
+import { parseManifest } from '../../../packages/data-package/src/manifest';
+import { readNdjson } from '../../../packages/data-package/src/ndjson';
 
 function codeOf(error: unknown): string {
   return (error as { code?: string }).code ?? 'other';

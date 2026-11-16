@@ -16,6 +16,7 @@ export default defineConfig({
       '~': path.resolve(__dirname, 'app'),
       '@core/shared-ui': path.resolve(__dirname, 'packages/shared-ui/src'),
       '@core/offline-package': path.resolve(__dirname, 'packages/offline-package/index.ts'),
+      '@core/data-package': path.resolve(__dirname, 'packages/data-package/index.ts'),
       '@core/field-ui': path.resolve(__dirname, 'packages/field-ui/src'),
     },
   },

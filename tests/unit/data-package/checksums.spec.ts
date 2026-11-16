@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createDigestTap, createSha256Hasher, generateChecksums, MAX_CHECKSUM_ENTRIES, MAX_CHECKSUMS_BYTES, parseChecksums, sha256Hex, sha256OfStream,
   type DigestStreamCtor, type ChecksumEntry,
-} from '../../../server/lib/data-package/checksums';
+} from '@core/data-package';
 import { prng, randomBytes, rejectsWithCode, streamOf } from './helpers';
 
 const H1 = '0123456789abcdef'.repeat(4);

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { generateChecksums, parseChecksums, sha256Hex } from '../../../server/lib/data-package/checksums';
-import { compareEntryNames, MediaIndexWriter, MIN_MEDIA_INDEX_ROW_BYTES, readMediaIndex, verifyMediaIndex, type MediaIndexRow } from '../../../server/lib/data-package/media-index';
-import { keyProblem, mapKeyToEntryName } from '../../../server/lib/data-package/media-key';
-import { encodeNdjsonRow } from '../../../server/lib/data-package/ndjson';
-import type { JsonObject } from '../../../server/lib/data-package/safe-json';
+import { generateChecksums, parseChecksums, sha256Hex } from '@core/data-package';
+import { compareEntryNames, MediaIndexWriter, MIN_MEDIA_INDEX_ROW_BYTES, readMediaIndex, verifyMediaIndex, type MediaIndexRow } from '@core/data-package';
+import { keyProblem, mapKeyToEntryName } from '@core/data-package';
+import { encodeNdjsonRow } from '@core/data-package';
+import type { JsonObject } from '@core/data-package';
 import { collect, prng, rejectsWithCode, streamOf, text } from './helpers';
 
 const E_ACUTE = String.fromCharCode(0xe9);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { classifyPackageEntry } from '../../../server/lib/data-package/volume';
-import { dataFileName, emptyDataFile, isTableName, parseDataFileName, ShardCutter } from '../../../server/lib/data-package/shard';
+import { classifyPackageEntry } from '@core/data-package';
+import { dataFileName, emptyDataFile, isTableName, parseDataFileName, ShardCutter } from '@core/data-package';
 import { prng } from './helpers';
 
 describe('data file names', () => {

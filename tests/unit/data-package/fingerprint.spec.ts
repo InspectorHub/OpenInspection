@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columnSetFingerprint } from '../../../server/lib/data-package/fingerprint';
+import { columnSetFingerprint } from '@core/data-package';
 import { rejectsWithCode } from './helpers';
 
 describe('columnSetFingerprint', () => {

@@ -174,6 +174,7 @@ function resolveSpecifier(root, from, spec, opts = {}) {
     else if (spec.startsWith('~/')) base = join(root, 'app', spec.slice(2));
     else if (spec.startsWith('@core/field-ui')) base = join(root, 'packages/field-ui/src', spec.slice('@core/field-ui'.length));
     else if (spec === '@core/offline-package') base = join(root, 'packages/offline-package/index.ts');
+    else if (spec === '@core/data-package') base = join(root, 'packages/data-package/index.ts');
     else if (opts.sharedUi && spec.startsWith('@core/shared-ui')) base = join(root, 'packages/shared-ui/src', spec.slice('@core/shared-ui'.length));
     else return null;
     for (const c of candidates(base)) {
