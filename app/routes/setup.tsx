@@ -6,7 +6,7 @@ import { isCrossSitePost } from "~/lib/same-origin-post.server";
 import { getToken, createSessionWithToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeSetupSchema } from "~/lib/forms/auth.schema";
-import { Input, Button } from "@core/shared-ui";
+import { Input, Button, Checkbox } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
@@ -40,7 +40,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (submission.status !== "success") {
     return submission.reply();
   }
-  const { workspaceName, adminName, email, password, setupCode } = submission.value;
+  const { workspaceName, adminName, email, password, setupCode, startEmpty } = submission.value;
   // A form posted from another site is refused before anything is spent or any session is created (login CSRF).
   if (isCrossSitePost(request)) return submission.reply({ formErrors: [m.auth_setup_error_failed()] });
 
@@ -53,6 +53,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         email,
         password,
         verificationCode: setupCode,
+        startEmpty: startEmpty ?? false,
       },
     });
 
@@ -191,6 +192,18 @@ export default function SetupPage() {
               </>
             }
           />
+
+          <div>
+            <Checkbox
+              id={fields.startEmpty.id}
+              name={fields.startEmpty.name}
+              label={m.auth_setup_blank_label()}
+              aria-describedby={`${fields.startEmpty.id}-help`}
+            />
+            <p id={`${fields.startEmpty.id}-help`} className="mt-1 ml-6 text-[11px] text-ih-fg-3">
+              {m.auth_setup_blank_help()}
+            </p>
+          </div>
 
           {form.errors && (
             <div className="px-3 py-2 rounded-lg bg-ih-bad-bg border border-ih-bad text-sm text-ih-bad-fg">
