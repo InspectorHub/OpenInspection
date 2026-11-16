@@ -8,8 +8,8 @@ const ROOT = resolve(__dirname, '..', '..', '..');
 const readJson = (p: string) => JSON.parse(readFileSync(join(ROOT, p), 'utf8'));
 
 describe('release package table', () => {
-  it('lists exactly the two published packages, field-ui first and as the default', () => {
-    expect(Object.keys(PACKAGES)).toEqual(['field-ui', 'offline-package']);
+  it('lists exactly the three published packages, field-ui first and as the default', () => {
+    expect(Object.keys(PACKAGES)).toEqual(['field-ui', 'offline-package', 'data-package']);
     expect(DEFAULT_PACKAGE).toBe('field-ui');
   });
 
@@ -36,8 +36,19 @@ describe('release package table', () => {
     });
   });
 
+  it('describes data-package with its own tag prefix, workflow file and directory', () => {
+    expect(getPackage('data-package')).toMatchObject({
+      slug: 'data-package',
+      name: '@inspectorhub/data-package',
+      dir: 'packages/data-package',
+      manifestKey: 'packages/data-package',
+      tagPrefix: 'data-package-v',
+      workflow: 'publish-data-package.yml',
+    });
+  });
+
   it('rejects an unknown slug instead of falling back to a default', () => {
-    expect(() => getPackage('nope')).toThrow(/unknown package "nope".*field-ui, offline-package/);
+    expect(() => getPackage('nope')).toThrow(/unknown package "nope".*field-ui, offline-package, data-package/);
   });
 
   it('reads --package from argv in both spellings and defaults to field-ui', () => {
@@ -59,6 +70,6 @@ describe('release package table', () => {
       expect(readFileSync(join(ROOT, '.github', 'workflows', p.workflow), 'utf8'), p.slug).toContain(`name: ${p.workflow.replace(/\.yml$/, '')}`);
       checked += 1;
     }
-    expect(checked).toBe(2);
+    expect(checked).toBe(3);
   });
 });

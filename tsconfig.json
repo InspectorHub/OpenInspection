@@ -55,6 +55,7 @@
       "~/*": ["./app/*"],
       "@core/shared-ui": ["./packages/shared-ui/src/index.ts"],
       "@core/offline-package": ["./packages/offline-package/index.ts"],
+      "@core/data-package": ["./packages/data-package/index.ts"],
       "@core/field-ui": ["./packages/field-ui/src/index.ts"],
       "@core/field-ui/*": ["./packages/field-ui/src/*"]
     },

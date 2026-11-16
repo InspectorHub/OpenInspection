@@ -33,6 +33,14 @@ export const PACKAGES = {
         tagPrefix: 'offline-package-v',
         workflow: 'publish-offline-package.yml',
     },
+    'data-package': {
+        slug: 'data-package',
+        name: '@inspectorhub/data-package',
+        dir: 'packages/data-package',
+        manifestKey: 'packages/data-package',
+        tagPrefix: 'data-package-v',
+        workflow: 'publish-data-package.yml',
+    },
 };
 
 export const DEFAULT_PACKAGE = 'field-ui';

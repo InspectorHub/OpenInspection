@@ -111,3 +111,6 @@ packages/field-ui/src/i18n/generated/
 
 # The staged npm package of @inspectorhub/offline-package (npm run stage:offline-package); rebuilt from scratch each run
 /packages/offline-package/.publish/
+
+# The staged npm package of @inspectorhub/data-package (npm run stage:data-package); rebuilt from scratch each run
+/packages/data-package/.publish/

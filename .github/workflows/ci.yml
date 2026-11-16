@@ -434,6 +434,9 @@ jobs:
       # The same check for @inspectorhub/offline-package, which also compares the built
       # declaration file against the committed export list (packages/offline-package/api-surface.json).
       - run: npm run release:check:offline-package
+      # The same check for @inspectorhub/data-package: build, compare the built
+      # declaration against packages/data-package/api-surface.json, stage, scan and dry-run pack.
+      - run: npm run release:check:data-package
 
   # ── The required check ───────────────────────────────────────────────────
   # Does no work; exists so branch protection has a single stable name to
