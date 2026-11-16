@@ -53,6 +53,8 @@ export const servicePayRules = sqliteTable('service_pay_rules', {
         .where(sql`user_id IS NOT NULL`),
     uniqueIndex('uq_service_pay_rules_default').on(t.tenantId, t.serviceId)
         .where(sql`user_id IS NULL`),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_service_pay_rules_tenant_id').on(t.tenantId, t.id),
 ]);
 
 /**
@@ -101,6 +103,8 @@ export const inspectionServicePaySplits = sqliteTable('inspection_service_pay_sp
         .where(sql`corrects_split_id IS NULL`),
     index('idx_pay_split_user').on(t.tenantId, t.userId),
     index('idx_pay_split_line').on(t.tenantId, t.inspectionServiceId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_inspection_service_pay_splits_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export type ServicePayRule = typeof servicePayRules.$inferSelect;

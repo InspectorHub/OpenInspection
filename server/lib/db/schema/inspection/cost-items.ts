@@ -75,4 +75,6 @@ export const costItems = sqliteTable('cost_items', {
 }, (t) => [
     index('idx_cost_items_tenant_inspection').on(t.tenantId, t.inspectionId),
     index('idx_cost_items_finding_key').on(t.findingKey),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_cost_items_tenant_id').on(t.tenantId, t.id),
 ]);

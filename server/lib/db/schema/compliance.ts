@@ -48,6 +48,8 @@ export const erasureLog = sqliteTable('erasure_log', {
     createdAt:       integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_erasure_log_tenant').on(t.tenantId, t.createdAt),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_erasure_log_tenant_id').on(t.tenantId, t.id),
 ]);
 
 // Track L (D7) — the TCPA disclosure shown at SMS opt-in. version is monotonic;
@@ -154,6 +156,8 @@ export const smsConsentLog = sqliteTable('sms_consent_log', {
 }, (t) => [
     index('idx_sms_consent_contact').on(t.tenantId, t.contactId, t.createdAt),
     index('idx_sms_consent_subject').on(t.tenantId, t.subjectKind, t.subjectId, t.createdAt),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_sms_consent_log_tenant_id').on(t.tenantId, t.id),
 ]);
 
 // SMS provider compliance state — one row per tenant, tracks carrier (Twilio /

@@ -89,7 +89,8 @@ export const automations = sqliteTable('automations', {
     // Appended at table end for D1 rebuild safety.
     inAppTemplateId: text('in_app_template_id'),
 }, (t) => [
-    index('idx_automations_tenant').on(t.tenantId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_automations_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export const automationLogs = sqliteTable('automation_logs', {
@@ -219,6 +220,8 @@ export const automationLogs = sqliteTable('automation_logs', {
     uniqueIndex('uq_automation_logs_event')
         .on(t.automationId, t.inspectionId, t.eventId, t.channel, t.recipient)
         .where(sql`event_id IS NOT NULL`),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_automation_logs_tenant_id').on(t.tenantId, t.id),
 ]);
 
 // Spec 4D — Inspection Events
@@ -248,6 +251,8 @@ export const eventTypes = sqliteTable('event_types', {
     followUpDelayHours: integer('follow_up_delay_hours').notNull().default(72),
 }, (t) => [
     uniqueIndex('uq_event_types_tenant_slug').on(t.tenantId, t.slug),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_event_types_tenant_id').on(t.tenantId, t.id),
 ]);
 
 // Settings + Library IA — tenant-defined inspection subtypes layered on the
@@ -270,6 +275,8 @@ export const inspectionTypes = sqliteTable('inspection_types', {
     createdAt:   integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     uniqueIndex('idx_inspection_types_tenant_name').on(t.tenantId, t.name),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_inspection_types_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export const inspectionEvents = sqliteTable('inspection_events', {
@@ -290,4 +297,6 @@ export const inspectionEvents = sqliteTable('inspection_events', {
 }, (t) => [
     index('idx_inspection_events_scheduled').on(t.tenantId, t.scheduledAt),
     index('idx_inspection_events_inspection').on(t.inspectionId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_inspection_events_tenant_id').on(t.tenantId, t.id),
 ]);

@@ -75,4 +75,6 @@ export const legalHolds = sqliteTable('legal_holds', {
     // are not available here, so the null-ness of `released_at` is filtered in
     // the query and this index just keeps the scan tenant-ordered.
     index('idx_legal_holds_tenant_active').on(t.tenantId, t.releasedAt),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_legal_holds_tenant_id').on(t.tenantId, t.id),
 ]);

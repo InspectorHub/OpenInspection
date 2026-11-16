@@ -28,4 +28,6 @@ export const conciergeConfirmTokens = sqliteTable('concierge_confirm_tokens', {
 }, (t) => [
     index('idx_concierge_tokens_expiry').on(t.expiresAt),
     uniqueIndex('idx_concierge_confirm_token_hash').on(t.tokenHash),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_concierge_confirm_tokens_tenant_id').on(t.tenantId, t.id),
 ]);

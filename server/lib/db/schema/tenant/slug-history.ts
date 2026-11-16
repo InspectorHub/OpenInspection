@@ -46,5 +46,6 @@ export const tenantSlugHistory = sqliteTable('tenant_slug_history', {
     changedAt:    integer('changed_at', { mode: 'timestamp_ms' }).notNull(),
     retiredUntil: integer('retired_until', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
-    index('idx_tenant_slug_history_tenant').on(t.tenantId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_tenant_slug_history_tenant_old_slug').on(t.tenantId, t.oldSlug),
 ]);

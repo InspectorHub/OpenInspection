@@ -56,6 +56,8 @@ export const clientUploads = sqliteTable('client_uploads', {
   createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({
   idxInspection: index('idx_client_uploads_inspection').on(t.tenantId, t.inspectionId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    idxTenantKey: index('idx_client_uploads_tenant_id').on(t.tenantId, t.id),
 }));
 
 export type ClientUpload = typeof clientUploads.$inferSelect;

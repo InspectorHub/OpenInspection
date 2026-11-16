@@ -71,6 +71,27 @@
       "when": 1794305272238,
       "tag": "0009_templates_schema_unwrap",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794843837689,
+      "tag": "0010_export_tenant_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1794843845605,
+      "tag": "0011_drop_redundant_tenant_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794846201038,
+      "tag": "0012_tenant_data_jobs",
+      "breakpoints": true
     }
   ]
 }

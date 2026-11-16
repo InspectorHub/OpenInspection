@@ -84,6 +84,8 @@ export const aiCallProvenance = sqliteTable('ai_call_provenance', {
     endpoint: text('endpoint'),
 }, (t) => ({
     byTenantTime: index('idx_ai_call_provenance_tenant_created').on(t.tenantId, t.createdAt),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    idxTenantKey: index('idx_ai_call_provenance_tenant_id').on(t.tenantId, t.id),
 }));
 
 export type AiCallProvenance = typeof aiCallProvenance.$inferSelect;
@@ -195,6 +197,8 @@ export const aiContentReviews = sqliteTable('ai_content_reviews', {
      */
     oneReviewPerPersonPerCall: uniqueIndex('uq_ai_content_reviews_person_call')
         .on(t.tenantId, t.artifactType, t.artifactId, t.aiCallId, t.reviewedBy),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    idxTenantKey: index('idx_ai_content_reviews_tenant_id').on(t.tenantId, t.id),
 }));
 
 export type AiContentReview = typeof aiContentReviews.$inferSelect;

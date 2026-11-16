@@ -70,6 +70,8 @@ export const signingKeys = sqliteTable('signing_keys', {
     uqTenantActive: uniqueIndex('uq_signing_keys_tenant_active')
         .on(t.tenantId)
         .where(sql`retired_at IS NULL`),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    idxTenantKey: index('idx_signing_keys_tenant_id').on(t.tenantId, t.id),
 }));
 
 /**
@@ -122,6 +124,10 @@ export const esignAuditLogs = sqliteTable('esign_audit_logs', {
     uqEventDedup:  uniqueIndex('idx_esign_audit_logs_event_dedup')
         .on(t.tenantId, t.requestId, t.event)
         .where(sql`event NOT LIKE 'signer.%'`),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    idxTenantKey: index('idx_esign_audit_logs_tenant_id').on(t.tenantId, t.id),
+    // Chain-order export cursor: (tenant_id, created_at, rowid).
+    idxTenantCreated: index('idx_esign_audit_logs_tenant_created').on(t.tenantId, t.createdAt),
 }));
 
 export type SigningKey = typeof signingKeys.$inferSelect;

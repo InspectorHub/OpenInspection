@@ -66,6 +66,8 @@ export const orderPayments = sqliteTable('order_payments', {
     // An offline path that needs dedupe must bring its own key; do not assume
     // this constraint is doing it.
     uniqueIndex('uq_order_payments_provider_ref').on(t.tenantId, t.provider, t.providerRef),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_order_payments_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export type OrderPayment = typeof orderPayments.$inferSelect;
