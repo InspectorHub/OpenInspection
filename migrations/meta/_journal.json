@@ -85,6 +85,13 @@
       "when": 1794843845605,
       "tag": "0011_drop_redundant_tenant_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794846201038,
+      "tag": "0012_tenant_data_jobs",
+      "breakpoints": true
     }
   ]
 }

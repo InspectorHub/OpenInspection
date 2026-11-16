@@ -162,3 +162,8 @@ export type { PermissionTemplateRow, NewPermissionTemplateRow } from './permissi
 // Attempt counters of the signed audit export's knowledge check (atomic reserve, short-lived rows).
 export { verifyExportAttempts } from './verify-export-attempts';
 export type { VerifyExportAttempt } from './verify-export-attempts';
+// One export or import of a company's data package: stage, resumable cursor, sizes, lease. One active job per company.
+export {
+    tenantDataJobs, DATA_JOB_KINDS, DATA_JOB_STATUSES, DATA_JOB_STAGES, DATA_JOB_ERROR_CODES, DATA_JOB_TEXT_MAX_CHARS,
+} from './data-package';
+export type { TenantDataJob, NewTenantDataJob } from './data-package';
