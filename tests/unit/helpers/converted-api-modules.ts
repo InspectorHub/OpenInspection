@@ -319,6 +319,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/auth/step-up.ts',
+        tuple: 'stepUpRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/auth/step-up');
+            return { app: m.default, configs: m.stepUpRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/automations.ts',
         tuple: 'automationsRouteConfigs',
         load: async () => {

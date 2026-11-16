@@ -149,7 +149,7 @@ describe('free-tier pre-flight cap (platform-mode only)', () => {
 
     // the named exemption list, read from the authority the cooling window already keeps
     expect([...ACCOUNT_EMAIL_CLASSES].sort()).toEqual([
-      'password-reset', 'subject-erasure-confirmed', 'subject-export-ready',
+      'password-reset', 'step-up-code', 'subject-erasure-confirmed', 'subject-export-ready',
       'usage-quota-reached', 'usage-quota-warning', 'workspace-invitation',
     ]);
     for (const classId of ACCOUNT_EMAIL_CLASSES) {

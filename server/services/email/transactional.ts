@@ -29,6 +29,21 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
         }
 
         /**
+         * The one-time code an owner with no password enters to confirm a sensitive
+         * action. Fixed copy (non-editable template), code and action name only: no
+         * link, no tenant detail. The caller supplies the recipient from the user
+         * table; nothing here takes an address from a request.
+         */
+        async sendStepUpCode(to: string, code: string, actionLabel: string): Promise<{ delivered: boolean }> {
+            const rendered = this.renderOr('step-up-code', { code, actionLabel }, {
+                subject: 'Your confirmation code',
+                html: `<p>Your confirmation code is ${escapeHtml(code)}. Enter it to ${escapeHtml(actionLabel)}. It expires in 10 minutes. If this was not you, ignore this email and contact your administrator.</p>`,
+            });
+            if (!rendered.enabled) return { delivered: false };
+            return this.sendRendered(rendered, [to]);
+        }
+
+        /**
          * The client portal's magic sign-in link.
          *
          * The route used to build this HTML itself and call `sendEmail`

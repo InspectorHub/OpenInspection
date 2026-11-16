@@ -39,7 +39,9 @@ type ChainPaths =
     | '/reset-password'
     | '/setup'
     | '/setup-status'
-    | '/sso';
+    | '/sso'
+    | '/step-up'
+    | '/step-up/email-code';
 
 // Compile-time only. `CoreAuthApi` is derived from `coreAuthRouteParts`: the SSO consume route and the profile and
 // two-factor routers are mounted at the root among the router's own routes. A mount or route left out of the list,
@@ -52,7 +54,7 @@ describe('CoreAuthApi client', () => {
     it('has the same top-level segments, so a dropped mount shows up', () => {
         expectTypeOf<Keys<Client>>().toEqualTypeOf<
             '2fa' | 'change-password' | 'checklist' | 'forgot-password' | 'invite-info' | 'join' | 'login' | 'logout'
-            | 'me' | 'profile' | 'reset-password' | 'setup' | 'setup-status' | 'sso'
+            | 'me' | 'profile' | 'reset-password' | 'setup' | 'setup-status' | 'sso' | 'step-up'
         >();
         expectTypeOf<Keys<Client['login']>>().toEqualTypeOf<'$post' | '2fa'>();
         expectTypeOf<Keys<Client['2fa']>>().toEqualTypeOf<'setup' | 'verify' | 'disable' | 'recovery-codes'>();

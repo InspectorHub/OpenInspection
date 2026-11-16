@@ -28,6 +28,24 @@ export const SYSTEM_TEMPLATES: EmailTemplateDescriptor[] = [
   },
 
   {
+    trigger: 'step-up-code',
+    name: 'Confirmation code',
+    category: 'system',
+    editable: false,
+    required: true,
+    brand: 'platform',
+    defaultSubject: 'Your confirmation code',
+    blocks: [
+      { key: 'heading', label: 'Heading', default: 'Your confirmation code',                                                                                                                                                    multiline: false },
+      { key: 'body',    label: 'Body',    default: 'Your confirmation code is {{code}}. Enter it to {{actionLabel}}. It expires in 10 minutes. If this was not you, ignore this email and contact your administrator.', multiline: true  },
+    ],
+    variables: [
+      { name: 'code',        desc: 'Six-digit confirmation code' },
+      { name: 'actionLabel', desc: 'The action being confirmed, in words' },
+    ],
+  },
+
+  {
     trigger: 'workspace-invitation',
     name: 'Workspace invitation',
     category: 'system',

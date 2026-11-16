@@ -237,6 +237,15 @@ describe('the seam is actually connected', () => {
         expect(vi.mocked(fetch)).not.toHaveBeenCalled();
     });
 
+    it('never withholds the step-up confirmation code, whatever the recipient preference says', async () => {
+        await seedContact();
+        await mute('step-up-code');
+        expect(await port().isMuted('step-up-code', ADDR)).toBe(false);
+        const svc = assembleTenantEmailService(env(), { dbSecrets: {} }, TENANT);
+        await svc.sendEmail([ADDR], 'S', 'H', undefined, { classId: 'step-up-code' });
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    });
+
     it('the same recipient still gets a REQUIRED class', async () => {
         await seedContact();
         await mute('password-reset');
