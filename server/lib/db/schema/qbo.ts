@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
 /**
  * One QuickBooks company, one workspace — and the webhook depends on it.
@@ -65,6 +65,8 @@ export const qboEntityMap = sqliteTable('qbo_entity_map', {
 }, (t) => [
     uniqueIndex('idx_qbo_entity_map_qbo').on(t.tenantId, t.qboType, t.qboId),
     uniqueIndex('idx_qbo_entity_map_oi').on(t.tenantId, t.oiType, t.oiId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_qbo_entity_map_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export const qboSyncErrors = sqliteTable('qbo_sync_errors', {
@@ -110,4 +112,7 @@ export const qboSyncErrors = sqliteTable('qbo_sync_errors', {
      * resolution date fails closed rather than being treated as long ago.
      */
     resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
-});
+}, (t) => [
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_qbo_sync_errors_tenant_id').on(t.tenantId, t.id),
+]);

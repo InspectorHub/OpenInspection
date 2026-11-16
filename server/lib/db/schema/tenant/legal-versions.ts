@@ -77,4 +77,6 @@ export const tenantLegalVersions = sqliteTable('tenant_legal_versions', {
 }, (t) => [
     uniqueIndex('idx_tenant_legal_versions_doc_version').on(t.tenantId, t.doc, t.version),
     index('idx_tenant_legal_versions_latest').on(t.tenantId, t.doc, t.publishedAt),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_tenant_legal_versions_tenant_id').on(t.tenantId, t.id),
 ]);

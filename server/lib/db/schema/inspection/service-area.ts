@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
 /**
  * Which ZIPs an inspector will travel to.
@@ -31,4 +31,6 @@ export const inspectorServiceAreas = sqliteTable('inspector_service_areas', {
     // not double it; the replace-list write deletes then inserts, and this
     // index is what makes a partially-applied replace impossible to paper over.
     uniqueIndex('uq_inspector_service_areas').on(t.tenantId, t.userId, t.zipPrefix),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_inspector_service_areas_tenant_id').on(t.tenantId, t.id),
 ]);

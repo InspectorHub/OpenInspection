@@ -11,7 +11,7 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 |---|---|
 | Tables | 116 |
 | Columns | 1316 |
-| Indexes (excluding primary keys) | 188 |
+| Indexes (excluding primary keys) | 255 |
 | Database foreign keys (all legacy, frozen) | 51 |
 | Columns carrying a source comment | 619 (47%) |
 
@@ -52,7 +52,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | Multi-tenant isolation, per the Schema Rules. |
 | `user_id` | text | NN UQ |  |  | The `users` row this acceptance was committed alongside. |
 | `actor_identity_ref` | text |  |  |  | The portal `identities.id` the acceptance was captured against, when it was captured over there. |
@@ -67,6 +67,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `uq_account_acceptances_user_doc_version` (user_id, doc, version)
 - `idx_account_acceptances_tenant` (tenant_id, accepted_at)
+- `idx_account_acceptances_tenant_id` (tenant_id, id)
 
 ---
 
@@ -99,7 +100,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX FK→`inspections.id` |  |  | Every agreement envelope is bound to an inspection (the send UI + every service path require it). |
 | `agreement_id` | text | NN FK→`agreements.id` |  |  | *App-layer reference to another row — no database foreign key.* |
@@ -126,9 +127,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `idx_agreement_requests_verify_token` (verification_token)
-- `idx_agreement_requests_tenant` (tenant_id)
 - `idx_agreement_requests_inspection` (inspection_id)
 - **UNIQUE** `idx_agreement_requests_token_hash` (token_hash)
+- `idx_agreement_requests_tenant_id` (tenant_id, id)
 
 ---
 
@@ -140,7 +141,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | → tenants.id (app-layer; FK intentionally omitted per Schema Rules) |
 | `request_id` | text | NN UQ IX |  |  | → agreement_requests.id (app-layer) |
 | `name` | text | NN |  |  |  |
@@ -172,6 +173,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - `idx_agreement_signers_tenant_request` (tenant_id, request_id)
 - **UNIQUE** `idx_agreement_signers_request_email` (request_id, email)
 - **UNIQUE** `idx_agreement_signers_token_hash` (token_hash)
+- `idx_agreement_signers_tenant_id` (tenant_id, id)
 
 ---
 
@@ -181,7 +183,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN |  |  |  |
 | `content` | text | NN |  |  | The tenant's template body, run through sanitizeAgreementHtml on EVERY create/update (never trusted as stored). |
@@ -190,7 +192,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_agreements_tenant` (tenant_id)
+- `idx_agreements_tenant_id` (tenant_id, id)
 
 ---
 
@@ -202,7 +204,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `capability` | text | NN |  | `assist, translate` | Which AI workload ran. Same vocabulary as `AiUsageKind` and as the `ai_assist*`/`ai_translate*` usage metrics, so a provenance row and a metered unit describe the same call in the same words. |
 | `provider` | text | NN |  |  | Adapter id of the backend that was called (`AiProvider.id`, e.g. 'gemini'), taken from the adapter instance the call actually used rather than from configuration — a mismatch between the two is exactly the kind of thing this row exists to make visible. |
@@ -215,6 +217,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_ai_call_provenance_tenant_created` (tenant_id, created_at)
+- `idx_ai_call_provenance_tenant_id` (tenant_id, id)
 
 ---
 
@@ -226,8 +229,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `artifact_type` | text | NN UQ |  | `inspection_result, report` | WHICH TABLE holds the row that received the text. `artifact_id` below is that row's primary key, so neither column means anything without the other. **[more]** |
 | `artifact_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
 | `reviewed_by` | text | NN UQ |  |  | The STAFF user who reviewed the text (`users.id`), never a contact. Named `reviewed_by` and not `accepted_by` on purpose — the control that writes this row says "Review AI-assisted content before publication", and a column called "accepted" would quietly restate the absolution claim this product … **[more]** |
@@ -238,6 +241,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_ai_content_reviews_ai_call` (ai_call_id)
 - **UNIQUE** `uq_ai_content_reviews_person_call` (tenant_id, artifact_type, artifact_id, ai_call_id, reviewed_by)
+- `idx_ai_content_reviews_tenant_id` (tenant_id, id)
 
 ---
 
@@ -247,7 +251,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text |  |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
 | `action` | text | NN |  |  | e.g. 'inspection.create' |
@@ -264,6 +268,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_audit_tenant_created` (tenant_id, created_at)
 - `idx_audit_entity` (entity_type, entity_id)
+- `idx_audit_logs_tenant_id` (tenant_id, id)
 
 ---
 
@@ -273,7 +278,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `automation_id` | text | UQ |  |  | Nullable since Communication A2: `automation_id IS NULL` means a MANUAL send (an operator pressing Send report), logged into the same ledger so the Outbox answers "what left this office" regardless of who pressed it. |
 | `inspection_id` | text | NN UQ IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
@@ -297,6 +302,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - `idx_automation_logs_pending` (tenant_id, status, send_at)
 - `idx_automation_logs_insp` (inspection_id)
 - **UNIQUE** `uq_automation_logs_event` (automation_id, inspection_id, event_id, channel, recipient) — partial, `WHERE event_id IS NOT NULL`
+- `idx_automation_logs_tenant_id` (tenant_id, id)
 
 ---
 
@@ -306,7 +312,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN |  |  |  |
 | `trigger` | text | NN |  |  | THE EVENT THAT ENQUEUES THIS RULE. `AutomationService.trigger()` matches the tenant's active rules whose trigger equals the fired `ctx.triggerEvent` and writes one pending `automation_logs` row per (recipient, channel); the same value is stamped onto the notice header's `notifications.type`. |
@@ -324,7 +330,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_automations_tenant` (tenant_id)
+- `idx_automations_tenant_id` (tenant_id, id)
 
 ---
 
@@ -334,8 +340,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspector_id` | text | NN UQ FK→`users.id` |  |  | *App-layer reference to another row — no database foreign key.* |
 | `day_of_week` | integer | NN UQ |  |  | *An integer value.* |
 | `start_time` | text | NN UQ |  |  | Clock time-of-day 'HH:MM' for a recurring weekly window (keyed by day_of_week) — intentionally TEXT (no date, no epoch) per the Schema Rules calendar/clock exception. |
@@ -345,6 +351,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `idx_availability_window_unique` (inspector_id, day_of_week, start_time)
+- `idx_availability_tenant_id` (tenant_id, id)
 
 ---
 
@@ -354,8 +361,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspector_id` | text | NN UQ FK→`users.id` |  |  | *App-layer reference to another row — no database foreign key.* |
 | `date` | text | NN UQ |  |  | *Calendar date `YYYY-MM-DD`, no time and no zone.* |
 | `is_available` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
@@ -370,6 +377,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `idx_avail_overrides_block_unique` (inspector_id, date) — partial, `WHERE is_available = 0 AND source IS NULL`
 - **UNIQUE** `uq_avail_overrides_external` (inspector_id, source, external_id)
+- `idx_availability_overrides_tenant_id` (tenant_id, id)
 
 ---
 
@@ -379,7 +387,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text | NN IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
 | `title` | text | NN |  |  |  |
@@ -394,6 +402,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_calendar_blocks_tenant_user_date` (tenant_id, user_id, date)
+- `idx_calendar_blocks_tenant_id` (tenant_id, id)
 
 ---
 
@@ -405,7 +414,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `connection_id` | text | NN UQ IX |  |  | calendar_connections.id (app-layer) |
 | `external_calendar_id` | text | NN UQ |  |  | Google calendar id |
@@ -418,6 +427,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `uq_conn_read_cal` (connection_id, external_calendar_id)
 - `idx_conn_read_cal_tenant` (tenant_id, connection_id)
+- `idx_calendar_connection_read_calendars_tenant_id` (tenant_id, id)
 
 ---
 
@@ -429,7 +439,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text | NN UQ IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
 | `provider` | text | NN UQ |  | `google, microsoft, apple` | Which system holds the calendar. `getCalendarProvider(provider)` is the only dispatch: it picks the API client that reads busy time and pushes events. |
@@ -447,6 +457,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `uq_calendar_connections_user_provider` (user_id, provider)
 - `idx_calendar_connections_tenant_user` (tenant_id, user_id)
+- `idx_calendar_connections_tenant_id` (tenant_id, id)
 
 ---
 
@@ -458,7 +469,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text | NN IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
 | `provider` | text | NN UQ IX |  | `google, microsoft, apple` | Which system `external_id` belongs to — a fact about the ROW, not about whatever connection the user holds today. |
@@ -473,6 +484,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `uq_calendar_external_links_entity` (tenant_id, provider, entity_type, entity_id)
 - `idx_calendar_external_links_user` (tenant_id, user_id, provider)
+- `idx_calendar_external_links_tenant_id` (tenant_id, id)
 
 ---
 
@@ -484,7 +496,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `uploaded_by_kind` | text | NN |  | `client, co_client, inspector` | Who put the file here — and, with `visibility`, the read gate: the client list and download drop inspector+internal rows, and a client may DELETE only rows whose `uploaded_by_ref` is their own. |
@@ -502,6 +514,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_client_uploads_inspection` (tenant_id, inspection_id)
+- `idx_client_uploads_tenant_id` (tenant_id, id)
 
 ---
 
@@ -531,7 +544,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `text` | text | NN |  |  |  |
 | `category` | text |  |  |  | The repair-item vocabulary (safety / maintenance / recommendation, plus tenant-custom values), read and filtered on by RecommendationService and ranked on by the agent repair-items view. |
@@ -551,8 +564,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_comments_tenant` (tenant_id)
 - `idx_comments_library_id` (library_id)
+- `idx_comments_tenant_id` (tenant_id, id)
 
 ---
 
@@ -564,8 +577,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN |  |  | App-layer reference to inspections.id — no DB FK per Schema Rules. The legacy `.references()` this table carried went with the rebuild. |
 | `client_email` | text | NN |  |  | *An email address.* |
 | `token_hash` | text | NN UQ |  |  | SHA-256 hex of the token in the emailed link. NOT NULL: it is the only way a presented token resolves to this row. |
@@ -577,6 +590,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_concierge_tokens_expiry` (expires_at)
 - **UNIQUE** `idx_concierge_confirm_token_hash` (token_hash)
+- `idx_concierge_confirm_tokens_tenant_id` (tenant_id, id)
 
 ---
 
@@ -588,7 +602,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `key` | text | NN UQ |  |  | stable machine id, unique per tenant |
 | `label` | text | NN |  |  | tenant-editable display name |
@@ -604,8 +618,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_crp_tenant` (tenant_id)
 - **UNIQUE** `uq_crp_tenant_key` (tenant_id, key) — partial, `WHERE is_active = 1`
+- `idx_contact_role_profiles_tenant_id` (tenant_id, id)
 
 ---
 
@@ -615,7 +629,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `type` | text | NN IX | `'client'` | `client, agent, other` | Load-bearing, not descriptive. Agent signup will only bind an account to a contact already typed 'agent', and the booking path's auto-create only reuses an existing 'client' — so retyping a row changes what it can be matched to. **[more]** |
 | `name` | text | NN |  |  |  |
@@ -637,6 +651,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - **UNIQUE** `uq_contacts_tenant_email` (tenant_id, email) — partial, `WHERE email IS NOT NULL AND archived_at IS NULL`
 - **UNIQUE** `uq_contacts_tenant_agent_user` (tenant_id, agent_user_id) — partial, `WHERE agent_user_id IS NOT NULL AND archived_at IS NULL`
 - `idx_contacts_agent_user` (agent_user_id)
+- `idx_contacts_tenant_id` (tenant_id, id)
 
 ---
 
@@ -648,7 +663,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN |  |  |  |
 | `sort_order` | integer | NN | `0` |  | *Display order within its tenant; lower sorts first.* |
@@ -657,8 +672,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_contractor_types_tenant` (tenant_id)
 - **UNIQUE** `uq_contractor_types_tenant_trade` (tenant_id, trade_slug) — partial, `WHERE trade_slug IS NOT NULL`
+- `idx_contractor_types_tenant_id` (tenant_id, id)
 
 ---
 
@@ -668,7 +683,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `building_id` | text |  |  |  | Phase F soft references — nullable, no FK (D1 rebuild liability). |
@@ -698,6 +713,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_cost_items_tenant_inspection` (tenant_id, inspection_id)
 - `idx_cost_items_finding_key` (finding_key)
+- `idx_cost_items_tenant_id` (tenant_id, id)
 
 ---
 
@@ -709,7 +725,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN |  |  |  |
 | `color` | text | NN | `'#6b7280'` |  |  |
@@ -720,7 +736,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_defect_categories_tenant` (tenant_id)
+- `idx_defect_categories_tenant_id` (tenant_id, id)
 
 ---
 
@@ -752,7 +768,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `code` | text | NN |  |  |  |
 | `type` | text | NN |  | `fixed, percent` | Decides how `value` below is READ: 'fixed' = integer cents, clamped to the subtotal so a big code cannot make a booking negative; 'percent' = whole percent, floor(subtotal * value / 100). |
@@ -765,8 +781,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_discount_codes_tenant` (tenant_id)
 - **UNIQUE** `uq_discount_codes_code_tenant` (upper(code), tenant_id)
+- `idx_discount_codes_tenant_id` (tenant_id, id)
 
 ---
 
@@ -798,7 +814,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN UQ IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `document_key` | text | NN UQ |  |  | Stable key from the seed catalog (server/lib/pca-document-catalog.ts). |
@@ -814,6 +830,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_doc_review_inspection` (tenant_id, inspection_id)
 - **UNIQUE** `uq_doc_review_item` (inspection_id, document_key)
+- `idx_document_review_items_tenant_id` (tenant_id, id)
 
 ---
 
@@ -825,7 +842,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `email` | text | NN IX |  |  | normalized lower-cased + trimmed |
 | `reason` | text | NN |  | `hard_bounce, complaint` | The ADMISSION criterion, not a label: a row exists only because an inbound event resolved to one of these two (a soft bounce resolves to neither and writes nothing). |
@@ -836,6 +853,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_email_suppressions_email` (tenant_id, email)
+- `idx_email_suppressions_tenant_id` (tenant_id, id)
 
 ---
 
@@ -864,7 +882,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `subject_email` | text | NN |  |  | The data subject (client) whose erasure was requested. |
 | `requested_by` | text |  |  |  | The admin/user sub who ran the erasure (accountability). Nullable for system-initiated runs. |
@@ -880,6 +898,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_erasure_log_tenant` (tenant_id, created_at)
+- `idx_erasure_log_tenant_id` (tenant_id, id)
 
 ---
 
@@ -891,7 +910,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `request_id` | text | NN UQ IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `event` | text | NN UQ |  | `request.created, request.sent, request.viewed, signer.presented, agree…` | The dedup key (with tenant + request) for the partial index below, and the label the admin audit trail and the downloadable evidence JSON print. |
@@ -906,6 +925,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_esign_audit_logs_request` (tenant_id, request_id, created_at)
 - **UNIQUE** `idx_esign_audit_logs_event_dedup` (tenant_id, request_id, event) — partial, `WHERE event NOT LIKE 'signer.%'`
+- `idx_esign_audit_logs_tenant_id` (tenant_id, id)
+- `idx_esign_audit_logs_tenant_created` (tenant_id, created_at)
 
 ---
 
@@ -915,8 +936,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN |  |  |  |
 | `slug` | text | NN UQ |  |  |  |
 | `default_duration_min` | integer | NN | `30` |  | *An integer value.* |
@@ -930,6 +951,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `uq_event_types_tenant_slug` (tenant_id, slug)
+- `idx_event_types_tenant_id` (tenant_id, id)
 
 ---
 
@@ -964,7 +986,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN UQ IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `recipient_email` | text | NN UQ |  |  | *An email address.* |
@@ -981,6 +1003,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - `idx_iat_inspection` (tenant_id, inspection_id)
 - **UNIQUE** `idx_iat_recipient` (inspection_id, recipient_email)
 - **UNIQUE** `idx_iat_token_hash` (token_hash)
+- `idx_inspection_access_tokens_tenant_id` (tenant_id, id)
 
 ---
 
@@ -990,7 +1013,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX FK→`inspections.id` ⊗ |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `event_type_id` | text | NN FK→`event_types.id` |  |  | *App-layer reference to another row — no database foreign key.* |
@@ -1009,6 +1032,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_inspection_events_scheduled` (tenant_id, scheduled_at)
 - `idx_inspection_events_inspection` (inspection_id)
+- `idx_inspection_events_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1020,7 +1044,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `inspection_id` | text | PK NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `inspection_id` | text | PK NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `user_id` | text | PK NN IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `role` | text | NN | `'lead'` | `lead, helper` | 'lead' is the value everything keys on: the ICS feed takes the lead's row as the calendar owner, roster.ts hangs the rest off it, inspector metrics split led-vs-assisted from it, and version-diff calls the lead "the" inspector of a report version. |
@@ -1030,6 +1054,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_insp_inspectors_tenant_user` (tenant_id, user_id)
 - `idx_insp_inspectors_user` (user_id)
+- `idx_inspection_inspectors_tenant_inspection_id_user_id` (tenant_id, inspection_id, user_id)
 
 ---
 
@@ -1047,9 +1072,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_tag_links_tenant` (tenant_id)
 - `idx_tag_links_tag` (tag_id)
 - `idx_tag_links_inspection_item` (inspection_id, item_id)
+- `idx_inspection_item_tag_links_tenant_pk` (tenant_id, inspection_id, item_id, tag_id)
 
 ---
 
@@ -1061,7 +1086,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `r2_key` | text | NN |  |  | *Object key in the R2 bucket.* |
@@ -1079,8 +1104,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_media_pool_tenant` (tenant_id)
 - `idx_media_pool_inspection` (inspection_id)
+- `idx_inspection_media_pool_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1092,7 +1117,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | IX FK→`inspections.id` ⊗ |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `from_role` | text | NN IX |  | `inspector, client, agent, other` | Every consumer tests `!= 'inspector'` rather than naming the counterparty roles — the unread rollup, the mark-read pass, and the notification that fires only for inbound messages — so adding a counterparty role needs no code change, while renaming 'inspector' silently inverts all three. |
@@ -1109,6 +1134,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - `idx_msg_inspection` (inspection_id, created_at)
 - `idx_msg_contact` (tenant_id, contact_id, created_at)
 - `idx_msg_unread` (tenant_id, contact_id, from_role) — partial, `WHERE "inspection_messages"."read_at" IS NULL`
+- `idx_inspection_messages_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1120,7 +1146,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN UQ |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `contact_id` | text | NN UQ |  |  | → contacts.id |
@@ -1129,8 +1155,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_ip_tenant` (tenant_id)
 - **UNIQUE** `uq_ip_insp_contact_role` (inspection_id, contact_id, role_profile_id)
+- `idx_inspection_people_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1142,7 +1168,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `client_name` | text | NN |  |  | *A name.* |
 | `client_email` | text | IX |  |  | *An email address.* |
@@ -1161,6 +1187,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_inspection_requests_tenant` (tenant_id, status, scheduled_at)
 - `idx_inspection_requests_email` (tenant_id, client_email)
+- `idx_inspection_requests_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1170,7 +1197,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX FK→`inspections.id` |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `data` | text | NN |  |  | Item id -> { rating, value, photos[], customComments, ... }, plus reserved `_`-prefixed keys (`_inspector_signature`). |
@@ -1182,9 +1209,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_results_tenant` (tenant_id)
 - `idx_results_inspection` (inspection_id)
 - **UNIQUE** `uq_results_report` (report_id)
+- `idx_inspection_results_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1196,7 +1223,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_service_id` | text | NN UQ IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `user_id` | text | NN UQ IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
@@ -1213,6 +1240,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - **UNIQUE** `uq_pay_split_line_user` (tenant_id, inspection_service_id, user_id) — partial, `WHERE corrects_split_id IS NULL`
 - `idx_pay_split_user` (tenant_id, user_id)
 - `idx_pay_split_line` (tenant_id, inspection_service_id)
+- `idx_inspection_service_pay_splits_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1222,7 +1250,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX FK→`inspections.id` ⊗ |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `service_id` | text | NN FK→`services.id` |  |  | *App-layer reference to another row — no database foreign key.* |
@@ -1233,8 +1261,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_insp_services_tenant` (tenant_id)
 - `idx_insp_services_insp` (inspection_id)
+- `idx_inspection_services_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1260,8 +1288,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN UQ |  |  |  |
 | `based_on` | text |  |  |  | Platform commercial-subtype slug this tenant subtype derives from, chosen from a dropdown in Settings → Inspection Types; NULL when left blank. |
 | `description` | text |  |  |  |  |
@@ -1272,6 +1300,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `idx_inspection_types_tenant_name` (tenant_id, name)
+- `idx_inspection_types_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1281,7 +1310,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `parent_unit_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
@@ -1296,6 +1325,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_inspection_units_tenant_inspection` (tenant_id, inspection_id)
 - `idx_inspection_units_parent` (parent_unit_id)
+- `idx_inspection_units_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1390,6 +1420,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - `idx_inspections_inspector_date` (inspector_id, date)
 - `idx_inspections_root` (root_inspection_id)
 - `idx_inspections_tenant_created` (tenant_id, created_at, id)
+- `idx_inspections_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1401,7 +1432,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text | NN IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
 | `label` | text | NN |  |  | e.g. "InterNACHI CPI"; '' for a pure image row |
@@ -1414,8 +1445,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_inspector_credentials_tenant` (tenant_id)
 - `idx_inspector_credentials_user` (user_id)
+- `idx_inspector_credentials_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1427,8 +1458,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text | NN UQ |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
 | `zip_prefix` | text | NN UQ |  |  | Uppercased and shape-checked at the API: 3-10 chars, `[A-Z0-9]+` rather than digits-only, so ZIP+4 and a Canadian FSA both fit. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
@@ -1436,6 +1467,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `uq_inspector_service_areas` (tenant_id, user_id, zip_prefix)
+- `idx_inspector_service_areas_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1447,7 +1479,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `target` | text | NN IX |  | `sms, email, stripe, gemini` | Which integration was probed. Schema Rules: state/category column declares its enum. |
 | `provider` | text |  |  |  | Optional provider variant within a target (e.g. twilio/telnyx, resend/sendgrid/ postmark/mailgun). |
@@ -1460,6 +1492,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_integration_test_tenant_target` (tenant_id, target, tested_at)
+- `idx_integration_test_results_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1469,7 +1502,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | IX FK→`inspections.id` |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `contact_id` | text | IX FK→`contacts.id` |  |  | *The contact this belongs to (`contacts.id`). App-layer reference.* |
@@ -1495,6 +1528,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - `idx_invoices_inspection` (inspection_id)
 - `idx_invoices_contact` (tenant_id, contact_id)
 - **UNIQUE** `uq_invoices_tenant_number` (tenant_id, invoice_number)
+- `idx_invoices_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1506,7 +1540,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | Multi-tenant isolation, per the Schema Rules. The unit of a hold. |
 | `matter` | text | NN |  |  | The matter this hold exists for — a case number, regulator reference, complaint ID or DSAR ID. |
 | `reason` | text | NN |  |  | Why preservation is required, in a sentence a later reader can evaluate. Separate from `matter`: the reference identifies the proceeding, this says what about it reaches this tenant's data. |
@@ -1519,6 +1553,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_legal_holds_tenant_active` (tenant_id, released_at)
+- `idx_legal_holds_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1560,7 +1595,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN IX |  |  |  |
 | `channel` | text | NN IX |  | `email, sms, in_app` | B1 — `in_app` templates carry a notice's wording. Type-layer only. |
@@ -1576,6 +1611,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_message_templates_tenant_channel` (tenant_id, channel)
 - `idx_message_templates_variant` (tenant_id, name, channel, locale)
+- `idx_message_templates_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1619,7 +1655,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `created_by` | text | NN |  |  | users.id of the operator who staged it. Soft reference. |
 | `intent` | text | NN |  | `templates.create, templates.overwrite, contacts.import, members.invite…` |  |
@@ -1646,6 +1682,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_migration_batches_tenant_created` (tenant_id, created_at)
 - `idx_migration_batches_expires` (expires_at)
+- `idx_migration_batches_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1657,7 +1694,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `batch_id` | text | NN IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `entity` | text | NN |  | `template, contact, member` |  |
@@ -1674,7 +1711,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_migration_rows_batch_status` (batch_id, status)
-- `idx_migration_rows_tenant` (tenant_id)
+- `idx_migration_rows_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1702,8 +1739,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `subject_kind` | text | NN UQ |  | `user, contact` | Which id space `subjectId` belongs to. |
 | `subject_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
 | `class_id` | text | NN UQ |  |  | A `NOTIFICATION_CLASSES` id. Not a template trigger — those are a subset. |
@@ -1715,6 +1752,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `idx_notification_prefs_unique` (tenant_id, subject_kind, subject_id, class_id, channel)
+- `idx_notification_preferences_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1724,7 +1762,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` ⊗ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text | IX FK→`users.id` ⊗ |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
 | `type` | text | NN |  |  | The automation trigger event that produced the notice (`ctx.triggerEvent`), or 'manual.send' for an operator press. |
@@ -1744,6 +1782,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - `idx_notifications_tenant_user_created` (tenant_id, user_id, created_at)
 - `idx_notifications_tenant_user_unread` (tenant_id, user_id, read_at)
 - `idx_notifications_tenant_contact_created` (tenant_id, contact_id, created_at)
+- `idx_notifications_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1776,7 +1815,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | IX |  |  | The ORDER is the primary key of a payment. A booking deposit is taken before any invoice exists (`booking.service.ts` creates none), so keying this table on the invoice would make `kind: 'deposit'` unrepresentable — and this table is append-only and financial, the worst kind to re-key. **[more]** |
 | `invoice_id` | text | IX |  |  | A LINK, not identity: null until an invoice exists, then set — and backfilled onto the deposit rows that predate it. |
@@ -1796,6 +1835,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - `idx_order_payments_inspection` (tenant_id, inspection_id)
 - `idx_order_payments_invoice` (tenant_id, invoice_id)
 - **UNIQUE** `uq_order_payments_provider_ref` (tenant_id, provider, provider_ref)
+- `idx_order_payments_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1807,7 +1847,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `r2_key` | text | NN IX |  |  | *Object key in the R2 bucket.* |
@@ -1816,6 +1856,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_orphaned_media_key` (tenant_id, r2_key)
+- `idx_orphaned_media_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1846,8 +1887,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN UQ |  |  |  |
 | `base_role` | text | NN |  | `manager, inspector, staff` | Not owner (never reducible) and not agent (never a team member). |
 | `overrides` | text | NN |  |  |  |
@@ -1859,6 +1900,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `uq_permission_templates_name` (tenant_id, name) — partial, `WHERE archived_at IS NULL`
+- `idx_permission_templates_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1897,8 +1939,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN UQ |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `responses` | text |  |  |  | A free-form question -> answer map, NOT a fixed catalogue: whatever keys the upsert sends are rendered verbatim as the Appendix E definition list, so the question wording lives in the data. |
 | `status` | text | NN | `'sent'` | `sent, received, declined` | *State-machine column — see the Values column for the vocabulary.* |
@@ -1911,6 +1953,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `uq_psq_inspection` (tenant_id, inspection_id)
 - **UNIQUE** `idx_psq_share_token` (share_token)
+- `idx_psq_responses_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1946,8 +1989,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `oi_type` | text | NN UQ |  |  | Which OI entity `oi_id` names — 'contact' \| 'invoice' \| 'refund' at the three insert sites. |
 | `oi_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
 | `qbo_type` | text | NN UQ |  |  | The QuickBooks-side entity name of the twin, spelled as Intuit spells it ('Customer' \| 'Invoice' \| 'CreditMemo'). |
@@ -1960,6 +2003,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `idx_qbo_entity_map_qbo` (tenant_id, qbo_type, qbo_id)
 - **UNIQUE** `idx_qbo_entity_map_oi` (tenant_id, oi_type, oi_id)
+- `idx_qbo_entity_map_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1969,8 +2013,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `oi_type` | text | NN |  |  | The OI entity this open flag is about ('invoice' \| 'refund' \| 'contact'), part of the (tenant, oi_type, oi_id, error_code) identity of one open row. |
 | `oi_id` | text | NN |  |  | *App-layer reference to another row — no database foreign key.* |
 | `error_code` | text | NN |  |  | WHAT kind of thing a human has to look at, and part of the open-row identity: a failed push ('SYNC_ERROR') and a payment discrepancy (QBO_PAYMENT_DISCREPANCY) on the same invoice are two separate open rows, and sharing one would overwrite each other. |
@@ -1980,6 +2024,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
 | `resolved_at` | integer |  |  |  | WHEN the operational obligation ended — the retention anchor, and the reason this column exists at all. **[more]** |
+
+**Indexes**
+
+- `idx_qbo_sync_errors_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1991,8 +2039,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN |  |  |  |
 | `slug` | text | NN UQ |  |  |  |
 | `description` | text |  |  |  |  |
@@ -2005,6 +2053,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `idx_rating_systems_tenant_slug` (tenant_id, slug)
+- `idx_rating_systems_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2014,8 +2063,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `repair_request_id` | text | NN IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `finding_key` | text | NN |  |  | `unitId:sectionId:itemId` (`packages/field-ui/src/shared/finding-key.ts`; `_default` when the template has no units) — one item's entry in `inspection_results.data`, the same key shape `cost_items.finding_key` points at. **[more]** |
 | `section_title` | text | NN |  |  | Snapshots of the report's `section.title` / `item.label` at add time, so a contractor reading the shared list still knows where the defect is after the template or the report has been edited under it. |
@@ -2033,6 +2082,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_repair_request_items_rr` (repair_request_id)
+- `idx_repair_request_items_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2044,7 +2094,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `created_by_kind` | text | NN |  | `client, agent, inspector` | With `created_by_ref`, the list's OWNER identity: `listMine` filters on the pair and `assertCanEdit` refuses on a mismatch of either, so this is an authorization input, not a label. **[more]** |
@@ -2060,6 +2110,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_repair_requests_inspection` (tenant_id, inspection_id)
 - **UNIQUE** `idx_repair_requests_share_token` (share_token)
+- `idx_repair_requests_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2071,7 +2122,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `format` | text | NN |  | `docx` | Never accepted from a request and never read back: the enqueue route passes the one literal, and no query filters on it. |
@@ -2085,6 +2136,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_report_exports_inspection` (tenant_id, inspection_id)
+- `idx_report_exports_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2096,7 +2148,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN UQ IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `type` | text | NN UQ IX |  | `summary, full` | Selects the RENDER, not just a label: 'summary' appends `&summary=1` to the report URL so print-mode CSS drops everything but defects + safety. |
@@ -2112,9 +2164,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `uq_report_pdfs_inspection_type` (inspection_id, type, version_number)
-- `idx_report_pdfs_tenant` (tenant_id)
 - `idx_report_pdfs_status` (status)
 - `idx_report_pdfs_content_hash` (inspection_id, type, content_hash)
+- `idx_report_pdfs_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2126,7 +2178,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN UQ IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `role` | text | NN UQ |  | `field_observer, pcr_reviewer` | Which ASTM seat signed — and the UPSERT KEY with inspection_id, so re-signing REPLACES the prior attestation rather than appending one. |
@@ -2142,6 +2194,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_report_signoff_inspection` (tenant_id, inspection_id)
 - **UNIQUE** `uq_report_signoff_role` (inspection_id, role)
+- `idx_report_signoff_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2151,8 +2204,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `report_id` | text | NN UQ |  |  | `reports.id` — the deliverable, not the order. Not a foreign key. |
 | `locale` | text | NN UQ |  |  | BCP-47 tag of the language produced, e.g. `es-419`. |
 | `content` | text | NN |  |  | The translated segments, as a JSON array of strings in the order they were sent. Callers re-insert them POSITIONALLY, so the array's length is part of its meaning and a shorter one is never a partial success to salvage (`server/lib/ai/translate-response.ts` refuses one at the seam). **[more]** |
@@ -2166,6 +2219,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `uq_report_translations_report_locale` (tenant_id, report_id, locale)
+- `idx_report_translations_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2175,8 +2229,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `version_number` | integer | NN UQ |  |  | *An integer value.* |
 | `snapshot_json` | text | NN |  |  | *Serialized JSON snapshot.* |
@@ -2196,6 +2250,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `uq_report_versions_report_version` (report_id, version_number)
 - **UNIQUE** `idx_report_versions_verify_token` (verification_token)
+- `idx_report_versions_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2207,8 +2262,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN UQ |  |  | The ORDER whose report page was rendered. Named `inspection_id`, not `report_id`, because that is what was observed — see the note above. |
 | `access_token_id` | text | NN UQ |  |  | WHO opened it: `inspection_access_tokens.id`. No `.references()` — referential integrity is the service layer's job (Schema Rules), and an FK here would freeze this table against future column work. |
 | `first_viewed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
@@ -2218,6 +2273,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `idx_report_views_scope` (tenant_id, inspection_id, access_token_id)
+- `idx_report_views_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2229,7 +2285,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN UQ IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `kind` | text | NN |  | `primary, ancillary` | 'primary' is not just another ancillary: it is the one that must exist, the one the pay gate keys on, and the one a client means by "my report". |
@@ -2246,8 +2302,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_reports_inspection` (inspection_id)
-- `idx_reports_tenant` (tenant_id)
 - **UNIQUE** `uq_reports_primary` (inspection_id) — partial, `WHERE kind = 'primary'`
+- `idx_reports_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2259,14 +2315,14 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `service_id` | text | PK NN |  |  | *App-layer reference to another row — no database foreign key.* |
-| `user_id` | text | PK NN |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
+| `service_id` | text | PK NN IX |  |  | *App-layer reference to another row — no database foreign key.* |
+| `user_id` | text | PK NN IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 
 **Indexes**
 
-- `idx_service_inspectors_tenant` (tenant_id)
+- `idx_service_inspectors_tenant_service_id_user_id` (tenant_id, service_id, user_id)
 
 ---
 
@@ -2278,8 +2334,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `service_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
 | `user_id` | text | UQ |  |  | NULL = the default for this service, applied to any inspector without a specific rule. That is what makes "60% to whoever runs it" expressible without a row per employee. |
 | `type` | text | NN |  | `percent, fixed, percent_after_deduction` | Three types: a straight percentage, a flat amount, and a percentage applied AFTER a deduction off the top (materials, a franchise fee). |
@@ -2291,6 +2347,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `uq_service_pay_rules_user` (tenant_id, service_id, user_id) — partial, `WHERE user_id IS NOT NULL`
 - **UNIQUE** `uq_service_pay_rules_default` (tenant_id, service_id) — partial, `WHERE user_id IS NULL`
+- `idx_service_pay_rules_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2300,7 +2357,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN |  |  |  |
 | `description` | text |  |  |  |  |
@@ -2316,7 +2373,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_services_tenant` (tenant_id)
+- `idx_services_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2328,8 +2385,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `public_key` | text | NN |  |  | base64url SPKI. Stored in the clear on purpose: it is what a third party needs to check the seal, served as PEM from /.well-known and embedded in the audit-trail export so an offline verifier needs nothing from us. |
 | `private_key_enc` | text | NN |  |  | *Encrypted at rest (AES-GCM envelope).* |
 | `private_key_iv` | text | NN |  |  | base64url 12-byte AES-GCM IV for privateKeyEnc, freshly random per keypair. Not a secret, but not optional either: without it the private key cannot be decrypted and the tenant can never sign again under this fingerprint. |
@@ -2342,6 +2399,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `uq_signing_keys_tenant_fingerprint` (tenant_id, fingerprint)
 - **UNIQUE** `uq_signing_keys_tenant_active` (tenant_id) — partial, `WHERE retired_at IS NULL`
+- `idx_signing_keys_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2366,7 +2424,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `contact_id` | text | IX |  |  | The contact this consent attaches to — NULL when the subject is a staff `users` row (see `subjectKind` below). |
 | `recipient_type` | text | NN |  | `client, agent, other, staff` | The BASIS the recipient was reachable under, for a carrier audit. `staff` is internal-operational: an employee under account/employment terms, never consumer consent. |
@@ -2384,6 +2442,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_sms_consent_contact` (tenant_id, contact_id, created_at)
 - `idx_sms_consent_subject` (tenant_id, subject_kind, subject_id, created_at)
+- `idx_sms_consent_log_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2395,7 +2454,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `provider_message_id` | text | NN IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `status` | text | NN |  | `queued, sent, delivered, undelivered, failed` | *State-machine column — see the Values column for the vocabulary.* |
@@ -2405,6 +2464,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_sms_delivery_status_msg` (tenant_id, provider_message_id)
+- `idx_sms_delivery_status_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2431,7 +2491,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN UQ IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `form_id` | text | NN UQ |  |  | The form, never a revision -- which revision applies is the date's answer. |
@@ -2442,6 +2502,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `uq_statutory_form_entries_subject` (tenant_id, inspection_id, form_id)
 - `idx_statutory_form_entries_inspection` (tenant_id, inspection_id)
+- `idx_statutory_form_entries_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2453,7 +2514,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `form_id` | text | NN IX |  |  | The FORM, never one of its revisions -- e.g. `tx_trec_rei`. |
@@ -2466,6 +2527,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_statutory_productions_form_version` (form_id, version)
 - `idx_statutory_productions_inspection` (tenant_id, inspection_id)
+- `idx_statutory_form_productions_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2527,8 +2589,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN UQ |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `inspector_signature_date` | text |  |  |  | Calendar day, `YYYY-MM-DD` — a signature is dated, never timestamped, on every form measured. |
 | `employee_printed_name` | text |  |  |  | The second signer on FL OIR-B1-1802 page 5: the employee of the entity the inspector works for, printed rather than signed. |
@@ -2543,6 +2605,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `uq_statutory_inspection_details_subject` (tenant_id, inspection_id)
+- `idx_statutory_inspection_details_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2577,8 +2640,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN UQ |  |  |  |
 | `color` | text |  |  |  |  |
 | `is_seed` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
@@ -2587,6 +2650,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `idx_tags_tenant_name` (tenant_id, name)
+- `idx_tags_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2596,7 +2660,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN |  |  |  |
 | `version` | integer | NN | `1` |  | *An integer value.* |
@@ -2612,8 +2676,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_templates_tenant` (tenant_id)
 - `idx_templates_rating_system` (rating_system_id)
+- `idx_templates_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2753,8 +2817,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `date` | text | NN UQ |  |  | Calendar-semantic civil date stored as YYYY-MM-DD, without a time zone. |
 | `name` | text | NN |  |  |  |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
@@ -2763,6 +2827,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `uq_tenant_custom_holidays_tenant_date` (tenant_id, date)
+- `idx_tenant_custom_holidays_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2774,7 +2839,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | string snapshot — intentionally NOT an FK (tenant row is gone) |
 | `tenant_slug` | text |  |  |  | non-personal label for the destroyed tenant |
 | `rows_deleted` | integer | NN | `0` |  | *An integer value.* |
@@ -2791,8 +2856,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_destruction_tenant` (tenant_id)
 - `idx_destruction_destroyed_at` (destroyed_at)
+- `idx_tenant_destruction_records_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2802,7 +2867,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `email` | text | NN UQ |  |  |  |
 | `role` | text | NN | `'inspector'` | `owner, manager, inspector, staff, agent` | The role the invitee GETS: `joinTeam` copies it straight onto users.role, for a brand-new row and for a reactivated soft-deleted one alike, and emits it on the `user.invited` outbox event that drives portal seat sync. |
@@ -2812,8 +2877,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_invites_tenant` (tenant_id)
 - **UNIQUE** `uq_tenant_invites_pending_email` (tenant_id, email) — partial, `WHERE status = 'pending'`
+- `idx_tenant_invites_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2825,7 +2890,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `doc` | text | NN UQ IX |  | `privacy, terms` | Which document. It is the discriminator in the uniqueness key and in every "latest in force" lookup, so the two version independently — saving Terms never mints a Privacy row. **[more]** |
 | `version` | text | NN UQ |  |  | `YYYY-MM-DD` in the tenant's own timezone — the date a reader is shown. |
@@ -2839,6 +2904,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `idx_tenant_legal_versions_doc_version` (tenant_id, doc, version)
 - `idx_tenant_legal_versions_latest` (tenant_id, doc, published_at)
+- `idx_tenant_legal_versions_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2848,8 +2914,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `library_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
 | `imported_semver` | text | NN |  |  | The catalogue semver this tenant is currently ON. Re-pointed in place by every update, so it is a position and never a history. |
 | `imported_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
@@ -2860,6 +2926,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `uq_tenant_library_import` (tenant_id, library_id)
+- `idx_tenant_library_imports_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2871,7 +2938,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `library_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `template_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
@@ -2888,6 +2955,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - `idx_marketplace_history_tenant` (tenant_id, created_at)
 - `idx_marketplace_history_template` (template_id)
 - `idx_marketplace_history_library` (library_id)
+- `idx_tenant_marketplace_import_history_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2899,14 +2967,14 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `old_slug` | text | PK NN |  |  | The slug as it appears in an old public link — the LOOKUP KEY, matched exactly by `resolveByPathParam` after the live-slug and KV lookups miss, and never cached (a history hit must not warm `tenant:<slug>` for whoever claims that slug next). **[more]** |
+| `old_slug` | text | PK NN IX |  |  | The slug as it appears in an old public link — the LOOKUP KEY, matched exactly by `resolveByPathParam` after the live-slug and KV lookups miss, and never cached (a history hit must not warm `tenant:<slug>` for whoever claims that slug next). **[more]** |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `changed_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `retired_until` | integer | NN |  |  | *An integer value.* |
 
 **Indexes**
 
-- `idx_tenant_slug_history_tenant` (tenant_id)
+- `idx_tenant_slug_history_tenant_old_slug` (tenant_id, old_slug)
 
 ---
 
@@ -2962,8 +3030,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | UQ FK→`tenants.id` |  |  | Agent Accounts A1 — nullable: NULL only when role='agent' (global account accessing multiple tenants via agent_tenant_links). |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | UQ IX FK→`tenants.id` |  |  | Agent Accounts A1 — nullable: NULL only when role='agent' (global account accessing multiple tenants via agent_tenant_links). |
 | `email` | text | NN UQ IX |  |  | UNIQUE is on (tenant_id, email) (the `users_tenant_email_unique` composite index), not global on email. |
 | `password_hash` | text | NN |  |  | *Hash used for lookup and comparison; not reversible.* |
 | `name` | text |  |  |  |  |
@@ -2999,6 +3067,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - **UNIQUE** `uq_users_tenant_email` (tenant_id, email) — partial, `WHERE deleted_at IS NULL`
 - **UNIQUE** `idx_users_slug_per_tenant` (tenant_id, slug)
 - `idx_users_email` (email)
+- `idx_users_tenant_id` (tenant_id, id)
 
 ---
 
@@ -3045,8 +3114,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `media_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
 | `user_id` | text | NN |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
@@ -3066,4 +3135,5 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `uq_video_uploads_media` (tenant_id, media_id)
 - `idx_video_uploads_sweep` (state, expires_at)
+- `idx_video_uploads_tenant_id` (tenant_id, id)
 

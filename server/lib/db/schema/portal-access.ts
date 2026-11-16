@@ -75,6 +75,8 @@ export const inspectionAccessTokens = sqliteTable('inspection_access_tokens', {
     index('idx_iat_inspection').on(t.tenantId, t.inspectionId),
     uniqueIndex('idx_iat_recipient').on(t.inspectionId, t.recipientEmail),
     uniqueIndex('idx_iat_token_hash').on(t.tokenHash),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_inspection_access_tokens_tenant_id').on(t.tenantId, t.id),
 ]);
 
 /**
@@ -142,4 +144,6 @@ export const reportViews = sqliteTable('report_views', {
     viewCount:     integer('view_count').notNull().default(0),
 }, (t) => [
     uniqueIndex('idx_report_views_scope').on(t.tenantId, t.inspectionId, t.accessTokenId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_report_views_tenant_id').on(t.tenantId, t.id),
 ]);

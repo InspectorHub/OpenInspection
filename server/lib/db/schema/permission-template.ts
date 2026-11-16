@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import type { PermissionOverrides } from '../../auth/capabilities';
 
@@ -37,6 +37,8 @@ export const permissionTemplates = sqliteTable('permission_templates', {
     archivedAt: integer('archived_at', { mode: 'timestamp_ms' }),
 }, (t) => [
     uniqueIndex('uq_permission_templates_name').on(t.tenantId, t.name).where(sql`archived_at IS NULL`),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_permission_templates_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export type PermissionTemplateRow = typeof permissionTemplates.$inferSelect;

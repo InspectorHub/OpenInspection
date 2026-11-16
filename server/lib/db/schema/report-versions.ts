@@ -9,7 +9,7 @@
  * version_number is monotonic per inspection (UNIQUE constraint). The
  * service computes the next via SELECT MAX(version_number) + 1.
  */
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const reportVersions = sqliteTable('report_versions', {
@@ -67,4 +67,6 @@ export const reportVersions = sqliteTable('report_versions', {
     // it, duplicating both the lookup and the write cost.
     uniqueIndex('uq_report_versions_report_version').on(t.reportId, t.versionNumber),
     uniqueIndex('idx_report_versions_verify_token').on(t.verificationToken),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_report_versions_tenant_id').on(t.tenantId, t.id),
 ]);

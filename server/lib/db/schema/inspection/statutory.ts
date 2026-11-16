@@ -34,6 +34,8 @@ export const statutoryFormEntries = sqliteTable('statutory_form_entries', {
     uniqueIndex('uq_statutory_form_entries_subject')
         .on(t.tenantId, t.inspectionId, t.formId),
     index('idx_statutory_form_entries_inspection').on(t.tenantId, t.inspectionId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_statutory_form_entries_tenant_id').on(t.tenantId, t.id),
 ]);
 
 /**
@@ -98,4 +100,6 @@ export const statutoryInspectionDetails = sqliteTable('statutory_inspection_deta
 }, (t) => [
     uniqueIndex('uq_statutory_inspection_details_subject')
         .on(t.tenantId, t.inspectionId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_statutory_inspection_details_tenant_id').on(t.tenantId, t.id),
 ]);

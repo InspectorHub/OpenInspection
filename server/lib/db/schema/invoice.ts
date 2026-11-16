@@ -87,4 +87,6 @@ export const invoices = sqliteTable('invoices', {
     // documents a customer cannot tell apart — so it is refused by the
     // database rather than by whoever remembers.
     uniqueIndex('uq_invoices_tenant_number').on(t.tenantId, t.invoiceNumber),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_invoices_tenant_id').on(t.tenantId, t.id),
 ]);

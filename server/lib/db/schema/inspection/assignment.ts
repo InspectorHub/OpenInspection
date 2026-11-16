@@ -27,6 +27,8 @@ export const inspectionInspectors = sqliteTable('inspection_inspectors', {
     primaryKey({ columns: [t.inspectionId, t.userId] }),
     index('idx_insp_inspectors_tenant_user').on(t.tenantId, t.userId),
     index('idx_insp_inspectors_user').on(t.userId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_inspection_inspectors_tenant_inspection_id_user_id').on(t.tenantId, t.inspectionId, t.userId),
 ]);
 
 // IA-26 — inspector x service qualification (service limitations). ZERO rows for a service = every staff member is qualified
@@ -38,7 +40,8 @@ export const serviceInspectors = sqliteTable('service_inspectors', {
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     primaryKey({ columns: [t.serviceId, t.userId] }),
-    index('idx_service_inspectors_tenant').on(t.tenantId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_service_inspectors_tenant_service_id_user_id').on(t.tenantId, t.serviceId, t.userId),
 ]);
 
 export const availability = sqliteTable('availability', {
@@ -55,6 +58,8 @@ export const availability = sqliteTable('availability', {
     // DB-9 — duplicate weekly windows were silently accepted; dedup'd in the
     // 0016 migration before this index lands.
     uniqueIndex('idx_availability_window_unique').on(t.inspectorId, t.dayOfWeek, t.startTime),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_availability_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export const availabilityOverrides = sqliteTable('availability_overrides', {
@@ -89,4 +94,6 @@ export const availabilityOverrides = sqliteTable('availability_overrides', {
     // A-polish 10 — upsert target for the Google sync: one row per external event
     // per inspector. NULLs are distinct in SQLite, so manual rows never collide.
     uniqueIndex('uq_avail_overrides_external').on(t.inspectorId, t.source, t.externalId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_availability_overrides_tenant_id').on(t.tenantId, t.id),
 ]);

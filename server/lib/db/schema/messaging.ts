@@ -30,6 +30,8 @@ export const smsDeliveryStatus = sqliteTable('sms_delivery_status', {
     updatedAt:         integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_sms_delivery_status_msg').on(t.tenantId, t.providerMessageId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_sms_delivery_status_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export type SmsDeliveryStatus = typeof smsDeliveryStatus.$inferSelect;
@@ -78,6 +80,8 @@ export const emailSuppressions = sqliteTable('email_suppressions', {
     createdAt:       integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_email_suppressions_email').on(t.tenantId, t.email),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_email_suppressions_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export type EmailSuppression = typeof emailSuppressions.$inferSelect;

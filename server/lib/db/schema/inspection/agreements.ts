@@ -14,7 +14,8 @@ export const agreements = sqliteTable('agreements', {
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
-    index('idx_agreements_tenant').on(t.tenantId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_agreements_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export const agreementRequests = sqliteTable('agreement_requests', {
@@ -85,9 +86,10 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     signerCompanyName: text('signer_company_name'),
 }, (t) => [
     uniqueIndex('idx_agreement_requests_verify_token').on(t.verificationToken),
-    index('idx_agreement_requests_tenant').on(t.tenantId),
     index('idx_agreement_requests_inspection').on(t.inspectionId),
     uniqueIndex('idx_agreement_requests_token_hash').on(t.tokenHash),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_agreement_requests_tenant_id').on(t.tenantId, t.id),
 ]);
 
 // Track I-a (#117) — 1:N signer records under an agreement_requests envelope.
@@ -191,4 +193,6 @@ export const agreementSigners = sqliteTable('agreement_signers', {
     index('idx_agreement_signers_tenant_request').on(t.tenantId, t.requestId),
     uniqueIndex('idx_agreement_signers_request_email').on(t.requestId, t.email),
     uniqueIndex('idx_agreement_signers_token_hash').on(t.tokenHash),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_agreement_signers_tenant_id').on(t.tenantId, t.id),
 ]);

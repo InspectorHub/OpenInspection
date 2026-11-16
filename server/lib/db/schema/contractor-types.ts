@@ -33,7 +33,6 @@ export const contractorTypes = sqliteTable('contractor_types', {
      */
     tradeSlug: text('trade_slug'),
 }, (t) => [
-    index('idx_contractor_types_tenant').on(t.tenantId),
     /**
      * One row per canonical trade, per workspace — and PARTIAL, for the reason
      * spelled out on `tradeSlug` above: SQLite treats NULLs as distinct, so an
@@ -53,4 +52,6 @@ export const contractorTypes = sqliteTable('contractor_types', {
     uniqueIndex('uq_contractor_types_tenant_trade')
         .on(t.tenantId, t.tradeSlug)
         .where(sql`trade_slug IS NOT NULL`),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_contractor_types_tenant_id').on(t.tenantId, t.id),
 ]);

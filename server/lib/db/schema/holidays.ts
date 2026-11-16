@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
 /**
  * Tenant-defined company closed days merged into the holiday catalog when
@@ -17,4 +17,6 @@ export const tenantCustomHolidays = sqliteTable('tenant_custom_holidays', {
     // there used to be a second, non-unique index on exactly these two columns,
     // which could only ever duplicate this one's work and the writes to it.
     uniqueIndex('uq_tenant_custom_holidays_tenant_date').on(t.tenantId, t.date),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_tenant_custom_holidays_tenant_id').on(t.tenantId, t.id),
 ]);

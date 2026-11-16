@@ -43,6 +43,8 @@ export const repairRequests = sqliteTable('repair_requests', {
 }, (t) => ({
   idxInspection: index('idx_repair_requests_inspection').on(t.tenantId, t.inspectionId),
   uqShare: uniqueIndex('idx_repair_requests_share_token').on(t.shareToken),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    idxTenantKey: index('idx_repair_requests_tenant_id').on(t.tenantId, t.id),
 }));
 
 export const repairRequestItems = sqliteTable('repair_request_items', {
@@ -114,6 +116,8 @@ export const repairRequestItems = sqliteTable('repair_request_items', {
   repairActionTag: text('repair_action_tag', { enum: REPAIR_ACTION_TAGS }),
 }, (t) => ({
   idxRr: index('idx_repair_request_items_rr').on(t.repairRequestId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    idxTenantKey: index('idx_repair_request_items_tenant_id').on(t.tenantId, t.id),
 }));
 
 export type RepairRequest = typeof repairRequests.$inferSelect;

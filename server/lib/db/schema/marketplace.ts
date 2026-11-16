@@ -139,6 +139,8 @@ export const tenantLibraryImports = sqliteTable('tenant_library_imports', {
   uninstalledAt: integer('uninstalled_at', { mode: 'timestamp_ms' }),
 }, (t) => [
   uniqueIndex('uq_tenant_library_import').on(t.tenantId, t.libraryId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_tenant_library_imports_tenant_id').on(t.tenantId, t.id),
 ]);
 
 // Sprint 2 Track 3 (S2-8) — per-import history. One row per
@@ -169,4 +171,6 @@ export const tenantMarketplaceImportHistory = sqliteTable('tenant_marketplace_im
   index('idx_marketplace_history_tenant').on(t.tenantId, t.createdAt),
   index('idx_marketplace_history_template').on(t.templateId),
   index('idx_marketplace_history_library').on(t.libraryId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_tenant_marketplace_import_history_tenant_id').on(t.tenantId, t.id),
 ]);

@@ -23,6 +23,8 @@ export const ratingSystems = sqliteTable('rating_systems', {
     updatedAt:   integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({
     tenantSlugUnique: uniqueIndex('idx_rating_systems_tenant_slug').on(t.tenantId, t.slug),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    idxTenantKey: index('idx_rating_systems_tenant_id').on(t.tenantId, t.id),
 }));
 
 export const templates = sqliteTable('templates', {
@@ -69,6 +71,7 @@ export const templates = sqliteTable('templates', {
      */
     retiredAt: integer('retired_at', { mode: 'timestamp_ms' }),
 }, (t) => [
-    index('idx_templates_tenant').on(t.tenantId),
     index('idx_templates_rating_system').on(t.ratingSystemId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_templates_tenant_id').on(t.tenantId, t.id),
 ]);
