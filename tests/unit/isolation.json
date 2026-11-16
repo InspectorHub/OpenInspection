@@ -284,6 +284,7 @@
     "tests/unit/credentials/service.spec.ts",
     "tests/unit/credentials/update-schema.spec.ts",
     "tests/unit/cron/video-upload-sweep.spec.ts",
+    "tests/unit/data-package/classification-coverage.spec.ts",
     "tests/unit/data/data-export-money.spec.ts",
     "tests/unit/data/data-service-export-agent.spec.ts",
     "tests/unit/data/data-service-export-primary-client.spec.ts",
