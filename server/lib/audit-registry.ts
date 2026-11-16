@@ -151,6 +151,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'inspection.compliance.signoff': { family: 'inspection', label: 'audit_action_inspection_compliance_signoff', meta: { dualRole: 'flag', role: 'name' }, status: { kind: 'live' } },
     'inspection.compliance.signoff_removed': { family: 'inspection', label: 'audit_action_inspection_compliance_signoff_removed', meta: { role: 'name' }, status: { kind: 'live' } },
     'inspection.conflicts_resolved': { family: 'inspection', label: 'audit_action_inspection_conflicts_resolved', meta: {}, status: { kind: 'superseded', by: 'inspection.sync_conflict_resolved' } },
+    'inspection.copy_report': { family: 'inspection', label: 'audit_action_inspection_copy_report', meta: { sourceId: 'id', scope: 'name', samePropertyCopied: 'flag', photosRequested: 'flag', findingsCopied: 'count', findingsDropped: 'count', photosCopied: 'count', photosFailed: 'count' }, status: { kind: 'live' } },
     'inspection.create': { family: 'inspection', label: 'audit_action_inspection_create', meta: { clonedFrom: 'id', propertyAddress: 'name' }, status: { kind: 'live' } },
     'inspection.delete': { family: 'inspection', label: 'audit_action_inspection_delete', meta: { propertyAddress: 'name', status: 'name', reportPublished: 'flag', hadInvoice: 'flag', collabPurge: 'name' }, status: { kind: 'live' } },
     'inspection.inspector_signed': { family: 'agreement_request', label: 'audit_action_inspection_inspector_signed', meta: {}, status: { kind: 'superseded', by: 'agreement.inspector_signed' } },

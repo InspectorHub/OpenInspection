@@ -57,6 +57,7 @@ import inspectionReportRoutes, { inspectionReportRouteConfigs } from './inspecti
 import paySplitRoutes, { paySplitRouteConfigs } from './inspections/pay-splits';
 import cancellationRoutes, { cancellationRouteConfigs } from './inspections/cancellation';
 import inspectionRepairRequestRoutes, { inspectionRepairRequestRouteConfigs } from './inspections/repair-requests';
+import copyReportRoutes, { copyReportRouteConfigs } from './inspections/copy-report';
 
 export const inspectionsRoutes = createApiRouter();
 inspectionsRoutes.route('/', bulkRoutes);
@@ -120,6 +121,8 @@ inspectionsRoutes.route('/', cancellationRoutes);
 // reads are WRITTEN through /api/public/repair-builder, which authenticates
 // a client's token; this read is staff-only and cannot live there.
 inspectionsRoutes.route('/', inspectionRepairRequestRoutes);
+// POST /:id/copy-report: a new inspection that starts from an earlier one's findings.
+inspectionsRoutes.route('/', copyReportRoutes);
 
 /** Registration order, mounts included. Drives `InspectionsApi`; a test pins it to what `inspectionsRoutes` really registered. */
 export const inspectionsRouteParts = [
@@ -154,6 +157,7 @@ export const inspectionsRouteParts = [
     mounted('/', paySplitRoutes, paySplitRouteConfigs),
     mounted('/', cancellationRoutes, cancellationRouteConfigs),
     mounted('/', inspectionRepairRequestRoutes, inspectionRepairRequestRouteConfigs),
+    mounted('/', copyReportRoutes, copyReportRouteConfigs),
 ] as const;
 
 export type InspectionsApi = ApiOf<typeof inspectionsRouteParts>;

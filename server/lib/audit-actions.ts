@@ -20,6 +20,9 @@ export type AuditAction =
     // many connections, imported busy blocks, read-calendar choices and event links were removed.
     | 'calendar.disconnect'
     | 'inspection.create'
+    // A new inspection started from the findings of an earlier one. Records ids, the scope and counts only,
+    // never note text, file names or an address.
+    | 'inspection.copy_report'
     | 'inspection.delete'
     | 'inspection.status_change'
     | 'inspection.complete'

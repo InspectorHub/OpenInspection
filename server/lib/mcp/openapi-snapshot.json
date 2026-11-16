@@ -1283,6 +1283,67 @@
     "description": "Records a granted SMS consent event (captured_via=optin_link) for the contact encoded in the token. Idempotent — confirming twice simply appends a second granted event."
   },
   {
+    "operationId": "copyInspectionAsNewReport",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/copy-report",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose findings the new report starts from.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id of the inspection whose findings the new report starts from."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "rating",
+              "rating_notes",
+              "all"
+            ],
+            "description": "What to copy per finding: rating only; rating and notes; or everything the allow-list carries (rating, notes, value, attributes, canned-comment and defect tabs, custom comments, tags). Defaults to rating_notes for the same property and to rating for a different one. Free-text fields (notes, value, attributes, the comment, title and location of defects and custom comments, annotationsJson) are copied verbatim and can still name the previous client, a door or lockbox code or the old street; deadline is the old job's absolute date. One of: rating, rating_notes, all."
+          },
+          "property": {
+            "type": "string",
+            "enum": [
+              "same",
+              "different"
+            ],
+            "default": "same",
+            "description": "same: the address and property facts come along. different: they are cleared and propertyAddress is required. Defaults to same."
+          },
+          "propertyAddress": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The address of the new report. Required when property is different, ignored otherwise. 1-500 characters."
+          },
+          "photos": {
+            "type": "boolean",
+            "default": false,
+            "description": "Copy the finding photos as new objects under the new report. Off by default, and refused when property is different. The source photos are never shared or moved. Only a limited number are copied per request; see summary.photos.complete. Defaults to false."
+          }
+        }
+      }
+    },
+    "summary": "Copy an inspection as a new report",
+    "description": "Creates a new inspection whose report starts from the findings of an existing one. The booking and property details, price and requirements come across as they do for a clone; findings are copied per the chosen scope (rating, rating and notes, or everything the allow-list carries) into the places the new inspection's template has for them, and findings with no matching place are dropped and counted. Carried verbatim, and so able to name the previous client, a door or lockbox code or the old street: notes, value, attributes, and the comment, title and location of canned and custom defects and comments, and a photo's annotationsJson; a defect's deadline is the old job's absolute date. Without an explicit scope a copy at a different property takes ratings only. Photos are copied only when asked for (never for a different property), as new files under the new report, keeping only their content type; the source's files are never shared or changed. Videos are never copied, and photos stored under an older key layout (not directly in the inspection's photos folder) are skipped. Photos are copied within a small, conservative per-request storage budget: about six plain photos, or two with two baked variants each (the platform allowance behind this is unmeasured, so the figure is deliberately low). summary.photos reports copied, failed, skipped, unsupported, droppedVariants and deferred, and complete is null when photos were not asked for, false when anything photo-like is missing and true only when nothing is. Nothing continues a partial copy later. summary.people and summary.roster say whether the client/agent links and the lead and helpers came across. If the new inspection cannot be read back, the answer is still 201 with its basic header. Nothing about the source's sign-off comes across: no signature, no published version or verification token, no agreement, no payment, no client-portal access, no editing history. The copy is an ordinary editable inspection with status requested, payment unpaid and a draft report. Counts as one new inspection against the plan allowance, consumed before anything is written. Sends nothing to anyone. Not idempotent: each call makes another copy, so send an Idempotency-Key header to make a retry safe. Available to owner, manager and inspector roles (office staff get 403); an inspector restricted to their own inspections must be on the source inspection."
+  },
+  {
     "operationId": "correctInspectionPaySplit",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/pay-splits/{splitId}/corrections",
