@@ -73,6 +73,9 @@
     // Path aliases (tsconfig paths and vite aliases), not packages.
     "@core/shared-ui",
     "@core/api-types",
-    "@core/offline-package"
+    "@core/offline-package",
+    // Workspace package loaded by scripts/verify-data-package.mjs via its
+    // published name (dist build); knip cannot resolve it as a declared dep.
+    "@inspectorhub/data-package"
   ]
 }
