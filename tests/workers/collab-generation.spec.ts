@@ -41,6 +41,7 @@ interface DOInternals {
     doc: Y.Doc;
     hydrate(): Promise<void>;
     persist(): Promise<void>;
+    persistTimer: ReturnType<typeof setTimeout> | null;
     ctx: { storage: DurableObjectStorage };
 }
 
@@ -231,6 +232,15 @@ describe('generation: the object checks the generation the client reports', () =
         let writes = 0;
         await runInDurableObject(stub(name), async (instance) => {
             const io = instance as unknown as DOInternals;
+            // currentGen()'s handshake left a debounce timer and a durable alarm armed.
+            // On a loaded runner either can fire while persist is patched below and add
+            // a third write, making this an exact-count assertion flaky. Disarm both so
+            // the only flushes counted are the two close/error calls under test.
+            if (io.persistTimer !== null) {
+                clearTimeout(io.persistTimer);
+                io.persistTimer = null;
+            }
+            await io.ctx.storage.deleteAlarm();
             const original = io.persist.bind(io);
             io.persist = async () => { writes += 1; await original(); };
             const handlers = instance as unknown as { webSocketClose(ws: WebSocket): Promise<void>; webSocketError(ws: WebSocket): Promise<void> };

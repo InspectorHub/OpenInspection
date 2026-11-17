@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, asc } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/d1';
 import { inspections, tenantConfigs, invoices, agreementRequests, inspectionServices } from '../../lib/db/schema';
 import { visibleInspectionsCondition, type InspectionScope } from '../../lib/inspection/visibility';
@@ -16,8 +16,14 @@ import { visibleInspectionsCondition, type InspectionScope } from '../../lib/ins
  */
 export function readDashboardInputs(db: ReturnType<typeof drizzle>, tenantId: string, scope: InspectionScope) {
     return Promise.all([
+        // Stable order is load-bearing: the dashboard goldens (and the buckets cut from
+        // `all` below) rely on this sequence. Without it, adding an index such as
+        // idx_inspections_tenant_id (tenant_id, id) lets SQLite reorder a plain
+        // tenant scan by id, silently changing bucket order. Sort explicitly by the
+        // same key the historical idx_inspections_tenant_created scan produced.
         db.select().from(inspections)
-            .where(and(eq(inspections.tenantId, tenantId), visibleInspectionsCondition(db, scope, tenantId))),
+            .where(and(eq(inspections.tenantId, tenantId), visibleInspectionsCondition(db, scope, tenantId)))
+            .orderBy(asc(inspections.createdAt), asc(inspections.id)),
         // handoff-decisions §1 — the configurable attention thresholds (null when the row is missing).
         db.select({ thresholds: tenantConfigs.attentionThresholds })
             .from(tenantConfigs)

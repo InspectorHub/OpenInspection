@@ -171,6 +171,7 @@
   "notif_prefs_sms_heading": "Text messages",
   "notif_prefs_sms_on": "Texts to {phone} are ON.",
   "notif_class_password_reset": "Password reset",
+  "notif_class_step_up_code": "Confirmation code",
   "notif_class_agent_invite": "Partner agent invite",
   "notif_class_agent_login_link": "Agent sign-in link",
   "notif_class_subject_export_ready": "Your copy of your data is ready",

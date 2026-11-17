@@ -13,6 +13,7 @@ import { m } from "~/paraglide/messages";
  */
 const LABELS: Record<string, () => string> = {
   "password-reset": () => m.notif_class_password_reset(),
+  "step-up-code": () => m.notif_class_step_up_code(),
   "agent-invite": () => m.notif_class_agent_invite(),
   "agent-login-link": () => m.notif_class_agent_login_link(),
   "subject-export-ready": () => m.notif_class_subject_export_ready(),

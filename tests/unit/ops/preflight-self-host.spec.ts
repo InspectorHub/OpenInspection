@@ -395,7 +395,7 @@ describe('parseJsonc', () => {
 describe('preflight: nothing unsafe reaches a shell', () => {
     const r2Calls = (calls: string[][]) => calls.filter((c) => c[0] === 'r2');
     it.each(['x&calc', 'a|b', 'a b', '-abc', 'ab', 'A_B_C', 'abc"def'])('never runs wrangler with the bucket name %s', async (bad) => {
-        const cfg = GOOD_CONFIG.replace('my-photos', bad.replace(/"/g, '\\"'));
+        const cfg = GOOD_CONFIG.replace('my-photos', JSON.stringify(bad).slice(1, -1));
         const { report, f } = await run({ configPath: cfgFile(cfg) });
         expect(r2Calls(f.calls)).toEqual([]);
         const c = by(report, 'photos-write');

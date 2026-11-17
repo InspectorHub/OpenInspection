@@ -75,7 +75,7 @@ export type StepUpAction = (typeof STEP_UP_ACTIONS)[number];
 export const STEP_UP_TTL_SECONDS = 300;
 export const STEP_UP_COOKIE_NAME = '__Host-step_up';
 /** Native clients (Node/Electron) have no cookie jar; they carry the token in this header instead. */
-export const STEP_UP_HEADER_NAME = 'X-Step-Up-Token';
+const STEP_UP_HEADER_NAME = 'X-Step-Up-Token';
 export const STEP_UP_KV_PREFIX = 'stepup:';
 const STEP_UP_LATEST_KV_PREFIX = 'stepup-latest:';
 

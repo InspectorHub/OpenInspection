@@ -1,5 +1,5 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
 import { automations, automationLogs, inspections } from '../../lib/db/schema';
 import { nanoid } from 'nanoid';
 import { createHeadersForInsertedLogs } from './notice-headers';
@@ -33,13 +33,20 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                     err instanceof Error ? err : undefined);
             }
 
+            // Deterministic rule order is load-bearing: notice headers are inserted
+            // in this order and callers read them back positionally. A bare tenant
+            // scan used to come back in insertion order, but adding
+            // idx_automations_tenant_id (tenant_id, id) lets SQLite order it by id
+            // instead, which reshuffles which rule's notice lands first. Sort on the
+            // historical insertion key so the index cannot change observable order.
             const rules = await db.select().from(automations)
                 .where(and(
                     eq(automations.tenantId, ctx.tenantId),
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     eq(automations.trigger, ctx.triggerEvent as any),
                     eq(automations.active, true),
-                ));
+                ))
+                .orderBy(asc(automations.createdAt), asc(automations.id));
             logger.info('AutomationService.trigger: rules matched',
                 { event: ctx.triggerEvent, tenantId: ctx.tenantId, count: rules.length });
             if (rules.length === 0) return;
