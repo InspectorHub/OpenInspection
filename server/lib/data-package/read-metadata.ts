@@ -28,16 +28,24 @@ export interface BlobColumn {
     readonly name: string;
 }
 
+/** How a table's rows are attributed to a tenant; `tenant_row` (the tenants
+ * table itself) is matched on `id`, every exportable table otherwise has a
+ * `tenant_id` column. Mirrors the classification TenantScope. */
+export type ReadScope = 'direct' | 'direct_nullable' | 'tenant_row';
+
 /** Everything the read endpoint needs for one exportable table. */
 export interface TableReadMeta {
     readonly table: string;
     readonly disposition: 'export' | 'archive' | 'partial';
+    readonly scope: ReadScope;
     /** DB column names of the keyset, in ORDER BY order. */
     readonly keyset: readonly string[];
     /** True when the keyset uses SQLite's implicit `rowid` (only esign_audit_logs). */
     readonly usesRowid: boolean;
     /** Whitelisted DB column names, in schema order. */
     readonly columns: readonly string[];
+    /** Whether the table physically has a created_at column (for the snapshot watermark). */
+    readonly hasCreatedAt: boolean;
     /** Large columns that must be read via the chunk endpoint. */
     readonly blobColumns: readonly BlobColumn[];
     /** Columns whose stored JSON is returned verbatim, never normalized. */
@@ -110,9 +118,11 @@ export const TABLE_READ_META: readonly TableReadMeta[] = (() => {
         out.push({
             table: tableName,
             disposition: entry.disposition,
+            scope: entry.scope as ReadScope,
             keyset,
             usesRowid,
             columns,
+            hasCreatedAt: Object.values(cols).some((c) => c.name === 'created_at'),
             blobColumns,
             rawJsonColumns,
         });
