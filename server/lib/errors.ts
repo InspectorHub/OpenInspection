@@ -122,6 +122,11 @@ export enum ErrorCode {
     // A photo upload over the photo size ceiling (413). A code of its own so a client can tell the server's own
     // size refusal from a 413 raised by a proxy or edge limit in front of it.
     PHOTO_TOO_LARGE = 'PHOTO_TOO_LARGE',
+    // E-1 tenant data package: a job slot is held by another device (409, details.holder + details.leaseExpiresAt),
+    // the job's lease has lapsed and must be resumed (409), or a data-job credential failed verification (401).
+    JOB_LEASE_HELD = 'JOB_LEASE_HELD',
+    JOB_LEASE_EXPIRED = 'JOB_LEASE_EXPIRED',
+    JOB_TOKEN_INVALID = 'JOB_TOKEN_INVALID',
 }
 
 /**
@@ -168,6 +173,12 @@ export const Errors = {
     Validation: (details: unknown) => new AppError(400, ErrorCode.VALIDATION_ERROR, 'Validation failed', details),
     PayloadTooLarge: (msg: string) => new AppError(413, ErrorCode.BAD_REQUEST, msg),
     Conflict: (msg: string, details?: unknown) => new AppError(409, ErrorCode.CONFLICT, msg, details),
+    JobLeaseHeld: (holder: string, leaseExpiresAt: number) =>
+        new AppError(409, ErrorCode.JOB_LEASE_HELD, 'A data job is already active for this company.', { holder, leaseExpiresAt }),
+    JobLeaseExpired: (msg: string = 'This job lease has expired. Resume the job to continue.') =>
+        new AppError(409, ErrorCode.JOB_LEASE_EXPIRED, msg),
+    JobTokenInvalid: () =>
+        new AppError(401, ErrorCode.JOB_TOKEN_INVALID, 'The data job credential is invalid or expired.'),
     // `inspectionIds` is set when several were refused at once (an offline package); `inspectionId` is the first.
     ReportPublished: (inspectionId: string, inspectionIds: readonly string[] = [inspectionId]) =>
         new AppError(409, ErrorCode.REPORT_PUBLISHED, 'Report is published. Update and republish?', { inspectionId, inspectionIds }),

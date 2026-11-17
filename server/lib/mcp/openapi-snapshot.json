@@ -28,6 +28,43 @@
     "description": "Deletes a run that was never applied, together with its prepared entries and the file it was created from. A run that has been applied cannot be deleted, because its entries are the only record of where the imported rows came from."
   },
   {
+    "operationId": "abortDataPackageJob",
+    "method": "POST",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/abort",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package job this request acts on",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package job this request acts on"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant, job and user",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant, job and user"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Abort a data-package job and free its lease",
+    "description": "Terminates an active job and frees the lease (terminal cancelled). Requires the current X-Data-Job token. Only an owner may call it."
+  },
+  {
     "operationId": "acceptAgentTerms",
     "method": "POST",
     "pathTemplate": "/api/agent/accept-terms",
@@ -1158,6 +1195,45 @@
     "description": "Copy a rating system, built-in or custom, into a new editable one; this is how a built-in system is customised, because those are read-only. The copy gets the given name, the given slug or one generated from the source slug, the source description and levels with fresh level ids, and is never the default. Returns 404 for an unknown source and 409 when the slug is taken. Writes a rating_system.cloned audit entry. Each call creates another copy. Restricted to owners and managers."
   },
   {
+    "operationId": "completeDataPackageJob",
+    "method": "POST",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/complete",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package job this request acts on",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package job this request acts on"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant, job and user",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant, job and user"
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/DataPackageCompleteJobRequest"
+      }
+    },
+    "summary": "Record the client-declared result of a data-package job",
+    "description": "Records the desktop client attested counts/bytes/sha256 and frees the lease (terminal complete). Values are attestations, not server-computed proofs. Requires the current X-Data-Job token. Only an owner may call it."
+  },
+  {
     "operationId": "completeInspection",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/complete",
@@ -1864,6 +1940,24 @@
     },
     "summary": "Create a custom holiday",
     "description": "Adds a single-date custom closed day to the tenant holiday catalog."
+  },
+  {
+    "operationId": "createDataPackageJob",
+    "method": "POST",
+    "pathTemplate": "/api/admin/data-package/jobs",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/DataPackageCreateJobRequest"
+      }
+    },
+    "summary": "Start a tenant data-package export or import job",
+    "description": "Starts one export or import job and takes the company-wide lease (409 if another is active). Requires a step-up elevation for data-export-start. Returns a short-lived X-Data-Job token, the lease expiry, the row watermark and the export limits. Only an owner may call it."
   },
   {
     "operationId": "createDefectCategory",
@@ -8278,6 +8372,33 @@
     "description": "Counts the tenant's canned comments that recommend this contractor type. Advisory only -- the delete is never blocked, because the reference is soft by design and published reports store the resolved label rather than the id."
   },
   {
+    "operationId": "getDataPackageJob",
+    "method": "GET",
+    "pathTemplate": "/api/admin/data-package/jobs/:id",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package job this request acts on",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package job this request acts on"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Get one data-package job by id",
+    "description": "Returns one company job by id, scoped to the verified tenant. 404 when it is not this company's job. Read-only; no X-Data-Job token needed. Only an owner may call it."
+  },
+  {
     "operationId": "getDispatchBoard",
     "method": "GET",
     "pathTemplate": "/api/calendar/dispatch",
@@ -10751,6 +10872,43 @@
     "description": "Appends a granted row for the signed-in staff member. Staff are implied, so this withdraws an earlier stop rather than capturing consent — recorded under recipient_type staff so it never counts as consumer opt-in evidence."
   },
   {
+    "operationId": "heartbeatDataPackageJob",
+    "method": "POST",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/heartbeat",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package job this request acts on",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package job this request acts on"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant, job and user",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant, job and user"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Renew a data-package job lease and token",
+    "description": "Renews the lease and returns a fresh X-Data-Job token. The renewed expiry is persisted only when the lease is close to lapsing, to save D1 writes. Requires the current X-Data-Job token and a tenant-scoped active job. Only an owner may call it."
+  },
+  {
     "operationId": "importContacts",
     "method": "POST",
     "pathTemplate": "/api/contacts/import",
@@ -11968,6 +12126,59 @@
     },
     "summary": "List tenant custom holidays",
     "description": "Returns custom company closed days for the holiday catalog."
+  },
+  {
+    "operationId": "listDataPackageJobs",
+    "method": "GET",
+    "pathTemplate": "/api/admin/data-package/jobs",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List the company data-package jobs",
+    "description": "Returns the company data-package job ledger, newest first, capped at 50. Read-only; no X-Data-Job token needed. Only an owner may call it."
+  },
+  {
+    "operationId": "listDataPackageTables",
+    "method": "GET",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/tables",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package job this request acts on",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package job this request acts on"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant, job and user",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant, job and user"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List exportable tables and their column whitelist",
+    "description": "Returns the classification-derived table descriptors: the whitelisted columns, keyset, page ceilings and large blob columns for each exportable table. The list is decided by the server classification, never by the request; withheld/out columns never appear. Requires a valid X-Data-Job token."
   },
   {
     "operationId": "listDefectCategories",
@@ -18213,6 +18424,73 @@
     "description": "Save integration secrets. Masked values (containing bullet characters) and omitted keys are unchanged. An explicit empty string clears that key."
   },
   {
+    "operationId": "readDataPackageRows",
+    "method": "GET",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/tables/:table/rows",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package job this request acts on",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package job this request acts on"
+          }
+        },
+        {
+          "name": "table",
+          "in": "path",
+          "required": true,
+          "description": "Exportable table whose keyset page is being read",
+          "schema": {
+            "type": "string",
+            "description": "Exportable table whose keyset page is being read"
+          }
+        },
+        {
+          "name": "after",
+          "in": "query",
+          "required": false,
+          "description": "Opaque continuation cursor returned as `next` by the previous page",
+          "schema": {
+            "type": "string",
+            "description": "Opaque continuation cursor returned as `next` by the previous page"
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "description": "Maximum rows in this page, capped by the classification ceiling",
+          "schema": {
+            "type": "string",
+            "description": "Maximum rows in this page, capped by the classification ceiling"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant, job and user",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant, job and user"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Read one keyset page of an exportable table",
+    "description": "Returns one keyset page of a whitelisted table, scoped to the job tenant and cut at the job snapshot watermark. Stored values are returned verbatim. Pass the returned `next` cursor back as `after` to continue; the cursor is stateless and carries only keyset values. Page size is capped by the classification ceilings. Requires a valid X-Data-Job token."
+  },
+  {
     "operationId": "recordCollabFollowup",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/collab/followup",
@@ -19489,6 +19767,33 @@
     },
     "summary": "Resume managed SMS compliance provisioning from the first missing step",
     "description": "Idempotent re-run of the managed provisioning chain (waitUntil background). Skips any step whose SID is already persisted, resuming from the first missing step. SaaS-only; requires TWILIO_ACCOUNT_SID / TWILIO_API_KEY_SID / TWILIO_API_KEY_SECRET env vars."
+  },
+  {
+    "operationId": "resumeDataPackageJob",
+    "method": "POST",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/resume",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package job this request acts on",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package job this request acts on"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Resume a data-package job after its lease lapses",
+    "description": "Reclaims a tenant job whose lease has lapsed and returns a fresh X-Data-Job token. No step-up: the job was already authorized at start, so a still-valid bearer resumes it (an accepted trade-off for multi-hour exports). The job must be younger than 14 days and still active. Only an owner may call it."
   },
   {
     "operationId": "returnReport",

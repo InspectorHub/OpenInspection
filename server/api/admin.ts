@@ -37,6 +37,7 @@ import adminServiceAreasRoutes, { adminServiceAreasRouteConfigs } from './admin/
 import adminBookingRoutingRoutes, { adminBookingRoutingRouteConfigs } from './admin/admin-booking-routing';
 import adminStatutorySourceRoutes, { adminStatutorySourceRouteConfigs } from './admin/admin-statutory-source';
 import adminIntegrationSourcesRoutes, { adminIntegrationSourcesRouteConfigs } from './admin/admin-integration-sources';
+import adminDataPackageRoutes, { adminDataPackageRouteConfigs } from './admin/admin-data-package';
 
 const app = createApiRouter();
 app.route('/', adminAgreementsRoutes);
@@ -55,6 +56,7 @@ app.route('/', adminServiceAreasRoutes);
 app.route('/', adminBookingRoutingRoutes);
 app.route('/', adminStatutorySourceRoutes);
 app.route('/', adminIntegrationSourcesRoutes);
+app.route('/', adminDataPackageRoutes);
 
 /** Registration order, mounts included. Drives `AdminApi`; a test pins it to what `app` really registered. */
 export const adminRouteParts = [
@@ -74,6 +76,7 @@ export const adminRouteParts = [
     mounted('/', adminBookingRoutingRoutes, adminBookingRoutingRouteConfigs),
     mounted('/', adminStatutorySourceRoutes, adminStatutorySourceRouteConfigs),
     mounted('/', adminIntegrationSourcesRoutes, adminIntegrationSourcesRouteConfigs),
+    mounted('/', adminDataPackageRoutes, adminDataPackageRouteConfigs),
 ] as const;
 
 export type AdminApi = ApiOf<typeof adminRouteParts>;

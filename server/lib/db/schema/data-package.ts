@@ -10,6 +10,16 @@ export const DATA_JOB_KINDS = ['export', 'import'] as const;
 /** `queued` and `running` are the active states; the rest are terminal and free the company's single job slot. */
 export const DATA_JOB_STATUSES = ['queued', 'running', 'complete', 'failed', 'cancelled', 'expired'] as const;
 
+/** Named members of the job-status axis, so writers derive from a constant instead of a bare literal. */
+export const DATA_JOB_STATUS = {
+    QUEUED: 'queued',
+    RUNNING: 'running',
+    COMPLETE: 'complete',
+    FAILED: 'failed',
+    CANCELLED: 'cancelled',
+    EXPIRED: 'expired',
+} as const satisfies Record<string, (typeof DATA_JOB_STATUSES)[number]>;
+
 /** The stages a desktop client reports. All seven are shared by export and import; the server only records them. */
 export const DATA_JOB_STAGES = [
     'rows', 'media', 'finish', 'upload', 'preview', 'apply', 'revert',
