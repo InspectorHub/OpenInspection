@@ -52,4 +52,6 @@ export const messageTemplates = sqliteTable('message_templates', {
     // Variant lookup: the resolver filters tenant + name + channel and then
     // walks locales. Non-unique on purpose — see the `locale` comment.
     index('idx_message_templates_variant').on(t.tenantId, t.name, t.channel, t.locale),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_message_templates_tenant_id').on(t.tenantId, t.id),
 ]);

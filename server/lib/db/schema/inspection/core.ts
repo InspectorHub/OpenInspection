@@ -328,6 +328,7 @@ export const inspections = sqliteTable('inspections', {
     // tie-break half of the cursor; with only `(tenant_id, created_at)` the
     // planner still needs a temp B-tree for the right part of the sort.
     index('idx_inspections_tenant_created').on(t.tenantId, t.createdAt, t.id),
+    index('idx_inspections_tenant_id').on(t.tenantId, t.id),
 ]);
 
 // Sprint 2 S2-2 — A single customer booking can spawn multiple inspections
@@ -378,6 +379,7 @@ export const inspectionRequests = sqliteTable('inspection_requests', {
 }, (t) => [
     index('idx_inspection_requests_tenant').on(t.tenantId, t.status, t.scheduledAt),
     index('idx_inspection_requests_email').on(t.tenantId, t.clientEmail),
+    index('idx_inspection_requests_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export const inspectionResults = sqliteTable('inspection_results', {
@@ -409,9 +411,9 @@ export const inspectionResults = sqliteTable('inspection_results', {
     // Appended at table end for D1 rebuild safety.
     reportId:             text('report_id'),
 }, (t) => [
-    index('idx_results_tenant').on(t.tenantId),
     index('idx_results_inspection').on(t.inspectionId),
     // Was uq_results_inspection. A second report on one order is the whole
     // point of the reports entity; the old index made it impossible.
     uniqueIndex('uq_results_report').on(t.reportId),
+    index('idx_inspection_results_tenant_id').on(t.tenantId, t.id),
 ]);

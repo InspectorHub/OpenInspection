@@ -22,11 +22,14 @@ vi.mock("~/lib/session.server", () => ({
     createSessionWithToken: vi.fn(),
 }));
 
+const setupPost = vi.fn(async (_args: { json: Record<string, unknown> }) =>
+    new Response(JSON.stringify({ success: true }), { status: 200, headers: { "set-cookie": "inspector_token=abc; Path=/" } }));
+
 vi.mock("~/lib/api-client.server", () => ({
-    createApi: vi.fn(() => ({})),
+    createApi: vi.fn(() => ({ auth: { setup: { $post: setupPost } } })),
 }));
 
-import SetupPage from "~/routes/setup";
+import SetupPage, { action } from "~/routes/setup";
 
 function renderSetup() {
     const Stub = createRoutesStub([
@@ -62,5 +65,41 @@ describe("first-run setup — the agent-terms step", () => {
         renderSetup();
         const submit = await screen.findByRole("button", { name: /Create Account/i });
         expect(submit).not.toBeDisabled();
+    });
+});
+
+describe("first-run setup - starting without the starter content", () => {
+    const post = (extra: Record<string, string>) => {
+        const fd = new FormData();
+        const base: Record<string, string> = {
+            workspaceName: "Acme Inspections", adminName: "Mike Reynolds", email: "owner@example.com",
+            password: "P@ssword123", setupCode: "setup-code-123",
+        };
+        for (const [k, v] of Object.entries({ ...base, ...extra })) fd.set(k, v);
+        return action({
+            request: new Request("http://localhost/setup", { method: "POST", body: fd, headers: { origin: "http://localhost" } }),
+            context: {},
+            params: {},
+        } as unknown as Parameters<typeof action>[0]);
+    };
+
+    it("offers an unchecked option to start without the starter content", async () => {
+        renderSetup();
+        const box = await screen.findByRole("checkbox", { name: /without the starter content/i });
+        expect((box as HTMLInputElement).checked).toBe(false);
+        expect((box as HTMLInputElement).name).toBe("startEmpty");
+    });
+
+    it("sends startEmpty: true only when the box is ticked", async () => {
+        setupPost.mockClear();
+        await post({ startEmpty: "on" });
+        expect(setupPost.mock.calls[0]?.[0].json.startEmpty).toBe(true);
+    });
+
+    it("CONTROL - sends startEmpty: false when the box is left alone", async () => {
+        setupPost.mockClear();
+        await post({});
+        expect(setupPost).toHaveBeenCalledTimes(1);
+        expect(setupPost.mock.calls[0]?.[0].json.startEmpty).toBe(false);
     });
 });

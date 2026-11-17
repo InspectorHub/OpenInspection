@@ -29,6 +29,13 @@ export interface TenantUpdateParams {
      * exist.
      */
     acceptance?: CapturedAcceptance;
+    /**
+     * First-run setup only: create the owner without the starter templates,
+     * comments, agreement or services. Role profiles, default automations and
+     * the SMS disclosure are system configuration rather than content, so they
+     * are still written.
+     */
+    startEmpty?: boolean;
 }
 
 export interface IntegrationProvider {

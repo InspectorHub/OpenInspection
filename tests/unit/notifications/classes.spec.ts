@@ -30,6 +30,8 @@ import { REGISTRY } from '../../../server/lib/email-templates/registry';
 const NEVER_OFF = [
     'password-reset', 'workspace-invitation', 'agent-invite', 'agent-login-link',
     'client-portal-login',
+    // The code that lets an owner with no password confirm a sensitive action; muting it would lock them out of it.
+    'step-up-code',
     'agreement-request', 'agreement-signed', 'evidence-pack', 'payment-request',
     // The receipt is the same harm as the invoice, from the other side: it is
     // the only record we produce of money the recipient has already paid.

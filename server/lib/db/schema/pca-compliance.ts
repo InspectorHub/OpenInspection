@@ -40,6 +40,8 @@ export const reportSignoff = sqliteTable('report_signoff', {
 }, (t) => [
     index('idx_report_signoff_inspection').on(t.tenantId, t.inspectionId),
     uniqueIndex('uq_report_signoff_role').on(t.inspectionId, t.role),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_report_signoff_tenant_id').on(t.tenantId, t.id),
 ]);
 
 /**
@@ -70,6 +72,8 @@ export const psqResponses = sqliteTable('psq_responses', {
 }, (t) => [
     uniqueIndex('uq_psq_inspection').on(t.tenantId, t.inspectionId),
     uniqueIndex('idx_psq_share_token').on(t.shareToken),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_psq_responses_tenant_id').on(t.tenantId, t.id),
 ]);
 
 /**
@@ -95,4 +99,6 @@ export const documentReviewItems = sqliteTable('document_review_items', {
 }, (t) => [
     index('idx_doc_review_inspection').on(t.tenantId, t.inspectionId),
     uniqueIndex('uq_doc_review_item').on(t.inspectionId, t.documentKey),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_document_review_items_tenant_id').on(t.tenantId, t.id),
 ]);

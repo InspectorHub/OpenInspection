@@ -6,8 +6,8 @@ describe('email template registry', () => {
   // A hand-maintained count is the only tripwire for a template being DELETED
   // by accident — nothing else in the suite notices a shrinking registry (an
   // orphaned class is legal, since a class may exist before its template does).
-  it('has exactly 29 descriptors — bump deliberately when adding one', () => {
-    expect(REGISTRY.length).toBe(29);
+  it('has exactly 30 descriptors — bump deliberately when adding one', () => {
+    expect(REGISTRY.length).toBe(30);
   });
   it('every trigger is unique', () => {
     const t = REGISTRY.map(d => d.trigger);
@@ -24,7 +24,7 @@ describe('email template registry', () => {
     // contradict the fact being reported about their own deletion.
     const platform = REGISTRY.filter(d => !d.editable).map(d => d.trigger);
     expect(platform).toEqual([
-        'password-reset', 'usage-quota-warning', 'usage-quota-reached', 'destruction-incomplete',
+        'password-reset', 'step-up-code', 'usage-quota-warning', 'usage-quota-reached', 'destruction-incomplete',
     ]);
   });
   // Which triggers are `required` is no longer asserted here. A hardcoded pair

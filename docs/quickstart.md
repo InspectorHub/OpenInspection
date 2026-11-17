@@ -74,6 +74,18 @@ Visit `https://<your-worker>.workers.dev/setup` and fill in your company name,
 your name, an email address, a password, and the `SETUP_CODE`. That creates the
 first workspace and its admin account, and logs you in.
 
+By default a new workspace is given the starter content: sample inspection
+templates, canned comments, an agreement template and services. Tick **Start
+without the starter content** on the setup form (or send `"startEmpty": true` to
+`POST /api/auth/setup`) to create only the owner account instead, for example
+when you are about to load your own data. Role profiles and the default email
+automations are still created, because the People section and lifecycle emails
+need them. A workspace started this way is left alone by the post-upgrade
+content sweep; you can still add the starter content later from **Settings →
+Data → Install what's new**, after which later releases' content is delivered
+automatically again. Tags, rating systems and defect categories still appear
+the first time they are used.
+
 Two things about this door are worth understanding, because both are deliberate:
 
 - **It is gated solely on the `SETUP_CODE` secret, and it fails closed.** When

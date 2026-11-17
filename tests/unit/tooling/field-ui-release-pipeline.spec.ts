@@ -184,6 +184,7 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 describe.each([
   { slug: 'field-ui', file: 'publish-field-ui.yml', prefix: 'field-ui-v', name: '@inspectorhub/field-ui' },
   { slug: 'offline-package', file: 'publish-offline-package.yml', prefix: 'offline-package-v', name: '@inspectorhub/offline-package' },
+  { slug: 'data-package', file: 'publish-data-package.yml', prefix: 'data-package-v', name: '@inspectorhub/data-package' },
 ])('publish workflow: $slug', ({ slug, file, prefix, name }) => {
   const publish = loadWorkflow(file);
 
@@ -282,11 +283,12 @@ describe.each([
 });
 
 describe('workflows: ci', () => {
-  it('the build job runs both release checks WITHOUT --require-extra', () => {
+  it('the build job runs all three release checks WITHOUT --require-extra', () => {
     const ci = loadWorkflow('ci.yml');
     const run = ci.jobs.build.steps.map((s: { run?: string }) => s.run ?? '').join('\n');
     expect(run).toContain('npm run release:check:field-ui');
     expect(run).toContain('npm run release:check:offline-package');
+    expect(run).toContain('npm run release:check:data-package');
     expect(run).not.toContain('--require-extra');
     expect(ci.jobs.verify.needs).toContain('build');
   });
@@ -295,9 +297,9 @@ describe('workflows: ci', () => {
 describe('release-please configuration', () => {
   const config = JSON.parse(readFileSync(join(ROOT, 'release-please-config.json'), 'utf8'));
 
-  it('the root package excludes both published packages, and each has its own component and tag prefix', () => {
-    expect(config.packages['.']['exclude-paths']).toEqual(['packages/field-ui', 'packages/offline-package']);
-    for (const slug of ['field-ui', 'offline-package']) {
+  it('the root package excludes all three published packages, and each has its own component and tag prefix', () => {
+    expect(config.packages['.']['exclude-paths']).toEqual(['packages/field-ui', 'packages/offline-package', 'packages/data-package']);
+    for (const slug of ['field-ui', 'offline-package', 'data-package']) {
       expect(config.packages[`packages/${slug}`]).toMatchObject({ component: slug, 'include-component-in-tag': true, 'bump-minor-pre-major': true });
     }
   });

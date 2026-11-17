@@ -111,6 +111,47 @@ First-run `/setup` is gated **solely** on the `SETUP_CODE` secret — the server
 
 Then visit `https://<your-worker>.workers.dev/setup` and enter that value to bootstrap your first admin account.
 
+By default a new workspace is given the starter content: sample inspection
+templates, canned comments, an agreement template and services. Tick **Start
+without the starter content** on the setup form (or send `"startEmpty": true` to
+`POST /api/auth/setup`) to create only the owner account instead, for example
+when you are about to load your own data. Role profiles and the default email
+automations are still created, because the People section and lifecycle emails
+need them. A workspace started this way is left alone by the post-upgrade
+content sweep; you can still add the starter content later from **Settings →
+Data → Install what's new**, after which later releases' content is delivered
+automatically again. Tags, rating systems and defect categories still appear
+the first time they are used.
+
+### Check a new deployment (preflight)
+
+Before you load any data into a freshly deployed instance, run the preflight script from the repository checkout you deployed from. It needs only Node, and no data in the instance:
+
+```bash
+node scripts/preflight-self-host.mjs --url https://inspect.example.com
+node scripts/preflight-self-host.mjs --url https://inspect.example.com --json   # one JSON document
+```
+
+It reads your wrangler config (`WRANGLER_CONFIG`, else `wrangler.local.jsonc`, else `wrangler.jsonc`; override with `--config`), calls `GET /status`, and runs `npx wrangler` for the two checks that need your Cloudflare account, so it uses your existing wrangler login. The config path may contain only letters, digits and `. _ - ~ / \ :` (no spaces), and may not start with `-`. The R2 probe runs with its temporary directory as the working directory and names the file `probe.txt`, so no temporary path is on the command line. On Windows the script starts the wrangler installed in this checkout's `node_modules` directly with Node. If that wrangler is not found it falls back to `npx.cmd` through a shell and refuses any argument with a space or other shell character (for example a checkout path with a space); the check then fails with "wrangler could not be started safely on this machine" and does not touch your account. Run the script from the repository checkout after `npm ci` to avoid this. Error text from wrangler or from parsing your config is never printed, only an exit status and an error code such as `ETIMEDOUT`. Run it with `--skip-wrangler` if you have none; those checks then report "need attention" instead of passing.
+
+What it checks, and nothing more:
+
+| Check | What it actually does |
+|---|---|
+| `status` | `GET /status` answers 200 with a health body and a version; `--min-version x.y.z` fails an older one |
+| `base-url` | The URL is https and not a `workers.dev` host (a warning otherwise) |
+| `config` | The wrangler config file parses |
+| `binding-*` | `DB`, `PHOTOS`, `TENANT_CACHE` and `CRON_QUEUE` are declared (a missing one or a placeholder id fails); `OAUTH_KV`, `WORD_EXPORT_QUEUE`, `BROWSER`, `SIGN_COMPLETION_WORKFLOW` and `INSPECTION_DOC` are declared (a warning otherwise). It reads the config file, so it cannot tell that a declared queue or namespace really exists in your account |
+| `cron` | The `*/5 * * * *` trigger is declared, and the `CRON_QUEUE` queue has a producer and a consumer. It does not check that a tick has fired |
+| `jwt-keyring` | By secret name only: `JWT_SECRET` and the private and public key for the `JWT_CURRENT_KID` in your config exist. The keys are not read or validated |
+| `photos-write` | Writes one small object under `preflight/` in the bucket named in **your local config** (not necessarily the bucket the live Worker is bound to) with `wrangler r2 object put --remote`, then deletes it. A bucket pinned to a jurisdiction is reported as not found by this command, so that probe fails even though the bucket exists. If the write or the delete fails (including a timeout), it tries a cleanup delete and names the key and the command to remove it by hand. The bucket name must be 3 to 63 lowercase letters, digits and hyphens |
+| `turnstile` | A Turnstile secret is set and the site key is not the public test key (a warning otherwise). It cannot tell whether the two belong together |
+| `email` | `RESEND_API_KEY` and `SENDER_EMAIL` are set (a warning otherwise; a company can still configure its own email in Settings) |
+
+It prints `N passed, N need attention, N failed` together, and a run that evaluates no checks is a failure, not a pass. Exit code `0` means no check failed, `1` means at least one failed, `2` means a usage error. It prints secret names, never values, and never requests them.
+
+Two things cannot be read from outside your account, so the script only asks: whether the Cloudflare account is on the Workers paid plan (the free plan's CPU limit stops long jobs with error 1102), and whether the D1 free-tier daily write quota is enough for what you plan to load.
+
 ### Publish the agent terms
 
 The agent portal is **off until the deployment publishes a document written for
@@ -165,6 +206,12 @@ cannot come to mean different words.
 ### How the single worker is wired
 
 The Worker entry at `workers/app.ts` is a Hono app. It routes API-owned paths (`/api/*`, `/status`, `/sign/*`, …) to the API app (`server/`) in-process, and sends every other path to React Router via `createRequestHandler` with `import("virtual:react-router/server-build")`, passing `{ cloudflare: { env, ctx } }` as the `AppLoadContext`. Before delegating to SSR it injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app directly — no network hop, no second worker. `@cloudflare/vite-plugin` integrates the React Router SSR build with wrangler, so the standard `wrangler deploy` pipeline ships everything.
+
+### Rate limiting and the emailed confirmation code
+
+Sensitive owner actions (company data export and import) ask the owner to confirm again before they run. An owner who signed up only through an external sign-in has no password, so the confirmation is a six-digit code emailed to the address on their account. That is a weaker check than a password: it proves control of the mailbox.
+
+The code is valid for ten minutes, allows five wrong tries and three sends per ten minutes. These caps are kept in the cache namespace, which cannot update a counter atomically, so a burst of parallel guesses can exceed them. What holds the line is the `RATE_LIMITER` rate-limit binding (see `wrangler.jsonc`). If you deploy without that binding, or set `DISABLE_RATE_LIMIT=1`, the protection against guessing the code is weaker. Keep the binding in place on any deployment that is reachable from the internet.
 
 ### Local development
 

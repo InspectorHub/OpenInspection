@@ -48,6 +48,8 @@ export const reportExports = sqliteTable('report_exports', {
     updatedAt:     integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_report_exports_inspection').on(t.tenantId, t.inspectionId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_report_exports_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export type ReportExport = typeof reportExports.$inferSelect;

@@ -19,6 +19,7 @@ const EXAMPLES: Record<string, string> = {
   // `{declineReason}` would show an admin nothing to judge their copy by.
   declineReason: 'The export is a password-protected archive, and we have no way to open it without the password.',
   expiresOn: 'September 17, 2026',
+  code: '482913', actionLabel: 'start a company data export',
   clientName: 'Jordan Smith', inspectorName: 'Alex Rivera', agentName: 'Pat Lee',
   tenantName: 'Acme Inspections', workspaceName: 'Acme Inspections', agreementName: 'Inspection Agreement',
   date: 'July 1, 2026', time: '3:00 PM', amount: '$350.00',

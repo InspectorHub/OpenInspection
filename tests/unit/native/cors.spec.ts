@@ -62,7 +62,7 @@ describe('CORS for native app origins (real app)', () => {
       expect(res.headers.get('Access-Control-Allow-Origin')).toBe(origin);
       expect(res.headers.get('Access-Control-Allow-Credentials')).toBeNull();
       const allowed = csv(res.headers.get('Access-Control-Allow-Headers'));
-      for (const name of ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Client-Version', 'X-Client-Platform']) {
+      for (const name of ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Client-Version', 'X-Client-Platform', 'X-Step-Up-Token']) {
         expect(allowed, name).toContain(name.toLowerCase());
       }
       for (const name of nativeCorsHeaders.allowHeaders) expect(allowed).toContain(name.toLowerCase());

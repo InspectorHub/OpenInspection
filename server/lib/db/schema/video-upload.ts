@@ -41,6 +41,8 @@ export const videoUploads = sqliteTable('video_uploads', {
 }, (t) => [
     uniqueIndex('uq_video_uploads_media').on(t.tenantId, t.mediaId),
     index('idx_video_uploads_sweep').on(t.state, t.expiresAt),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_video_uploads_tenant_id').on(t.tenantId, t.id),
 ]);
 
 /** One received part of an unfinished upload: its storage tag (needed to complete) and its size. */

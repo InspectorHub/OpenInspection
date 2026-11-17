@@ -74,6 +74,8 @@ export const contacts = sqliteTable('contacts', {
         .where(sql`agent_user_id IS NOT NULL AND archived_at IS NULL`),
     // The agent portal's cross-tenant lookup: "every tenant that is me".
     index('idx_contacts_agent_user').on(t.agentUserId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_contacts_tenant_id').on(t.tenantId, t.id),
 ]);
 
 /**

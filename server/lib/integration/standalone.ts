@@ -11,6 +11,7 @@ import { seedDefaultAutomations } from './standalone-seed-automations';
 import { SmsConsentService } from '../../services/sms-consent.service';
 import { SMS_DISCLOSURE_V1 } from '../../services/automation/shared';
 import { initReplyToFromOwner } from './owner-reply-to';
+import { NO_STARTER_CONTENT } from '../../services/starter-content/content-version';
 
 // Default Comment Library entries seeded into every new tenant. The same set
 // is also backfilled into existing tenants by the default-comments seed
@@ -208,6 +209,7 @@ export class StandaloneProvider implements IntegrationProvider {
                 tier: tier || 'free',
                 status: (adminEmail ? 'active' : status) || 'pending',
                 deploymentMode: deploymentMode || 'silo',
+                ...(params.startEmpty ? { contentVersion: NO_STARTER_CONTENT } : {}),
                 ...(maxUsers != null ? { maxUsers } : {}),
                 createdAt: new Date(),
             });
@@ -221,6 +223,7 @@ export class StandaloneProvider implements IntegrationProvider {
             if (tier) update.tier = tier;
             if (deploymentMode) update.deploymentMode = deploymentMode;
             if (maxUsers != null) update.maxUsers = maxUsers;
+            if (params.startEmpty) update.contentVersion = NO_STARTER_CONTENT;
             // `update.name = name` was here. tsc named five of the six sites
             // touching that column and missed this one: `update` is a
             // `Record<string, …>`, so a dynamic key type-checks against anything.
@@ -320,7 +323,9 @@ export class StandaloneProvider implements IntegrationProvider {
                 // DELIBERATELY carries no `templateCreate` capability (#307).
                 // First-run setup runs before any user exists, so there is no
                 // acting user and no capability set to consult.
-                await db.insert(templates).values({
+                // `startEmpty` skips this template, the comments, the agreement
+                // and the services; system configuration below is kept.
+                if (!params.startEmpty) await db.insert(templates).values({
                     id: crypto.randomUUID(),
                     tenantId,
                     name: 'My Inspection Template (Blank)',
@@ -331,7 +336,7 @@ export class StandaloneProvider implements IntegrationProvider {
 
                 // Default Comment Library — gives new inspectors a starting set
                 // so they aren't typing every defect description from scratch.
-                await seedDefaultComments(this.db, tenantId);
+                if (!params.startEmpty) await seedDefaultComments(this.db, tenantId);
 
                 // ORDERING: seed the system role profiles (client/buyer_agent/
                 // listing_agent) BEFORE the default automations below. This
@@ -355,11 +360,11 @@ export class StandaloneProvider implements IntegrationProvider {
 
                 // Default pre-inspection agreement template so the e-sign flow
                 // (UC-C-2) has a document to send.
-                await seedDefaultAgreement(this.db, tenantId);
+                if (!params.startEmpty) await seedDefaultAgreement(this.db, tenantId);
 
                 // Default priced services so the public booking page (UC-C-3
                 // multi-service booking) has items to render.
-                await seedDefaultServices(this.db, tenantId);
+                if (!params.startEmpty) await seedDefaultServices(this.db, tenantId);
             } else {
                 await db.update(users).set({ passwordHash: adminPasswordHash }).where(eq(users.id, existingUser.id));
             }

@@ -23,7 +23,7 @@
  * data, out of scope for per-tenant list, meter and purge by construction.
  */
 const PLAIN_ID = /^[A-Za-z0-9_-]+$/;
-const PHOTO_FILENAME = /^[A-Za-z0-9_-]+\.(?:png|jpe?g|webp)$/i;
+export const PHOTO_FILENAME = /^[A-Za-z0-9_-]+\.(?:png|jpe?g|webp)$/i;
 
 /**
  * The mediaId of a new-convention photo key (`{t}/inspections/{i}/photos/{mediaId}.{ext}`), or null for the old ad-hoc
@@ -34,7 +34,7 @@ export function photoMediaId(key: string): string | null {
 }
 
 /** A baked derivative's file name: `{mediaId}.annotated|cropped[.{rev}].png|jpg`. Captures the mediaId. */
-const DERIVATIVE_NAME = /^([^/.]+)\.(?:annotated|cropped)(?:\.[0-9a-f]{8})?\.(?:png|jpg)$/;
+export const DERIVATIVE_NAME = /^([^/.]+)\.(?:annotated|cropped)(?:\.[0-9a-f]{8})?\.(?:png|jpg)$/;
 
 /** The mediaId a baked derivative's file name belongs to, or null when the name is not in the derivative family. */
 export function derivativeMediaId(fileName: string): string | null {

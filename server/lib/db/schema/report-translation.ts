@@ -52,7 +52,7 @@
  * to pre-tick its own box, and a deliberate untick DELETES the row, which is
  * how a person records that they no longer want one.
  */
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
 export const reportTranslations = sqliteTable('report_translations', {
     id:           text('id').primaryKey(),
@@ -121,6 +121,8 @@ export const reportTranslations = sqliteTable('report_translations', {
     // language; a second row would make "the" translation ambiguous at every
     // read, and regeneration would quietly accumulate them.
     uniqueIndex('uq_report_translations_report_locale').on(t.tenantId, t.reportId, t.locale),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_report_translations_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export type ReportTranslation = typeof reportTranslations.$inferSelect;

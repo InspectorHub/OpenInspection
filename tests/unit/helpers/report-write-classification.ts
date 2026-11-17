@@ -23,6 +23,7 @@ export const NOT_REPORT_CONTENT: Record<string, string> = {
     'POST /api/inspections/:id/clone': 'creates another inspection',
     'POST /api/inspections/:id/complete': 'status',
     'POST /api/inspections/:id/confirm': 'status',
+    'POST /api/inspections/:id/copy-report': 'creates another inspection (the source report is read only)',
     'POST /api/inspections/:id/export/word': 'export of existing content',
     'POST /api/inspections/:id/pay-splits/:splitId/corrections': 'money',
     'POST /api/inspections/:id/pay-splits/refresh': 'money',

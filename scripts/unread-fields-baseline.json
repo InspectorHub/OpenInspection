@@ -67,6 +67,18 @@
     "kind": "record",
     "reason": "The ordered list of template searches the editor issued on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
   },
+  "packages/data-package/src/shard.ts#ShardPlacement.opensShard": {
+    "kind": "deferred",
+    "reason": "Metadata the streaming shard cutter returns so a future exporter knows to close the previous shard before writing this row. Only specs read it today; the export runner (E-2/A-2) consumes it when it lands. Declared on the public format API so the exporter can rely on it."
+  },
+  "packages/data-package/src/volume.ts#PlannedEntry.volumeIndex": {
+    "kind": "deferred",
+    "reason": "Ordinal of the volume an entry was assigned to, returned by the streaming volume planner for the future exporter to build per-volume manifests. Only specs read it today; the export runner consumes it when it lands."
+  },
+  "packages/data-package/src/volume.ts#PlannedEntry.oversize": {
+    "kind": "deferred",
+    "reason": "Flags an entry larger than the volume byte budget so the future exporter can route it to an oversize path instead of a normal media volume. Only specs read it today; the export runner consumes it when it lands."
+  },
   "server/cron/types.ts#CronJob.maxBatch": {
     "kind": "invisible-read",
     "reason": "Read as a STRING key by `scripts/check-cron-budget.mjs`, a registered pre-push gate whose REQUIRED_FIELDS list includes `maxBatch:` and which refuses a job that omits it. The CPU ceiling is not protected by passing this value to `run()` — that gate says outright \"CPU cannot be measured from source, so this gate gates the SHAPE that made the overrun possible\", and it separately refuses any unbounded table read on a cron path. `maxBatch` is the declared budget a human tunes; the bounding is gated elsewhere."

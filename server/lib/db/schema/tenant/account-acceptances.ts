@@ -78,4 +78,6 @@ export const accountAcceptances = sqliteTable('account_acceptances', {
     // accepted twice.
     uniqueIndex('uq_account_acceptances_user_doc_version').on(t.userId, t.doc, t.version),
     index('idx_account_acceptances_tenant').on(t.tenantId, t.acceptedAt),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_account_acceptances_tenant_id').on(t.tenantId, t.id),
 ]);

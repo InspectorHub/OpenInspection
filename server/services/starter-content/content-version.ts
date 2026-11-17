@@ -39,3 +39,13 @@
  *      failed.
  */
 export const STARTER_CONTENT_VERSION = 'c2';
+
+/**
+ * The stamp of a workspace created without the bundled content, at the operator's
+ * request. It is not a release number: it never equals `STARTER_CONTENT_VERSION`,
+ * so the sweep would offer that workspace content on every release unless it
+ * recognises this value and leaves the workspace alone. A column that already
+ * holds the stamp carries the choice, which is why it needs no migration. The
+ * owner can still install the bundled content on demand from Settings -> Data.
+ */
+export const NO_STARTER_CONTENT = 'none';

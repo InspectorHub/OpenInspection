@@ -1283,6 +1283,67 @@
     "description": "Records a granted SMS consent event (captured_via=optin_link) for the contact encoded in the token. Idempotent — confirming twice simply appends a second granted event."
   },
   {
+    "operationId": "copyInspectionAsNewReport",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/copy-report",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose findings the new report starts from.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id of the inspection whose findings the new report starts from."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "rating",
+              "rating_notes",
+              "all"
+            ],
+            "description": "What to copy per finding: rating only; rating and notes; or everything the allow-list carries (rating, notes, value, attributes, canned-comment and defect tabs, custom comments, tags). Defaults to rating_notes for the same property and to rating for a different one. Free-text fields (notes, value, attributes, the comment, title and location of defects and custom comments, annotationsJson) are copied verbatim and can still name the previous client, a door or lockbox code or the old street; deadline is the old job's absolute date. One of: rating, rating_notes, all."
+          },
+          "property": {
+            "type": "string",
+            "enum": [
+              "same",
+              "different"
+            ],
+            "default": "same",
+            "description": "same: the address and property facts come along. different: they are cleared and propertyAddress is required. Defaults to same."
+          },
+          "propertyAddress": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The address of the new report. Required when property is different, ignored otherwise. 1-500 characters."
+          },
+          "photos": {
+            "type": "boolean",
+            "default": false,
+            "description": "Copy the finding photos as new objects under the new report. Off by default, and refused when property is different. The source photos are never shared or moved. Only a limited number are copied per request; see summary.photos.complete. Defaults to false."
+          }
+        }
+      }
+    },
+    "summary": "Copy an inspection as a new report",
+    "description": "Creates a new inspection whose report starts from the findings of an existing one. The booking and property details, price and requirements come across as they do for a clone; findings are copied per the chosen scope (rating, rating and notes, or everything the allow-list carries) into the places the new inspection's template has for them, and findings with no matching place are dropped and counted. Carried verbatim, and so able to name the previous client, a door or lockbox code or the old street: notes, value, attributes, and the comment, title and location of canned and custom defects and comments, and a photo's annotationsJson; a defect's deadline is the old job's absolute date. Without an explicit scope a copy at a different property takes ratings only. Photos are copied only when asked for (never for a different property), as new files under the new report, keeping only their content type; the source's files are never shared or changed. Videos are never copied, and photos stored under an older key layout (not directly in the inspection's photos folder) are skipped. Photos are copied within a small, conservative per-request storage budget: about six plain photos, or two with two baked variants each (the platform allowance behind this is unmeasured, so the figure is deliberately low). summary.photos reports copied, failed, skipped, unsupported, droppedVariants and deferred, and complete is null when photos were not asked for, false when anything photo-like is missing and true only when nothing is. Nothing continues a partial copy later. summary.people and summary.roster say whether the client/agent links and the lead and helpers came across. If the new inspection cannot be read back, the answer is still 201 with its basic header. Nothing about the source's sign-off comes across: no signature, no published version or verification token, no agreement, no payment, no client-portal access, no editing history. The copy is an ordinary editable inspection with status requested, payment unpaid and a draft report. Counts as one new inspection against the plan allowance, consumed before anything is written. Sends nothing to anyone. Not idempotent: each call makes another copy, so send an Idempotency-Key header to make a retry safe. Available to owner, manager and inspector roles (office staff get 403); an inspector restricted to their own inspections must be on the source inspection."
+  },
+  {
     "operationId": "correctInspectionPaySplit",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/pay-splits/{splitId}/corrections",
@@ -10856,6 +10917,11 @@
             "minLength": 6,
             "example": "change-me-6-chars-min",
             "description": "First-run setup code — must exactly equal the SETUP_CODE Worker secret. Any value >= 6 characters (no digit/charset constraint). Required: /setup fails closed when SETUP_CODE is unset."
+          },
+          "startEmpty": {
+            "type": "boolean",
+            "example": false,
+            "description": "Create the workspace with the owner account and no starter templates, canned comments, default agreement or services. Reference data (tags, rating systems, defect categories) still appears on first use; roles, default automations and the SMS disclosure are kept. Default false. The content can be installed later from Settings > Data."
           }
         },
         "required": [
@@ -20018,6 +20084,38 @@
     "description": "Owner and manager, and inspectors who work an inspection the contact is on or hold scheduleOthers (a contact on no inspection yet is open to all staff); other inspectors get 403. Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
+    "operationId": "sendStepUpEmailCode",
+    "method": "POST",
+    "pathTemplate": "/api/auth/step-up/email-code",
+    "scopes": [],
+    "tag": "auth",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "data-export-start",
+              "data-import-apply",
+              "data-import-revert"
+            ],
+            "example": "data-export-start",
+            "description": "The single sensitive action the emailed code is for. One of: data-export-start, data-import-apply, data-import-revert."
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "description": "The action the code is for."
+      }
+    },
+    "summary": "Email a one-time code to confirm one sensitive action",
+    "description": "For an owner whose account has no usable password (created through a federated sign-in only). Emails a six-digit code, valid for ten minutes, to the address on the owner's own account; no address is read from the request. At most three codes per ten minutes, five wrong tries per code, one live code per action. Refused for an account that has a password. The code is a weaker factor than a password (it proves control of the mailbox), accepted by explicit decision."
+  },
+  {
     "operationId": "sendTenant",
     "method": "POST",
     "pathTemplate": "/api/admin/agreements/send",
@@ -20698,6 +20796,58 @@
     },
     "summary": "Consume a portal-issued SSO handoff code",
     "description": "Reads sso:<code> from KV, issues a session cookie, redirects to /inspections."
+  },
+  {
+    "operationId": "stepUpReauthenticate",
+    "method": "POST",
+    "pathTemplate": "/api/auth/step-up",
+    "scopes": [],
+    "tag": "auth",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "data-export-start",
+              "data-import-apply",
+              "data-import-revert"
+            ],
+            "example": "data-export-start",
+            "description": "The single sensitive action the elevation is for. The token that comes back is accepted for this action only. One of: data-export-start, data-import-apply, data-import-revert."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "example": "currentPassword",
+            "description": "The signed-in account current password, entered again. Required for an account that has a password. 1-1024 characters."
+          },
+          "emailCode": {
+            "type": "string",
+            "maxLength": 20,
+            "example": "482913",
+            "description": "The code emailed to the account, for an owner who has no password (federated sign-up only). Ignored for an account that has a password. Up to 20 characters."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 20,
+            "example": "123456",
+            "description": "Current TOTP code or a recovery code. Required when the account has two-factor authentication on; ignored otherwise. 6-20 characters."
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "description": "The action to elevate for plus the credentials re-entered."
+      }
+    },
+    "summary": "Re-enter credentials to authorise one sensitive action",
+    "description": "Verifies the signed-in user's password again, and their TOTP or recovery code when two-factor authentication is on. On success, sets an HttpOnly cookie holding a token that is valid for the named action only, for the same user only, once, for five minutes. For a browser the token is never returned in the response body. A native client (which has no cookie jar) also receives the same single token in the response body and sends it back in the X-Step-Up-Token header; the cookie is still set and the browser path is unchanged. An owner with no password (federated sign-up only) sends the code emailed by POST /api/auth/step-up/email-code as emailCode instead of a password. That is a weaker factor than a password (it proves control of the mailbox), accepted by explicit decision, and it is refused for any account that has a password. An upstream identity provider own two-factor is not re-challenged here; the engine asks for TOTP only when the account has it on in this engine."
   },
   {
     "operationId": "submitReport",

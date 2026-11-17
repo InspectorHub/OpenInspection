@@ -41,6 +41,8 @@ export const inspectionUnits = sqliteTable('inspection_units', {
 }, (t) => [
     index('idx_inspection_units_tenant_inspection').on(t.tenantId, t.inspectionId),
     index('idx_inspection_units_parent').on(t.parentUnitId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_inspection_units_tenant_id').on(t.tenantId, t.id),
 ]);
 
 /**

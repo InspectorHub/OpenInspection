@@ -1,0 +1,30 @@
+{
+  "name": "@inspectorhub/data-package",
+  "version": "0.1.0",
+  "description": "The OpenInspection tenant data package format: safe-JSON, NDJSON, checksums, shards, volumes and media-index primitives shared by the desktop client and the engine.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/InspectorHub/OpenInspection.git",
+    "directory": "packages/data-package"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "peerDependencies": {
+    "zod": "^4.6.6"
+  },
+  "scripts": {
+    "build": "tsup"
+  }
+}

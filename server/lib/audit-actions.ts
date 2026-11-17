@@ -20,6 +20,9 @@ export type AuditAction =
     // many connections, imported busy blocks, read-calendar choices and event links were removed.
     | 'calendar.disconnect'
     | 'inspection.create'
+    // A new inspection started from the findings of an earlier one. Records ids, the scope and counts only,
+    // never note text, file names or an address.
+    | 'inspection.copy_report'
     | 'inspection.delete'
     | 'inspection.status_change'
     | 'inspection.complete'
@@ -85,6 +88,10 @@ export type AuditAction =
     | 'user.invite'
     | 'user.join'
     | 'user.password_change'
+    // Step-up re-authentication for a sensitive action. Payloads carry the action name and an enumerated reason or method only; never a password, code, token or address.
+    | 'auth.step_up_granted'
+    | 'auth.step_up_denied'
+    | 'auth.step_up_code_sent'
     // A member taken off the team. Carries how many of their open inspections
     // were handed to someone else or left unassigned, so the record answers
     // "where did their work go".

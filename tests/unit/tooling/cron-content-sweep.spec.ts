@@ -22,7 +22,7 @@ import Database from 'better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { tenants } from '../../../server/lib/db/schema';
 import { behind } from '../../../server/cron/jobs/content';
-import { STARTER_CONTENT_VERSION } from '../../../server/services/starter-content/content-version';
+import { STARTER_CONTENT_VERSION, NO_STARTER_CONTENT } from '../../../server/services/starter-content/content-version';
 import { setupSchema } from '../db';
 
 type Db = ReturnType<typeof drizzle<typeof schema>>;
@@ -36,11 +36,12 @@ beforeAll(async () => {
     await setupSchema(sqlite);
     db = drizzle(sqlite, { schema });
 
-    // Three workspaces, one per state the column can be in.
+    // Four workspaces, one per state the column can be in.
     const rows = [
         { id: 'w-never', version: null },
         { id: 'w-older', version: OLDER },
         { id: 'w-current', version: CURRENT },
+        { id: 'w-blank', version: NO_STARTER_CONTENT },
     ];
     for (const r of rows) {
         await db.insert(tenants).values({
@@ -56,12 +57,12 @@ const swept = async () => (await db.select({ id: tenants.id }).from(tenants).whe
     .map((r) => r.id).sort();
 
 describe('content-seed-sweep — which workspaces are behind', () => {
-    it('CONTROL — the three fixtures really are in the three distinct states', () => {
+    it('CONTROL — the four fixtures really are in the four distinct states', () => {
         // Without this, every assertion below is satisfiable by a table whose
         // rows all look alike, and "the predicate selects two of three" would
         // be a statement about nothing.
         expect(db.select().from(tenants).all().map((r) => r.contentVersion).sort())
-            .toEqual([CURRENT, OLDER, null].sort());
+            .toEqual([CURRENT, NO_STARTER_CONTENT, OLDER, null].sort());
     });
 
     it('offers content to a workspace that has NEVER been swept', async () => {
@@ -76,6 +77,10 @@ describe('content-seed-sweep — which workspaces are behind', () => {
         expect(await swept()).not.toContain('w-current');
     });
 
+    it('leaves a workspace its operator started empty alone', async () => {
+        expect(await swept()).not.toContain('w-blank');
+    });
+
     it('selects exactly those two and nothing else', async () => {
         expect(await swept()).toEqual(['w-never', 'w-older']);
     });
@@ -86,7 +91,7 @@ describe('content-seed-sweep — which workspaces are behind', () => {
         // test would fail, and the comment on `behind()` would need rewriting.
         const withoutNullArm = await db.select({ id: tenants.id }).from(tenants)
             .where(ne(tenants.contentVersion, CURRENT)).all();
-        expect(withoutNullArm.map((r) => r.id)).toEqual(['w-older']);
+        expect(withoutNullArm.map((r) => r.id).sort()).toEqual(['w-blank', 'w-older']);
         expect(withoutNullArm.map((r) => r.id)).not.toContain('w-never');
     });
 

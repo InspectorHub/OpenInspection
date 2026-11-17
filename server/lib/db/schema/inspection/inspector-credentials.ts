@@ -16,6 +16,7 @@ export const inspectorCredentials = sqliteTable('inspector_credentials', {
   createdAt:    integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt:    integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
-  index('idx_inspector_credentials_tenant').on(t.tenantId),
   index('idx_inspector_credentials_user').on(t.userId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_inspector_credentials_tenant_id').on(t.tenantId, t.id),
 ]);

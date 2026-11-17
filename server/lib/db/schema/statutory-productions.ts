@@ -47,6 +47,8 @@ export const statutoryFormProductions = sqliteTable('statutory_form_productions'
     index('idx_statutory_productions_form_version').on(t.formId, t.version),
     // The per-inspection read: what this workspace produced for one visit.
     index('idx_statutory_productions_inspection').on(t.tenantId, t.inspectionId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_statutory_form_productions_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export type StatutoryFormProductionRow = typeof statutoryFormProductions.$inferSelect;

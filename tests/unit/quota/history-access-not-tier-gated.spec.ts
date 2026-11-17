@@ -27,6 +27,8 @@ const ALLOWED: Record<string, Kind> = {
     'server/services/concierge.service.ts': 'create',
     'server/services/inspection-request.service.ts': 'create',
     'server/services/inspection.service.ts': 'create',
+    'server/services/inspection/inspection-copy-report.service.ts': 'create',
+    'server/api/inspections/copy-report.ts': 'create',
     'server/services/inspection/inspection-core.service.ts': 'create',
     'server/services/inspection/inspection-create-variants.service.ts': 'create',
     'server/services/inspection/inspection-reinspection.service.ts': 'create',

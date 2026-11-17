@@ -59,6 +59,8 @@ export function makeSetupSchema() {
       .email(m.auth_validation_email_invalid()),
     password: makeStrongPassword(),
     setupCode: requiredText(m.auth_validation_setup_code_min()).min(6, m.auth_validation_setup_code_min()),
+    // Conform-native checkbox: checked -> true, absent -> undefined.
+    startEmpty: z.boolean().optional(),
   });
 }
 

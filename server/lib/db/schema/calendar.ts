@@ -57,6 +57,8 @@ export const calendarConnections = sqliteTable('calendar_connections', {
 }, (t) => [
     uniqueIndex('uq_calendar_connections_user_provider').on(t.userId, t.provider),
     index('idx_calendar_connections_tenant_user').on(t.tenantId, t.userId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_calendar_connections_tenant_id').on(t.tenantId, t.id),
 ]);
 
 // A-polish 10b — multi-read / single-write. The read set of Google calendars
@@ -75,6 +77,8 @@ export const calendarConnectionReadCalendars = sqliteTable('calendar_connection_
 }, (t) => [
     uniqueIndex('uq_conn_read_cal').on(t.connectionId, t.externalCalendarId),
     index('idx_conn_read_cal_tenant').on(t.tenantId, t.connectionId),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_calendar_connection_read_calendars_tenant_id').on(t.tenantId, t.id),
 ]);
 
 /**
@@ -128,6 +132,8 @@ export const calendarExternalLinks = sqliteTable('calendar_external_links', {
     uniqueIndex('uq_calendar_external_links_entity')
         .on(t.tenantId, t.provider, t.entityType, t.entityId),
     index('idx_calendar_external_links_user').on(t.tenantId, t.userId, t.provider),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_calendar_external_links_tenant_id').on(t.tenantId, t.id),
 ]);
 
 export const calendarBlocks = sqliteTable('calendar_blocks', {
@@ -145,4 +151,6 @@ export const calendarBlocks = sqliteTable('calendar_blocks', {
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_calendar_blocks_tenant_user_date').on(t.tenantId, t.userId, t.date),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    index('idx_calendar_blocks_tenant_id').on(t.tenantId, t.id),
 ]);

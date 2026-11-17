@@ -87,6 +87,8 @@ export const COOLING_WINDOW_MS = COOLING_WINDOW_HOURS * 60 * 60 * 1000;
 export const ACCOUNT_EMAIL_CLASSES: ReadonlySet<string> = new Set([
     // Account mechanics — blocking these locks a paying customer out.
     'password-reset',
+    // The code that lets an owner with no password confirm a sensitive action; blocking it would lock them out of it.
+    'step-up-code',
     'workspace-invitation',
     'usage-quota-warning',
     'usage-quota-reached',

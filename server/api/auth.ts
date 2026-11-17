@@ -21,7 +21,9 @@ import { safeReturnTo } from '../lib/mcp/safe-return-to';
 import { findGlobalAgentById } from '../services/agent/account';
 import totpRoutes, { totpRouteConfigs } from './auth/totp';
 import profileRoutes, { profileRouteConfigs } from './auth/profile';
+import stepUpRoutes, { stepUpRouteConfigs } from './auth/step-up';
 import { getDrizzle } from '../lib/route-helpers';
+import { seedSetupContent } from '../services/starter-content/setup-seed';
 import { platformActorClaims } from '../lib/platform-actor-claims';
 
 // --- Routes ---
@@ -561,22 +563,10 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
         adminEmail: body.email,
         adminPasswordHash: passwordHash,
         adminName: body.adminName,
+        startEmpty: body.startEmpty === true,
     });
 
-    // Auto-seed the FULL starter content library for the new tenant in one
-    // idempotent pass (templates, agreements, canned comments, event types, tags,
-    // recommendations, rating systems, marketplace libraries) — the same canonical
-    // seeder `POST /api/admin/data/install-bundled-content` uses, so /setup yields
-    // a fully populated NEW workspace (no separate post-deploy seed step needed).
-    // Not an EXISTING one — `already_initialized` above refuses forever once a user exists, so content a later release ships arrives only via that route.
-    try {
-        const { seedStarterContent } = await import('../services/starter-content.service');
-        const seeded = await seedStarterContent(c.env.DB, tenantId);
-        logger.info('Auto-seeded starter content during setup', { tenantId, ...seeded });
-    } catch (seedErr) {
-        // Don't block setup if seeding fails — log and continue.
-        logger.error('Auto-seed starter content failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
-    }
+    await seedSetupContent(c.env.DB, tenantId, body.startEmpty === true);
 
     // 4. Issue a JWT for the new admin so the caller can authenticate immediately
     const newUser = await db.select().from(users).where(eq(users.email, body.email)).get().catch(() => null);
@@ -601,6 +591,7 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
 });
 coreAuthRoutes.route('/', profileRoutes);
 coreAuthRoutes.route('/', totpRoutes);
+coreAuthRoutes.route('/', stepUpRoutes);
 coreAuthRoutes.openapi(inviteInfoRoute, async (c) => {
     const { token } = c.req.valid('query');
     const info = await c.var.services.auth.getInviteInfo(token);
@@ -612,7 +603,7 @@ coreAuthRoutes.openapi(setupStatusRoute, async (c) => {
     return c.json({ success: true as const, data: { isSetUp } }, 200); // projection-allow: the nested value is a boolean: whether first-run setup is complete
 });
 
-export const coreAuthRouteParts = [loginRoute, changePasswordRoute, joinTeamRoute, mounted('/', ssoRootRoutes, [ssoConsumeRoute] as const), forgotPasswordRoute, resetPasswordRoute, setupRoute, mounted('/', profileRoutes, profileRouteConfigs), mounted('/', totpRoutes, totpRouteConfigs), inviteInfoRoute, setupStatusRoute] as const;
+export const coreAuthRouteParts = [loginRoute, changePasswordRoute, joinTeamRoute, mounted('/', ssoRootRoutes, [ssoConsumeRoute] as const), forgotPasswordRoute, resetPasswordRoute, setupRoute, mounted('/', profileRoutes, profileRouteConfigs), mounted('/', totpRoutes, totpRouteConfigs), mounted('/', stepUpRoutes, stepUpRouteConfigs), inviteInfoRoute, setupStatusRoute] as const;
 
 export type CoreAuthApi = ApiOf<typeof coreAuthRouteParts>;
 

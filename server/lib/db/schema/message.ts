@@ -77,4 +77,6 @@ export const inspectionMessages = sqliteTable('inspection_messages', {
     unreadIdx:     index('idx_msg_unread')
         .on(t.tenantId, t.contactId, t.fromRole)
         .where(sql`${t.readAt} IS NULL`),
+    // Keyset paging within one tenant (export): leading (tenant_id, key).
+    idxTenantKey: index('idx_inspection_messages_tenant_id').on(t.tenantId, t.id),
 }));
