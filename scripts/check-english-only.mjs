@@ -86,6 +86,10 @@ const ALLOWED = new Map([
      'Contains the pattern that BANS Chinese migration references; removing the Chinese would disable that gate.'],
     ['tests/unit/platform/content-disposition.spec.ts',
      'Asserts RFC 5987 encoding of a non-ASCII filename — the CJK string is the test input.'],
+    ['tests/unit/data-package/cursor.spec.ts',
+     'Round-trips non-Latin1 Unicode through base64url; the CJK characters are the byte-safety test input.'],
+    ['tests/unit/data-package/read.service.spec.ts',
+     'Verifies large-blob chunking cuts at byte (not char) boundaries; the CJK payload is the UTF-8 byte-count test input.'],
 ]);
 
 const offenders = [];

@@ -67,6 +67,10 @@
     "kind": "record",
     "reason": "The ordered list of template searches the editor issued on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
   },
+  "server/services/data-package/read.service.ts#ReadRowsResult.rowsScanned": {
+    "kind": "invisible-read",
+    "reason": "Rows examined per page, consumed by the /rows response serialization (returned as `data: page`, declared in RowsResponseSchema) and asserted by read.service.spec.ts. The application daily budget is disabled by owner decision, so nothing computes a rate from it in-process; it still travels to the desktop client as measurement data for a future budget re-enable."
+  },
   "packages/data-package/src/shard.ts#ShardPlacement.opensShard": {
     "kind": "deferred",
     "reason": "Metadata the streaming shard cutter returns so a future exporter knows to close the previous shard before writing this row. Only specs read it today; the export runner (E-2/A-2) consumes it when it lands. Declared on the public format API so the exporter can rely on it."

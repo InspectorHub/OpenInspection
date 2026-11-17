@@ -23,6 +23,7 @@ import type {
     DATA_JOB_ERROR_CODES} from '../../lib/db/schema/data-package';
 import {
     tenantDataJobs,
+    DATA_JOB_STATUS,
     type TenantDataJob,
     type NewTenantDataJob,
 } from '../../lib/db/schema/data-package';
@@ -35,9 +36,9 @@ export const JOB_LEASE_TTL_MS = 30 * 60 * 1000;
 /** A heartbeat writes the renewed expiry to D1 only when fewer than this many ms remain, to save free-tier writes. */
 export const JOB_HEARTBEAT_WRITE_WINDOW_MS = 5 * 60 * 1000;
 /** A finished/failed job may be inspected this long; after that its row is no longer resumable (14 days). */
-export const JOB_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+const JOB_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
-export type JobKind = (typeof DATA_JOB_KINDS)[number];
+type JobKind = (typeof DATA_JOB_KINDS)[number];
 export type JobErrorCode = (typeof DATA_JOB_ERROR_CODES)[number];
 
 export interface CreateJobInput {
@@ -100,7 +101,7 @@ export class DataPackageJobService {
             id: this.genId(),
             tenantId,
             kind: input.kind,
-            status: 'queued',
+            status: DATA_JOB_STATUS.QUEUED,
             stage: 'rows',
             leaseHolder: input.deviceLabel,
             leaseExpiresAt: new Date(nowMs + JOB_LEASE_TTL_MS),
@@ -206,7 +207,7 @@ export class DataPackageJobService {
         }
         const updated = await this.db.update(tenantDataJobs)
             .set({
-                status: 'running',
+                status: DATA_JOB_STATUS.RUNNING,
                 leaseHolder: deviceLabel,
                 leaseExpiresAt: new Date(nowMs + JOB_LEASE_TTL_MS),
                 updatedAt: new Date(nowMs),
@@ -225,7 +226,7 @@ export class DataPackageJobService {
         const nowMs = this.now();
         const updated = await this.db.update(tenantDataJobs)
             .set({
-                status: 'complete',
+                status: DATA_JOB_STATUS.COMPLETE,
                 ...(result.counts !== undefined ? { counts: result.counts } : {}),
                 ...(result.bytes !== undefined ? { bytes: result.bytes } : {}),
                 ...(result.sha256 !== undefined ? { sha256: result.sha256 } : {}),
@@ -247,7 +248,7 @@ export class DataPackageJobService {
         const nowMs = this.now();
         const updated = await this.db.update(tenantDataJobs)
             .set({
-                status: 'cancelled',
+                status: DATA_JOB_STATUS.CANCELLED,
                 ...(errorCode ? { errorCode } : {}),
                 finishedAt: new Date(nowMs),
                 updatedAt: new Date(nowMs),

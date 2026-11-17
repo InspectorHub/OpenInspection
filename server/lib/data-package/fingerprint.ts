@@ -12,13 +12,14 @@
 import { columnSetFingerprint } from '@core/data-package';
 import { TABLE_READ_META } from './read-metadata';
 
-let cached: Promise<string> | null = null;
-
+/**
+ * Pure: a SHA-256 of the sorted table.column whitelist. Kept stateless (no
+ * module-level cache) so importing this module cannot make two unit specs
+ * share mutable state — the cost is one short hash per job start, which is
+ * negligible next to the D1 reads that follow.
+ */
 export function schemaFingerprint(): Promise<string> {
-    if (!cached) {
-        const columnsByTable: Record<string, string[]> = {};
-        for (const meta of TABLE_READ_META) columnsByTable[meta.table] = [...meta.columns];
-        cached = columnSetFingerprint(columnsByTable);
-    }
-    return cached;
+    const columnsByTable: Record<string, string[]> = {};
+    for (const meta of TABLE_READ_META) columnsByTable[meta.table] = [...meta.columns];
+    return columnSetFingerprint(columnsByTable);
 }

@@ -23,7 +23,7 @@ import { columnDisposition, type ClassifiedTable } from './classification-types'
 export type ReadProfile = 'worker-free' | 'worker-paid';
 
 /** A column that is large enough that a row read should be chunked, with its DB column name. */
-export interface BlobColumn {
+interface BlobColumn {
     readonly property: string;
     readonly name: string;
 }
@@ -31,7 +31,7 @@ export interface BlobColumn {
 /** How a table's rows are attributed to a tenant; `tenant_row` (the tenants
  * table itself) is matched on `id`, every exportable table otherwise has a
  * `tenant_id` column. Mirrors the classification TenantScope. */
-export type ReadScope = 'direct' | 'direct_nullable' | 'tenant_row';
+type ReadScope = 'direct' | 'direct_nullable' | 'tenant_row';
 
 /** Everything the read endpoint needs for one exportable table. */
 export interface TableReadMeta {
