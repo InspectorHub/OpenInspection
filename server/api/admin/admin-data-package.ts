@@ -1,14 +1,9 @@
-// Admin → tenant data-package sub-router (E-1 read API).
-//
-// The dumb Worker API for desktop-client-owned export/import. This router owns
-// only authorization (native owner bearer + step-up at job start), the job/lease
-// ledger, and paginated reads of the classification whitelist. It does NOT do
-// the export work: the desktop client groups, hashes, zips and verifies bytes.
-//
-// Every data endpoint re-scopes the job by the verified tenant and requires the
-// short-lived X-Data-Job token bound to that tenant/job/user (see job-access.ts).
-// Application-layer daily budgets are DISABLED by owner decision: X-Dp-Budget
-// is emitted as a measurement header only and never returns 429.
+// Admin → tenant data-package sub-router (dumb Worker API). Owns only auth,
+// the job/lease ledger, classification-whitelist reads, and media streaming;
+// the desktop client groups/hashes/zips/verifies bytes. Every data endpoint
+// re-scopes the job by verified tenant + short-lived X-Data-Job token (see
+// job-access.ts). Application daily budgets are disabled: X-Dp-Budget is
+// measurement-only and never returns 429.
 import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { createApiRouter } from '../../lib/openapi-router';
@@ -38,6 +33,7 @@ import {
     SimpleResponseSchema,
 } from '../../lib/validations/data-package.schema';
 import { mediaRoute, mediaObjectRoute } from './data-package-media.routes';
+import { cancelJobRoute } from './data-package-web.routes';
 
 // ── Route definitions ────────────────────────────────────────────────────────
 
@@ -207,14 +203,11 @@ function jobService(c: Context<HonoConfig>) {
 function stateView(job: Awaited<ReturnType<DataPackageJobService['get']>>) {
     return {
         id: job!.id, kind: job!.kind, status: job!.status, stage: job!.stage,
-        leaseExpiresAt: job!.leaseExpiresAt?.toISOString() ?? null,
-        createdAt: job!.createdAt.toISOString(),
-        finishedAt: job!.finishedAt?.toISOString() ?? null,
-        errorCode: job!.errorCode ?? null,
+        leaseExpiresAt: job!.leaseExpiresAt?.toISOString() ?? null, createdAt: job!.createdAt.toISOString(),
+        finishedAt: job!.finishedAt?.toISOString() ?? null, errorCode: job!.errorCode ?? null,
     };
 }
 
-/** Page ceilings follow the tenant's paid/free tier (self-host = free). */
 async function resolveProfile(c: Context<HonoConfig>): Promise<ReadProfile> {
     const tenantId = c.get('tenantId');
     if (!tenantId) return 'worker-free';
@@ -231,7 +224,6 @@ const PAGE_CEILINGS = {
     'worker-paid': { maxPageRows: 1000, maxPageBytes: 4 * 1024 * 1024 },
 } as const;
 
-/** Measurement-only budget header (application caps disabled). */
 function budgetHeader(c: Context<HonoConfig>, profile: ReadProfile) {
     const caps = PAGE_CEILINGS[profile];
     c.header('X-Dp-Budget', `reads=0/0;writes=0/0;profile=${profile};pageRows=${caps.maxPageRows};pageBytes=${caps.maxPageBytes}`);
@@ -320,6 +312,17 @@ app.openapi(abortRoute, async (c) => {
     return c.json({ success: true as const }, 200);
 });
 
+// Web cancellation: bearer-only (no X-Data-Job), tenant re-scoped, like resume.
+app.openapi(cancelJobRoute, async (c) => {
+    const { id: jobId } = c.req.valid('param');
+    const { tenantId, db, secret } = envOf(c);
+    const svc = new DataPackageJobService(db, secret);
+    if (!(await svc.get(tenantId, jobId))) throw Errors.NotFound('Data job not found.');
+    await svc.abort(tenantId, jobId, 'cancelled_by_user');
+    auditFromContext(c, 'data.export', 'bulk_export', { metadata: { phase: 'cancel', jobId } });
+    return c.json({ success: true as const }, 200);
+});
+
 app.openapi(listJobsRoute, async (c) => {
     const { tenantId, db, secret } = envOf(c);
     const jobs = await new DataPackageJobService(db, secret).list(tenantId);
@@ -359,7 +362,6 @@ app.openapi(rowsRoute, async (c) => {
     return c.json({ success: true as const, data: page }, 200);
 });
 
-/** Bucket is passed by reference into the service; no direct binding hits in the route. */
 function mediaService(c: Context<HonoConfig>) {
     return new DataPackageMediaService(c.env.PHOTOS);
 }
@@ -389,7 +391,7 @@ app.openapi(mediaObjectRoute, async (c) => {
 
 /** Registration order. Drives the typed client; a test pins it to what `app` registered. */
 export const adminDataPackageRouteConfigs = [
-    createJobRoute, heartbeatRoute, resumeRoute, completeRoute, abortRoute,
+    createJobRoute, heartbeatRoute, resumeRoute, completeRoute, abortRoute, cancelJobRoute,
     listJobsRoute, getJobRoute, tablesRoute, rowsRoute, mediaRoute, mediaObjectRoute,
 ] as const;
 

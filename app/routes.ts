@@ -225,6 +225,7 @@ export default [
       route("settings/communication/templates/:trigger", "routes/settings-communication-template.tsx"),
       route("settings/automations", "routes/settings-automations.tsx"),
       route("settings/data", "routes/settings-data.tsx"),
+      route("settings/data/jobs", "routes/settings-data-jobs.tsx"),
       route("settings/imports", "routes/settings-imports.tsx"),
       route("settings/imports/:batchId", "routes/settings-imports-batch.tsx"),
       route("settings/offline-packages", "routes/settings-offline-packages.tsx"),

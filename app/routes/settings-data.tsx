@@ -94,6 +94,31 @@ export default function SettingsData() {
         </div>
       </section>
 
+      {/* Complete data package — the desktop app owns this export; the web only
+          explains it, offers the app protocol link and shows job status. A
+          browser driver was deliberately removed: every platform uses Electron. */}
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
+        <div>
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_data_package_heading()}</h3>
+          <p className="text-[12px] text-ih-fg-3 mt-1">{m.settings_data_package_subtitle()}</p>
+        </div>
+        <div className="flex gap-3 flex-wrap">
+          <a
+            href="io.inspectorhub.app://"
+            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors inline-flex items-center gap-2"
+          >
+            <DownloadIcon />
+            {m.settings_data_package_open()}
+          </a>
+          <Link
+            to="/settings/data/jobs"
+            className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors inline-flex items-center gap-2"
+          >
+            {m.settings_data_package_jobs()}
+          </Link>
+        </div>
+      </section>
+
       {/* Import section */}
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
         <div>

@@ -281,6 +281,39 @@ describe('data-package E-1 routes', () => {
         expect(body.data.leaseExpiresAt).toBeNull();
     });
 
+    it('cancels a job from the web with a bearer only (no X-Data-Job needed)', async () => {
+        const { jobId } = (await createJob()).data;
+        // No X-Data-Job header: a web session cannot mint one.
+        const res = await call(`/data-package/jobs/${jobId}/cancel`, { method: 'POST' });
+        expect(res.status).toBe(200);
+        const one = await call(`/data-package/jobs/${jobId}`, { method: 'GET' });
+        const body = await one.json() as { data: { status: string; leaseExpiresAt: string | null } };
+        expect(body.data.status).toBe('cancelled');
+        expect(body.data.leaseExpiresAt).toBeNull();
+    });
+
+    it('refuses a web cancel for a job outside the verified tenant', async () => {
+        const { jobId } = (await createJob()).data;
+        const res = await call(`/data-package/jobs/${jobId}/cancel`, { method: 'POST' }, { tenantId: OTHER_TENANT });
+        expect(res.status).toBe(404);
+    });
+
+    it('refuses a web cancel to a non-owner (owner-only guard)', async () => {
+        const { jobId } = (await createJob()).data;
+        const res = await call(`/data-package/jobs/${jobId}/cancel`, { method: 'POST' }, { role: 'inspector' });
+        expect(res.status).toBe(403);
+    });
+
+    it('refuses to cancel an already-terminal job (no double cancel)', async () => {
+        const { jobId, jobToken } = (await createJob()).data;
+        await call(`/data-package/jobs/${jobId}/abort`, { method: 'POST', headers: { 'X-Data-Job': jobToken } });
+        const res = await call(`/data-package/jobs/${jobId}/cancel`, { method: 'POST' });
+        expect(res.status).toBe(409);
+        const one = await call(`/data-package/jobs/${jobId}`, { method: 'GET' });
+        const state = await one.json() as { data: { status: string } };
+        expect(state.data.status).toBe('cancelled');
+    });
+
     it('resumes a lapsed lease without step-up and returns a fresh token bound to the same job', async () => {
         const { jobId, jobToken } = (await createJob()).data;
         // Force the lease to be lapsed, as it would be after a long export.

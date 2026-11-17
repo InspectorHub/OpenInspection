@@ -959,6 +959,33 @@
     "description": "Applies one action to every cell in scope: a row (one notification), a column (one channel), or everything. Channels a notification never uses are skipped, and always-sent notifications are never touched."
   },
   {
+    "operationId": "cancelDataPackageJob",
+    "method": "POST",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/cancel",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package job this request cancels",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package job this request cancels"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Cancel a data-package job from the web settings page",
+    "description": "Cancels a still-active job and frees its lease. Bearer-only: a web session has no X-Data-Job token, so the job is re-scoped by the verified tenant (404 when it is not this company's job) and must be queued or running. Only an owner may call it."
+  },
+  {
     "operationId": "cancelInspection",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/cancel",
