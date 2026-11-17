@@ -10,7 +10,7 @@ import {
     verifyExportAttempts, syncOutbox, parkedCmdEvents, processedCmdEvents, processedWebhookEvents,
     idempotencyKeys, nativeClientSeen, offlineImportApplied, inspectionTombstones, notifications,
     notificationPreferences, tenantCustomHolidays, permissionTemplates, migrationBatches, migrationRows,
-    integrationTestResults,
+    integrationTestResults, tenantDataJobs,
 } from '../db/schema';
 import {
     archiveTable, exportTable, outTable, partialTable, withholdTable,
@@ -144,4 +144,5 @@ export const TENANT_FAMILY: readonly ClassifiedTable[] = [
     outTable(migrationBatches, 'direct', 'Staging of earlier vendor imports; holds source files and other parties\' personal data. Not part of the tenant record.'),
     outTable(migrationRows, 'direct', 'Staging of earlier vendor imports; holds other parties\' personal data. Not part of the tenant record.'),
     outTable(integrationTestResults, 'direct', EPHEMERAL),
+    outTable(tenantDataJobs, 'direct', 'Lease and progress ledger of in-flight data-package jobs. It records the source deployment\'s device labels, expirations and byte counts, and the job records are not transferred; the destination creates its own jobs when it runs an export or import.'),
 ];
