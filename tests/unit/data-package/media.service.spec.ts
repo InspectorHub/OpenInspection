@@ -9,7 +9,7 @@
  * refused before any R2 call, and a bad Range must yield 416, never bytes.
  */
 import { describe, it, expect } from 'vitest';
-import { DataPackageMediaService } from '../../../server/services/data-package/media.service';
+import { DataPackageMediaService, mediaKind } from '../../../server/services/data-package/media.service';
 
 const TENANT = 'tenant-a';
 const OTHER = 'tenant-b';
@@ -103,8 +103,22 @@ describe('DataPackageMediaService.list', () => {
         const a = page.objects.find((o) => o.key === 'inspections/i1/photos/a.jpg')!;
         expect(a.size).toBe(3);
         expect(a.contentType).toBe('image/jpeg');
+        expect(a.kind).toBe('image');
+        const clip = page.objects.find((o) => o.key === 'media/videos/clip.mp4')!;
+        expect(clip.kind).toBe('video');
         expect(typeof a.etag).toBe('string');
         expect(typeof a.uploaded).toBe('number');
+    });
+
+    it('infers a coarse kind from content type, defaulting to other', () => {
+        expect(mediaKind('image/jpeg')).toBe('image');
+        expect(mediaKind('VIDEO/MP4; codecs=avc1')).toBe('video');
+        expect(mediaKind('audio/mp4')).toBe('audio');
+        expect(mediaKind('application/pdf')).toBe('document');
+        expect(mediaKind('application/vnd.openxmlformats-officedocument.wordprocessingml.document')).toBe('document');
+        expect(mediaKind('application/octet-stream')).toBe('other');
+        expect(mediaKind(undefined)).toBe('other');
+        expect(mediaKind('  text/plain  ')).toBe('other');
     });
 
     it('paginates with an opaque cursor and never loses or repeats an object', async () => {

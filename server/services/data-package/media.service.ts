@@ -22,6 +22,25 @@ const EXCLUDED_MEDIA_PREFIXES = ['exports/', 'migrations/', '_platform/'] as con
 const DEFAULT_PAGE_SIZE = 1000;
 const MAX_PAGE_SIZE = 1000;
 
+/** Coarse media class the client uses to decide handling (e.g. stream video as external). */
+export type MediaKind = 'image' | 'video' | 'audio' | 'document' | 'other';
+
+/**
+ * Derive a stable kind from the stored content type. The client uses this to
+ * apply per-kind policy (streamed video may be excluded as `external_media`);
+ * it is advisory only — the server never trusts it for authorization. Unknown
+ * or missing MIME types fall back to `other`, never to a permissive class.
+ */
+export function mediaKind(contentType: string | undefined): MediaKind {
+    const mime = (contentType ?? '').trim().toLowerCase().split(';', 1)[0]!;
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.startsWith('video/')) return 'video';
+    if (mime.startsWith('audio/')) return 'audio';
+    if (mime === 'application/pdf' || mime === 'application/msword'
+        || mime.startsWith('application/vnd.openxmlformats-officedocument')) return 'document';
+    return 'other';
+}
+
 interface MediaObjectInfo {
     /** Key relative to the tenant prefix (e.g. `inspections/i/photos/a.jpg`). */
     readonly key: string;
@@ -30,6 +49,7 @@ interface MediaObjectInfo {
     /** Epoch milliseconds from the R2 object's uploaded date. */
     readonly uploaded: number;
     readonly contentType: string;
+    readonly kind: MediaKind;
 }
 
 export interface MediaListPage {
@@ -113,6 +133,10 @@ export class DataPackageMediaService {
             const page: R2Objects = await this.bucket.list({
                 prefix,
                 limit: MAX_PAGE_SIZE,
+                // R2 list() omits httpMetadata by default; without this the
+                // contentType (and the kind derived from it) would be empty in
+                // production even though the mock bucket returned it.
+                include: ['httpMetadata'],
                 ...(r2Cursor ? { cursor: r2Cursor } : {}),
             });
             for (const obj of page.objects) {
@@ -129,12 +153,14 @@ export class DataPackageMediaService {
                 const uploaded = obj.uploaded instanceof Date
                     ? obj.uploaded.getTime()
                     : Date.parse(String(obj.uploaded));
+                const contentType = obj.httpMetadata?.contentType ?? 'application/octet-stream';
                 objects.push({
                     key: relativeKey,
                     size: obj.size,
                     etag: obj.etag ?? '',
                     uploaded: Number.isFinite(uploaded) ? uploaded : 0,
-                    contentType: obj.httpMetadata?.contentType ?? 'application/octet-stream',
+                    contentType,
+                    kind: mediaKind(contentType),
                 });
                 lastKey = relativeKey;
             }

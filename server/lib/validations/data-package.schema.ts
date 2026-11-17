@@ -103,6 +103,8 @@ export const MediaObjectSchema = z.object({
     etag: z.string(),
     uploaded: z.number().int().describe('R2 upload time as epoch milliseconds.'),
     contentType: z.string(),
+    kind: z.enum(['image', 'video', 'audio', 'document', 'other'])
+        .describe('Coarse media class inferred from the content type; advisory only.'),
 }).openapi('DataPackageMediaObject');
 
 export const MediaListResponseSchema = z.object({
