@@ -910,6 +910,26 @@ Referral leaderboard — inspection counts grouped by `referredByAgentId`, desce
 
 ---
 
+## Tenant data-package endpoints (owner, native token)
+
+These power the desktop export. They are owner-only. Data endpoints also require
+a short-lived `X-Data-Job` bearer returned by `POST /jobs`; the job is re-scoped
+to the verified tenant on every call. Application-layer daily budgets are off:
+`X-Dp-Budget` is measurement-only and never returns 429.
+
+- `POST /api/admin/data-package/jobs` — start an export/import job and take the lease. Requires `X-Step-Up-Token` for `data-export-start`.
+- `POST /api/admin/data-package/jobs/:id/heartbeat`, `/resume`, `/complete`, `/abort`, `/cancel` — lease lifecycle (all POST). `cancel` is bearer-only (for the web status page); the others that touch an active job need `X-Data-Job`.
+- `GET /api/admin/data-package/jobs` / `GET /api/admin/data-package/jobs/:id` — job list/status, no `X-Data-Job` needed.
+- `GET /api/admin/data-package/jobs/:id/tables` — classification-derived table descriptors and column whitelist.
+- `GET /api/admin/data-package/jobs/:id/tables/:table/rows?after=&limit=` — one keyset page; pass `next` back as `after`.
+- `GET /api/admin/data-package/jobs/:id/media?cursor=&limit=` — one page of media objects under the tenant prefix, excluding platform prefixes.
+- `GET /api/admin/data-package/jobs/:id/media/object?key=<relative-key>` — stream one object with `Range` support (`206`/`416`, `Accept-Ranges`, `ETag`, `Cache-Control: no-store`).
+
+See [the format reference](./data-package-format.md) for the archive layout and
+[the operating guide](../operate/data-package.md) for the offline verifier.
+
+---
+
 ## Response envelope
 
 Both halves come from `server/lib/response.ts` (`sendSuccess` / `sendError`) and

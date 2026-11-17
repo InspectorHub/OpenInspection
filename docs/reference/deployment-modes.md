@@ -116,3 +116,17 @@ three.
 signals which D1 backend to query. It is not this deployment-wide topology, and
 it does not exist in a standalone install. Silo and shared saas collapsed into
 one `SAAS_PROFILE` in 2026-05.
+
+## Tenant data packages
+
+The desktop data-package export requires native clients to be enabled
+(`NATIVE_CLIENT_ENABLED`); without it the engine does not accept the native
+bearer token the export uses. The archive is assembled and stored on the
+operator's machine, not on the server or in R2 — a deployment needs no export
+bucket, delivery layer or retention job for it. The server keeps only the job
+ledger and streams media bytes from the tenant's existing `PHOTOS` bucket.
+
+Because the package is plaintext personal data held by the customer, deployment
+documentation should point operators to the [operating guide](../operate/data-package.md)
+and the [format reference](./data-package-format.md) rather than promising
+server-side custody or encryption.
