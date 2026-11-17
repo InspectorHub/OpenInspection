@@ -27,6 +27,7 @@ import type { HonoConfig } from '../../types/hono';
 import { SERVER_CONTRACT_VERSION } from '../../lib/native/client-version';
 import { DataPackageJobService, JOB_LEASE_TTL_MS } from '../../services/data-package/job.service';
 import { DataPackageReadService } from '../../services/data-package/read.service';
+import { DataPackageMediaService } from '../../services/data-package/media.service';
 import { authorizeDataJob } from '../../lib/data-package/job-access';
 import { schemaFingerprint } from '../../lib/data-package/fingerprint';
 import { TABLES_WITHOUT_KEYSET, type ReadProfile } from '../../lib/data-package/read-metadata';
@@ -36,6 +37,7 @@ import {
     JobListResponseSchema, TablesResponseSchema, RowsResponseSchema,
     SimpleResponseSchema,
 } from '../../lib/validations/data-package.schema';
+import { mediaRoute, mediaObjectRoute } from './data-package-media.routes';
 
 // ── Route definitions ────────────────────────────────────────────────────────
 
@@ -357,10 +359,38 @@ app.openapi(rowsRoute, async (c) => {
     return c.json({ success: true as const, data: page }, 200);
 });
 
+/** Bucket is passed by reference into the service; no direct binding hits in the route. */
+function mediaService(c: Context<HonoConfig>) {
+    return new DataPackageMediaService(c.env.PHOTOS);
+}
+
+app.openapi(mediaRoute, async (c) => {
+    const { id: jobId } = c.req.valid('param');
+    const { job } = await authorize(c, jobId);
+    const { cursor, limit } = c.req.valid('query');
+    const profile = await resolveProfile(c);
+    budgetHeader(c, profile);
+    const page = await mediaService(c).list(
+        job.tenantId, cursor, limit !== undefined ? Number(limit) : Number.NaN,
+    );
+    return c.json({ success: true as const, data: page }, 200);
+});
+
+app.openapi(mediaObjectRoute, async (c) => {
+    const { id: jobId } = c.req.valid('param');
+    const { job } = await authorize(c, jobId);
+    const { key } = c.req.valid('query');
+    const profile = await resolveProfile(c);
+    budgetHeader(c, profile);
+    const res = await mediaService(c).open(job.tenantId, key, c.req.header('Range') ?? undefined);
+    if (res === null) throw Errors.NotFound('Media object not found.');
+    return res;
+});
+
 /** Registration order. Drives the typed client; a test pins it to what `app` registered. */
 export const adminDataPackageRouteConfigs = [
     createJobRoute, heartbeatRoute, resumeRoute, completeRoute, abortRoute,
-    listJobsRoute, getJobRoute, tablesRoute, rowsRoute,
+    listJobsRoute, getJobRoute, tablesRoute, rowsRoute, mediaRoute, mediaObjectRoute,
 ] as const;
 
 export default app;

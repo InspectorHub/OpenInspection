@@ -96,6 +96,25 @@ export const RowsResponseSchema = z.object({
     }),
 }).openapi('DataPackageRowsResponse');
 
+/** GET /media — one tenant media object descriptor (key relative to the tenant prefix). */
+export const MediaObjectSchema = z.object({
+    key: z.string().describe('R2 object key relative to the tenant prefix.'),
+    size: z.number().int().nonnegative(),
+    etag: z.string(),
+    uploaded: z.number().int().describe('R2 upload time as epoch milliseconds.'),
+    contentType: z.string(),
+}).openapi('DataPackageMediaObject');
+
+export const MediaListResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({
+        objects: z.array(MediaObjectSchema),
+        cursor: z.string().nullable(),
+        truncated: z.boolean(),
+    }),
+    snapshotAt: z.number().int().optional(),
+}).openapi('DataPackageMediaListResponse');
+
 export const ErrorCodeSchema = z.enum(DATA_JOB_ERROR_CODES);
 
 export const SimpleResponseSchema = z.object({ success: z.literal(true) }).openapi('DataPackageSimpleResponse');

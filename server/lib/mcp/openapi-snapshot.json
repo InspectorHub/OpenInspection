@@ -8399,6 +8399,54 @@
     "description": "Returns one company job by id, scoped to the verified tenant. 404 when it is not this company's job. Read-only; no X-Data-Job token needed. Only an owner may call it."
   },
   {
+    "operationId": "getDataPackageMediaObject",
+    "method": "GET",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/media/object",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package job this request acts on",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package job this request acts on"
+          }
+        },
+        {
+          "name": "key",
+          "in": "query",
+          "required": true,
+          "description": "R2 object key relative to the tenant prefix, as listed by the media endpoint",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "R2 object key relative to the tenant prefix, as listed by the media endpoint"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant, job and user",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant, job and user"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Stream one tenant media object, honouring Range",
+    "description": "Streams one media object straight from R2 with RFC 9110 Range support (Accept-Ranges, 206 partial, 416 unsatisfiable, no-store). The key is always resolved under the verified tenant prefix, so a key from another tenant can never be read. Requires a valid X-Data-Job token. Only an owner may call it."
+  },
+  {
     "operationId": "getDispatchBoard",
     "method": "GET",
     "pathTemplate": "/api/calendar/dispatch",
@@ -12142,6 +12190,63 @@
     },
     "summary": "List the company data-package jobs",
     "description": "Returns the company data-package job ledger, newest first, capped at 50. Read-only; no X-Data-Job token needed. Only an owner may call it."
+  },
+  {
+    "operationId": "listDataPackageMedia",
+    "method": "GET",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/media",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package job this request acts on",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package job this request acts on"
+          }
+        },
+        {
+          "name": "cursor",
+          "in": "query",
+          "required": false,
+          "description": "Opaque continuation cursor returned by the previous media page",
+          "schema": {
+            "type": "string",
+            "description": "Opaque continuation cursor returned by the previous media page"
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "description": "Maximum objects in this page, capped by the service ceiling",
+          "schema": {
+            "type": "string",
+            "description": "Maximum objects in this page, capped by the service ceiling"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant, job and user",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant, job and user"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the tenant media objects to export",
+    "description": "Lists one page of R2 media objects under the verified tenant prefix, excluding platform-owned exports/migrations/_platform prefixes. Keys are relative to the tenant prefix. Pass the returned cursor back to continue; a malformed cursor restarts the list. Requires a valid X-Data-Job token. Only an owner may call it."
   },
   {
     "operationId": "listDataPackageTables",
