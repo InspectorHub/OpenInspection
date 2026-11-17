@@ -2,16 +2,17 @@
  * Reading, downloading and exporting stored records must not depend on the tenant's plan.
  *
  * A tenant whose paid plan ended (tier 'free') keeps viewing and downloading its history. The plan only
- * decides what a tenant may CREATE or SEND, and which backend takes a NEW video. This test lists every file
- * that touches the plan (the tier column, the plan-quota feature, the paying-plan predicate) and the one reason
- * each may. A new file that reads the plan fails here until its author registers it, and a registration under
- * a read, download or export surface fails regardless.
+ * decides what a tenant may CREATE or SEND, which backend takes a NEW video, and how large a data-package
+ * read page may be (capacity — every tenant still exports all rows, only the page size differs). This test
+ * lists every file that touches the plan (the tier column, the plan-quota feature, the paying-plan predicate)
+ * and the one reason each may. A new file that reads the plan fails here until its author registers it, and
+ * a registration under a read, download or export surface fails regardless.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
-type Kind = 'create' | 'send' | 'ai' | 'video-new' | 'display' | 'routing' | 'portal-sync' | 'definition';
+type Kind = 'create' | 'send' | 'ai' | 'video-new' | 'display' | 'routing' | 'portal-sync' | 'definition' | 'capacity';
 
 /** file (repo relative) -> why it may read the plan. */
 const ALLOWED: Record<string, Kind> = {
@@ -53,6 +54,10 @@ const ALLOWED: Record<string, Kind> = {
     'server/portal/ai-provisioning.ts': 'ai',
     // Which backend takes a NEW video upload.
     'server/services/video/resolve.ts': 'video-new',
+    // Plan sizes a page of a data-package read (free pages smaller than paid) but
+    // never gates whether the tenant may export its own history: every tenant
+    // exports all rows, only the per-page capacity differs.
+    'server/api/admin/admin-data-package.ts': 'capacity',
     // Showing the plan to the tenant.
     'server/api/billing.ts': 'display',
     'server/api/session-context.ts': 'display',
@@ -118,8 +123,8 @@ describe('history access is not tier gated', () => {
             `These files read the tenant plan but are not registered: ${unregistered.join(', ')}.\n`
             + 'A tenant whose paid plan ended must keep viewing, downloading and exporting its history, so a read, '
             + 'download or export path must never depend on the plan. If this file creates, sends, calls AI, picks a '
-            + 'backend for a NEW video or only displays the plan, add it to ALLOWED in this spec with that kind. '
-            + 'If it serves stored records, remove the plan read instead.',
+            + 'backend for a NEW video, sizes a data-package read page (capacity), or only displays the plan, add '
+            + 'it to ALLOWED in this spec with that kind. If it serves stored records, remove the plan read instead.',
         ).toEqual([]);
     });
 
@@ -141,7 +146,7 @@ describe('history access is not tier gated', () => {
     );
 
     it('every registered kind is one of the known reasons', () => {
-        const kinds: Kind[] = ['create', 'send', 'ai', 'video-new', 'display', 'routing', 'portal-sync', 'definition'];
+        const kinds: Kind[] = ['create', 'send', 'ai', 'video-new', 'display', 'routing', 'portal-sync', 'definition', 'capacity'];
         for (const [f, k] of Object.entries(ALLOWED)) expect(kinds, f).toContain(k);
     });
 });
