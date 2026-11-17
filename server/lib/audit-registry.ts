@@ -130,7 +130,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'credential.image_uploaded': { family: 'credential', label: 'audit_action_credential_image_uploaded', meta: {}, status: { kind: 'live' } },
     'credential.updated': { family: 'credential', label: 'audit_action_credential_updated', meta: {}, status: { kind: 'live' } },
     'data.delete': { family: 'client', label: 'audit_action_data_delete', meta: { clientEmail: 'person' }, status: { kind: 'live' } },
-    'data.export': { family: 'bulk_export', label: 'audit_action_data_export', meta: {}, status: { kind: 'live' } },
+    'data.export': { family: 'bulk_export', label: 'audit_action_data_export', meta: { phase: 'name', kind: 'name', jobId: 'id', bytes: 'count', sha256: 'name' }, status: { kind: 'live' } },
     // One writer, one family, no metadata: installing starter content. The
     // `import` alt family and the `counts` key were the intake delivery route's,
     // and it now writes `migration.delivered` on its own family. Leaving them

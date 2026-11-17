@@ -103,6 +103,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/admin/admin-data-package.ts',
+        tuple: 'adminDataPackageRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/admin/admin-data-package');
+            return { app: m.default, configs: m.adminDataPackageRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/admin/admin-defect-categories.ts',
         tuple: 'adminDefectCategoriesRouteConfigs',
         load: async () => {
