@@ -93,3 +93,36 @@ export const tenantDataJobs = sqliteTable('tenant_data_jobs', {
 
 export type TenantDataJob = typeof tenantDataJobs.$inferSelect;
 export type NewTenantDataJob = typeof tenantDataJobs.$inferInsert;
+
+/**
+ * Row-level import identity map. For every row an import creates or maps, one row
+ * records (package, table, source id) -> new id. It is the anchor for apply
+ * idempotency (a mapped row is skipped on replay), revert (the delete list), the
+ * free-tier quota exclusion (an inspection whose id is a `new_id` here is
+ * imported, not a new inspection) and the read-only marker on imported records.
+ * The marker is never removed: to reuse an imported report the owner copies it
+ * into a NEW report, which is not in this map.
+ *
+ * No FK to the imported tables: the map outlives deletes and stays tenant-scoped.
+ * Ids are opaque strings; the service layer, not this schema, validates their
+ * shape. Every read/write is scoped by tenant_id from the verified session.
+ */
+export const importIdMap = sqliteTable('import_id_map', {
+    id:         text('id').primaryKey(),
+    tenantId:   text('tenant_id').notNull(),
+    packageId:  text('package_id').notNull(),
+    tableName:  text('table_name').notNull(),
+    sourceId:   text('source_id').notNull(),
+    newId:      text('new_id').notNull(),
+    createdAt:  integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    // One mapping per (package, table, source row) — the idempotency/replay key.
+    uniqueIndex('uq_import_id_map_source').on(t.tenantId, t.packageId, t.tableName, t.sourceId),
+    // Quota / read-only checks ask "which imported inspections live here" by new id.
+    index('idx_import_id_map_new_id').on(t.tenantId, t.tableName, t.newId),
+    // Revert lists all rows a package wrote.
+    index('idx_import_id_map_package').on(t.tenantId, t.packageId),
+]);
+
+export type ImportIdMapRow = typeof importIdMap.$inferSelect;
+export type NewImportIdMapRow = typeof importIdMap.$inferInsert;
