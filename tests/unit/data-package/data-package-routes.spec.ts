@@ -231,11 +231,13 @@ describe('data-package E-1 routes', () => {
         });
         expect(res.status).toBe(200);
         expect(res.headers.get('X-Dp-Budget')).toContain('profile=worker-free');
-        const body = await res.json() as { data: { table: string; maxPageRows: number }[]; snapshotAt: number };
+        const body = await res.json() as { data: { table: string; maxPageRows: number; rowCountAtSnapshot: number }[]; snapshotAt: number };
         const names = body.data.map((t) => t.table);
         expect(names).toContain('inspections');
         expect(names).not.toContain('tenant_data_jobs');
         expect(body.data.find((t) => t.table === 'inspections')!.maxPageRows).toBe(48);
+        // Seeded tenant has one inspection before the job snapshot.
+        expect(body.data.find((t) => t.table === 'inspections')!.rowCountAtSnapshot).toBe(1);
     });
 
     it('reads one tenant-scoped keyset page within the job watermark', async () => {

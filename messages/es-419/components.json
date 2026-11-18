@@ -172,6 +172,7 @@
   "notif_prefs_sms_on": "Los mensajes de texto a {phone} están ACTIVADOS.",
   "notif_class_password_reset": "Restablecimiento de contraseña",
   "notif_class_step_up_code": "Código de confirmación",
+  "notif_class_data_export_start": "Exportación de datos iniciada",
   "notif_class_agent_invite": "Invitación de agente asociado",
   "notif_class_agent_login_link": "Enlace de inicio de sesión del agente",
   "notif_class_subject_export_ready": "Su copia de sus datos está lista",

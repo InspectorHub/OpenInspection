@@ -340,7 +340,11 @@ app.openapi(tablesRoute, async (c) => {
     const profile = await resolveProfile(c);
     const reader = new DataPackageReadService(db);
     budgetHeader(c, profile);
-    return c.json({ success: true as const, data: reader.tables(profile), snapshotAt: job.createdAt.getTime() }, 200);
+    return c.json({
+        success: true as const,
+        data: await reader.tables(job.tenantId, job.createdAt.getTime(), profile),
+        snapshotAt: job.createdAt.getTime(),
+    }, 200);
 });
 
 app.openapi(rowsRoute, async (c) => {

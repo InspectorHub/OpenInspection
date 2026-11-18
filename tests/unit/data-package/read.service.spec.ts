@@ -36,8 +36,8 @@ describe('DataPackageReadService', () => {
         ]);
     });
 
-    it('projects the table descriptors from classification with page ceilings', () => {
-        const tables = svc.tables('worker-free');
+    it('projects the table descriptors from classification with page ceilings', async () => {
+        const tables = await svc.tables(T1, SNAPSHOT, 'worker-free');
         const names = tables.map((t) => t.table);
         expect(names).toContain('inspections');
         expect(names).toContain('esign_audit_logs');
@@ -46,6 +46,19 @@ describe('DataPackageReadService', () => {
         expect(esign.keyset).toEqual(['created_at', 'rowid']);
         expect(esign.columns).toContain('payload_json');
         expect(esign.blobColumns.map((b) => b.name)).toContain('payload_json');
+        // Tenant- and snapshot-scoped: insp-a only (insp-b is after the watermark,
+        // insp-c is another tenant). tenants is tenant_row scope, one id row.
+        expect(tables.find((t) => t.table === 'inspections')!.rowCountAtSnapshot).toBe(1);
+        expect(tables.find((t) => t.table === 'tenants')!.rowCountAtSnapshot).toBe(1);
+    });
+
+    it('rowCountAtSnapshot excludes rows created after the watermark and other tenants', async () => {
+        // Move the watermark before insp-a: no inspections remain for T1.
+        const early = await svc.tables(T1, SNAPSHOT - 2000, 'worker-free');
+        expect(early.find((t) => t.table === 'inspections')!.rowCountAtSnapshot).toBe(0);
+        // A tenant with no inspections reads zero, never another tenant's rows.
+        const none = await svc.tables('tenant-with-no-data', SNAPSHOT, 'worker-free');
+        expect(none.find((t) => t.table === 'inspections')!.rowCountAtSnapshot).toBe(0);
     });
 
     it('reads a keyset page scoped to the tenant and cut at the snapshot watermark', async () => {
@@ -128,7 +141,7 @@ describe('DataPackageReadService', () => {
     });
 
     it('reads the tenants row itself via tenant_row scope (id, not tenant_id)', async () => {
-        const meta = svc.tables('worker-paid').find((t) => t.table === 'tenants')!;
+        const meta = (await svc.tables(T1, SNAPSHOT, 'worker-paid')).find((t) => t.table === 'tenants')!;
         expect(meta.keyset).toEqual(['id']);
         // tenants is keyed/matched on id (not tenant_id); the generic tenant_id
         // predicate would throw "no such column". Both tenants resolve to one row.
