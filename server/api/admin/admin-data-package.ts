@@ -15,7 +15,6 @@ import { tenants } from '../../lib/db/schema';
 import { isPaidPlan, type TenantPlan } from '../../features/plan-quota/policy';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
-import type { DrizzleDB } from '../../lib/db/scoped';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
 import type { HonoConfig } from '../../types/hono';
@@ -25,7 +24,6 @@ import { notifyExportStartBestEffort } from '../../services/data-package/export-
 import { auditResumeDeviceChange, resumeDeviceLabel } from '../../services/data-package/resume-audit.service';
 import { DataPackageReadService } from '../../services/data-package/read.service';
 import { DataPackageMediaService } from '../../services/data-package/media.service';
-import { authorizeDataJob } from '../../lib/data-package/job-access';
 import { schemaFingerprint } from '../../lib/data-package/fingerprint';
 import { TABLES_WITHOUT_KEYSET, type ReadProfile } from '../../lib/data-package/read-metadata';
 import {
@@ -37,6 +35,8 @@ import {
 import { mediaRoute, mediaObjectRoute } from './data-package-media.routes';
 import { cancelJobRoute } from './data-package-web.routes';
 import { resumeRoute } from './data-package-resume.routes';
+import { columnChunkRoute } from './data-package-columns.routes';
+import { envOf, authorize } from './data-package-route-helpers';
 
 // ── Route definitions ────────────────────────────────────────────────────────
 
@@ -172,17 +172,6 @@ const rowsRoute = createRoute(withMcpMetadata({
 
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
-function envOf(c: Context<HonoConfig>) {
-    // getDrizzle() is schema-agnostic (drizzle<any>); the data-package services
-    // are typed against the full schema. The underlying D1 handle is identical.
-    return {
-        db: getDrizzle(c) as DrizzleDB,
-        secret: c.env.JWT_SECRET,
-        tenantId: c.get('tenantId')!,
-        userId: c.get('user')!.sub,
-    };
-}
-
 function jobService(c: Context<HonoConfig>) {
     const { db, secret } = envOf(c);
     return new DataPackageJobService(db, secret);
@@ -251,13 +240,6 @@ app.openapi(createJobRoute, async (c) => {
         },
     }, 200);
 });
-
-async function authorize(c: Context<HonoConfig>, jobId: string) {
-    const { db, secret, tenantId, userId } = envOf(c);
-    const token = c.req.header('X-Data-Job');
-    const job = await authorizeDataJob(db, secret, { tenantId, userId, jobId, token });
-    return { job, db };
-}
 
 app.openapi(heartbeatRoute, async (c) => {
     const { id: jobId } = c.req.valid('param');
@@ -362,6 +344,18 @@ app.openapi(rowsRoute, async (c) => {
     return c.json({ success: true as const, data: page }, 200);
 });
 
+app.openapi(columnChunkRoute, async (c) => {
+    const { id: jobId, table, rowKey, column } = c.req.valid('param');
+    const { offset, len } = c.req.valid('query');
+    const { job, db } = await authorize(c, jobId);
+    const chunk = await new DataPackageReadService(db).readColumnChunk(
+        job.tenantId, table, column, rowKey, Number(offset), Number(len),
+    );
+    const headers: Record<string, string> = { 'X-Total-Bytes': String(chunk.totalBytes) };
+    if (chunk.nextOffset !== null) headers['X-Next-Offset'] = String(chunk.nextOffset);
+    return new Response(chunk.data, { status: 200, headers });
+});
+
 function mediaService(c: Context<HonoConfig>) {
     return new DataPackageMediaService(c.env.PHOTOS);
 }
@@ -392,7 +386,7 @@ app.openapi(mediaObjectRoute, async (c) => {
 /** Registration order. Drives the typed client; a test pins it to what `app` registered. */
 export const adminDataPackageRouteConfigs = [
     createJobRoute, heartbeatRoute, resumeRoute, completeRoute, abortRoute, cancelJobRoute,
-    listJobsRoute, getJobRoute, tablesRoute, rowsRoute, mediaRoute, mediaObjectRoute,
+    listJobsRoute, getJobRoute, tablesRoute, rowsRoute, columnChunkRoute, mediaRoute, mediaObjectRoute,
 ] as const;
 
 export default app;

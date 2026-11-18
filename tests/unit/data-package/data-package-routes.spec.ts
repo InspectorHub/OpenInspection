@@ -20,8 +20,9 @@ import * as buildEmailModule from '../../../server/lib/email/build-email-service
 import { createTestDb } from '../db';
 import { d1For } from '../helpers/d1-binding';
 import { issueStepUpToken, STEP_UP_KV_PREFIX } from '../../../server/lib/auth/step-up';
-import { tenants, inspections, users, auditLogs } from '../../../server/lib/db/schema';
+import { tenants, inspections, inspectionResults, users, auditLogs } from '../../../server/lib/db/schema';
 import { tenantDataJobs } from '../../../server/lib/db/schema/data-package';
+import { encodeCursor } from '../../../server/lib/data-package/cursor';
 
 const SECRET = 'e1-route-test-secret';
 const TENANT = 'tenant-e1';
@@ -250,6 +251,41 @@ describe('data-package E-1 routes', () => {
         expect(body.data.rows.map((r) => r.id)).toEqual(['insp-e1']);
         expect(body.data.rows.every((r) => r.tenant_id === TENANT)).toBe(true);
         expect(body.data.next).toBeNull();
+    });
+
+    it('reads a large blob column chunk with byte headers, scoped to the tenant', async () => {
+        const { jobId, jobToken } = (await createJob()).data;
+        await db.insert(inspectionResults).values({
+            id: 'res-e1', tenantId: TENANT, inspectionId: 'insp-e1',
+            data: '{}' as any, ydocState: Buffer.from('y'.repeat(5000)),
+            lastSyncedAt: new Date(SNAPSHOT - 10),
+        } as never);
+        const rowKey = encodeURIComponent(encodeCursor(['res-e1']));
+        const url = `/data-package/jobs/${jobId}/tables/inspection_results/rows/${rowKey}/columns/ydoc_state?offset=0&len=1024`;
+        const res = await call(url, { method: 'GET', headers: { 'X-Data-Job': jobToken } });
+        expect(res.status).toBe(200);
+        expect(res.headers.get('X-Total-Bytes')).toBe('5000');
+        expect(res.headers.get('X-Next-Offset')).toBe('1024');
+        const buf = Buffer.from(await res.arrayBuffer());
+        expect(buf.length).toBe(1024);
+        expect(buf.toString()).toBe('y'.repeat(1024));
+
+        // Last chunk has no next offset.
+        const last = await call(
+            `/data-package/jobs/${jobId}/tables/inspection_results/rows/${rowKey}/columns/ydoc_state?offset=4096&len=1024`,
+            { method: 'GET', headers: { 'X-Data-Job': jobToken } },
+        );
+        expect(last.status).toBe(200);
+        expect(last.headers.get('X-Next-Offset')).toBeNull();
+        expect(Buffer.from(await last.arrayBuffer()).length).toBe(904);
+
+        // A forged cursor for another tenant's row key resolves to nothing here.
+        const forged = encodeURIComponent(encodeCursor(['res-other']));
+        const miss = await call(
+            `/data-package/jobs/${jobId}/tables/inspection_results/rows/${forged}/columns/ydoc_state?offset=0&len=10`,
+            { method: 'GET', headers: { 'X-Data-Job': jobToken } },
+        );
+        expect(miss.status).toBe(404);
     });
 
     it('renews the lease and returns a fresh job token on heartbeat', async () => {

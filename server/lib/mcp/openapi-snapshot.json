@@ -18556,6 +18556,95 @@
     "description": "Save integration secrets. Masked values (containing bullet characters) and omitted keys are unchanged. An explicit empty string clears that key."
   },
   {
+    "operationId": "readDataPackageColumnChunk",
+    "method": "GET",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/tables/:table/rows/:rowKey/columns/:column",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package job this request acts on",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package job this request acts on"
+          }
+        },
+        {
+          "name": "table",
+          "in": "path",
+          "required": true,
+          "description": "Exportable table whose blob column is being read",
+          "schema": {
+            "type": "string",
+            "description": "Exportable table whose blob column is being read"
+          }
+        },
+        {
+          "name": "rowKey",
+          "in": "path",
+          "required": true,
+          "description": "Opaque row key cursor identifying the row, as returned by the rows endpoint",
+          "schema": {
+            "type": "string",
+            "description": "Opaque row key cursor identifying the row, as returned by the rows endpoint"
+          }
+        },
+        {
+          "name": "column",
+          "in": "path",
+          "required": true,
+          "description": "Whitelisted large blob column to read a byte slice of",
+          "schema": {
+            "type": "string",
+            "description": "Whitelisted large blob column to read a byte slice of"
+          }
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "required": true,
+          "description": "Byte offset at which the chunk begins, zero based",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Byte offset at which the chunk begins, zero based"
+          }
+        },
+        {
+          "name": "len",
+          "in": "query",
+          "required": true,
+          "description": "Maximum number of bytes to return in this chunk",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Maximum number of bytes to return in this chunk"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant, job and user",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant, job and user"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Read a byte slice of a large blob column",
+    "description": "Reads one byte slice of a whitelisted large blob column from a single row, using SQL substr() on a BLOB cast. The row is addressed by the opaque keyset cursor returned by the rows endpoint; the column must be one the table descriptor lists as a blob column, so no arbitrary column can be read. Intended as the escape hatch for rows too large for one page. Only an owner may call it."
+  },
+  {
     "operationId": "readDataPackageRows",
     "method": "GET",
     "pathTemplate": "/api/admin/data-package/jobs/:id/tables/:table/rows",
