@@ -15,25 +15,28 @@ import { tenants } from '../../lib/db/schema';
 import { isPaidPlan, type TenantPlan } from '../../features/plan-quota/policy';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
-import type { DrizzleDB } from '../../lib/db/scoped';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
 import type { HonoConfig } from '../../types/hono';
 import { SERVER_CONTRACT_VERSION } from '../../lib/native/client-version';
 import { DataPackageJobService, JOB_LEASE_TTL_MS } from '../../services/data-package/job.service';
+import { notifyExportStartBestEffort } from '../../services/data-package/export-notification.service';
+import { auditResumeDeviceChange, resumeDeviceLabel } from '../../services/data-package/resume-audit.service';
 import { DataPackageReadService } from '../../services/data-package/read.service';
 import { DataPackageMediaService } from '../../services/data-package/media.service';
-import { authorizeDataJob } from '../../lib/data-package/job-access';
 import { schemaFingerprint } from '../../lib/data-package/fingerprint';
 import { TABLES_WITHOUT_KEYSET, type ReadProfile } from '../../lib/data-package/read-metadata';
 import {
     CreateJobRequestSchema, CreateJobResponseSchema, HeartbeatResponseSchema,
-    ResumeResponseSchema, CompleteJobRequestSchema, JobStateResponseSchema,
+    CompleteJobRequestSchema, JobStateResponseSchema,
     JobListResponseSchema, TablesResponseSchema, RowsResponseSchema,
     SimpleResponseSchema,
 } from '../../lib/validations/data-package.schema';
 import { mediaRoute, mediaObjectRoute } from './data-package-media.routes';
 import { cancelJobRoute } from './data-package-web.routes';
+import { resumeRoute } from './data-package-resume.routes';
+import { columnChunkRoute } from './data-package-columns.routes';
+import { envOf, authorize } from './data-package-route-helpers';
 
 // ── Route definitions ────────────────────────────────────────────────────────
 
@@ -81,21 +84,6 @@ const heartbeatRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: HeartbeatResponseSchema } }, description: 'Lease renewed' },
         401: { description: 'Invalid or expired X-Data-Job token' },
         409: { description: 'Lease held by another device, or expired (JOB_LEASE_EXPIRED)' },
-    },
-}, { scopes: ['admin'], tier: 'extended' }));
-
-const resumeRoute = createRoute(withMcpMetadata({
-    method: 'post', path: '/data-package/jobs/:id/resume', operationId: 'resumeDataPackageJob',
-    summary: 'Resume a data-package job after its lease lapses',
-    description: 'Reclaims a tenant job whose lease has lapsed and returns a fresh X-Data-Job token. No step-up: the job was already authorized at start, so a still-valid bearer resumes it (an accepted trade-off for multi-hour exports). The job must be younger than 14 days and still active. Only an owner may call it.',
-    tags: ['admin'],
-    middleware: [requireRole('owner')],
-    request: { params: JobIdParam },
-    responses: {
-        200: { content: { 'application/json': { schema: ResumeResponseSchema } }, description: 'Job resumed' },
-        401: { description: 'Not signed in' },
-        404: { description: 'Not this company\'s job' },
-        409: { description: 'Job is terminal or too old to resume' },
     },
 }, { scopes: ['admin'], tier: 'extended' }));
 
@@ -184,17 +172,6 @@ const rowsRoute = createRoute(withMcpMetadata({
 
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
-function envOf(c: Context<HonoConfig>) {
-    // getDrizzle() is schema-agnostic (drizzle<any>); the data-package services
-    // are typed against the full schema. The underlying D1 handle is identical.
-    return {
-        db: getDrizzle(c) as DrizzleDB,
-        secret: c.env.JWT_SECRET,
-        tenantId: c.get('tenantId')!,
-        userId: c.get('user')!.sub,
-    };
-}
-
 function jobService(c: Context<HonoConfig>) {
     const { db, secret } = envOf(c);
     return new DataPackageJobService(db, secret);
@@ -232,7 +209,7 @@ function budgetHeader(c: Context<HonoConfig>, profile: ReadProfile) {
 const app = createApiRouter();
 
 app.openapi(createJobRoute, async (c) => {
-    const { tenantId, userId } = envOf(c);
+    const { tenantId, userId, db } = envOf(c);
     await checkRateLimit(c, 'data-job-create');
     const body = c.req.valid('json');
     const snapshotAt = Date.now();
@@ -241,6 +218,10 @@ app.openapi(createJobRoute, async (c) => {
         createdBy: userId, ...(body.packageId ? { packageId: body.packageId } : {}),
     });
     auditFromContext(c, 'data.export', 'bulk_export', { metadata: { phase: 'start', kind: body.kind, jobId: job.id } });
+    // §9B.1 — best-effort owner confirmation; a mail failure never fails the job.
+    notifyExportStartBestEffort(c, db, {
+        tenantId, userId, deviceLabel: body.deviceLabel, jobId: job.id, startedAt: snapshotAt,
+    });
     const profile = await resolveProfile(c);
     budgetHeader(c, profile);
     if (TABLES_WITHOUT_KEYSET.length) {
@@ -259,13 +240,6 @@ app.openapi(createJobRoute, async (c) => {
         },
     }, 200);
 });
-
-async function authorize(c: Context<HonoConfig>, jobId: string) {
-    const { db, secret, tenantId, userId } = envOf(c);
-    const token = c.req.header('X-Data-Job');
-    const job = await authorizeDataJob(db, secret, { tenantId, userId, jobId, token });
-    return { job, db };
-}
 
 app.openapi(heartbeatRoute, async (c) => {
     const { id: jobId } = c.req.valid('param');
@@ -287,7 +261,11 @@ app.openapi(resumeRoute, async (c) => {
     // to hold the bearer. No step-up: the job was already authorized at start.
     const existing = await svc.get(tenantId, jobId);
     if (!existing) throw Errors.NotFound('Data job not found.');
-    const resumed = await svc.resume(tenantId, jobId, existing.leaseHolder ?? 'resumed');
+    const deviceLabel = resumeDeviceLabel(c.req.header('X-Data-Device-Label'), existing.leaseHolder);
+    await auditResumeDeviceChange(c, existing.leaseHolder && deviceLabel !== existing.leaseHolder
+        ? { jobId, previousDeviceLabel: existing.leaseHolder, deviceLabel }
+        : null);
+    const resumed = await svc.resume(tenantId, jobId, deviceLabel);
     return c.json({ success: true as const, data: { jobToken: resumed.jobToken, leaseExpiresAt: new Date(resumed.job.leaseExpiresAt?.getTime() ?? Date.now() + JOB_LEASE_TTL_MS).toISOString() } }, 200);
 });
 
@@ -344,7 +322,11 @@ app.openapi(tablesRoute, async (c) => {
     const profile = await resolveProfile(c);
     const reader = new DataPackageReadService(db);
     budgetHeader(c, profile);
-    return c.json({ success: true as const, data: reader.tables(profile), snapshotAt: job.createdAt.getTime() }, 200);
+    return c.json({
+        success: true as const,
+        data: await reader.tables(job.tenantId, job.createdAt.getTime(), profile),
+        snapshotAt: job.createdAt.getTime(),
+    }, 200);
 });
 
 app.openapi(rowsRoute, async (c) => {
@@ -360,6 +342,18 @@ app.openapi(rowsRoute, async (c) => {
         job.createdAt.getTime(), profile,
     );
     return c.json({ success: true as const, data: page }, 200);
+});
+
+app.openapi(columnChunkRoute, async (c) => {
+    const { id: jobId, table, rowKey, column } = c.req.valid('param');
+    const { offset, len } = c.req.valid('query');
+    const { job, db } = await authorize(c, jobId);
+    const chunk = await new DataPackageReadService(db).readColumnChunk(
+        job.tenantId, table, column, rowKey, Number(offset), Number(len),
+    );
+    const headers: Record<string, string> = { 'X-Total-Bytes': String(chunk.totalBytes) };
+    if (chunk.nextOffset !== null) headers['X-Next-Offset'] = String(chunk.nextOffset);
+    return new Response(chunk.data, { status: 200, headers });
 });
 
 function mediaService(c: Context<HonoConfig>) {
@@ -392,7 +386,7 @@ app.openapi(mediaObjectRoute, async (c) => {
 /** Registration order. Drives the typed client; a test pins it to what `app` registered. */
 export const adminDataPackageRouteConfigs = [
     createJobRoute, heartbeatRoute, resumeRoute, completeRoute, abortRoute, cancelJobRoute,
-    listJobsRoute, getJobRoute, tablesRoute, rowsRoute, mediaRoute, mediaObjectRoute,
+    listJobsRoute, getJobRoute, tablesRoute, rowsRoute, columnChunkRoute, mediaRoute, mediaObjectRoute,
 ] as const;
 
 export default app;

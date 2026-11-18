@@ -75,6 +75,8 @@ export const TableDescriptorSchema = z.object({
     keyset: z.array(z.string()),
     maxPageRows: z.number().int(),
     maxPageBytes: z.number().int(),
+    rowCountAtSnapshot: z.number().int().nonnegative()
+        .describe('Row count for this table at the job snapshot, scoped to the job tenant.'),
     blobColumns: z.array(z.object({ property: z.string(), name: z.string() })),
 }).openapi('DataPackageTableDescriptor');
 

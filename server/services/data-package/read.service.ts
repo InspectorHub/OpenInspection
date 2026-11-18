@@ -43,6 +43,8 @@ export interface TableDescriptor {
     maxPageRows: number;
     maxPageBytes: number;
     blobColumns: { property: string; name: string }[];
+    /** Row count at the job snapshot, tenant-scoped; feeds the client's estimate. */
+    rowCountAtSnapshot: number;
 }
 
 export interface ReadRowsResult {
@@ -69,11 +71,31 @@ export class DataPackageReadService {
             : sql`${sql.identifier('tenant_id')} = ${tenantId}`;
     }
 
-    /** GET /tables: the exportable-table descriptors for a profile. */
-    tables(profile: ReadProfile): TableDescriptor[] {
-        return [...TABLE_READ_META_BY_NAME.values()].map((m) => {
+    /** Count a table's rows for one tenant at the job snapshot watermark. */
+    private async countAtSnapshot(meta: TableReadMeta, tenantId: string, snapshotAtMs: number): Promise<number> {
+        const conditions = [this.tenantPredicate(meta, tenantId)];
+        // Same watermark rule as readRows: only tables with a physical created_at
+        // column can be cut at a consistent instant.
+        if (meta.hasCreatedAt) {
+            conditions.push(sql`${sql.identifier('created_at')} <= ${snapshotAtMs}`);
+        }
+        const where = sql.join(conditions, sql` AND `);
+        const row = await this.db.get<{ n: number }>(
+            sql`SELECT count(*) AS n FROM ${sql.identifier(meta.table)} WHERE ${where}`,
+        );
+        const n = Number(row?.n ?? 0);
+        return Number.isSafeInteger(n) && n >= 0 ? n : 0;
+    }
+
+    /** GET /tables: the exportable-table descriptors for a profile, with snapshot row counts. */
+    async tables(tenantId: string, snapshotAtMs: number, profile: ReadProfile): Promise<TableDescriptor[]> {
+        const metas = [...TABLE_READ_META_BY_NAME.values()];
+        const out: TableDescriptor[] = [];
+        // Counts are per-table metadata reads; keep them sequential so a burst of
+        // tables cannot blow the free tier's concurrent subrequest ceiling.
+        for (const m of metas) {
             const caps = pageCeilings(m, profile);
-            return {
+            out.push({
                 table: m.table,
                 disposition: m.disposition,
                 columns: [...m.columns],
@@ -81,8 +103,10 @@ export class DataPackageReadService {
                 maxPageRows: caps.maxPageRows,
                 maxPageBytes: caps.maxPageBytes,
                 blobColumns: m.blobColumns.map((b) => ({ property: b.property, name: b.name })),
-            };
-        });
+                rowCountAtSnapshot: await this.countAtSnapshot(m, tenantId, snapshotAtMs),
+            });
+        }
+        return out;
     }
 
     /**

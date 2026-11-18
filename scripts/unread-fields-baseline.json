@@ -1,4 +1,16 @@
 {
+  "packages/data-package/src/shard.ts#ShardPlacement.opensShard": {
+    "kind": "deferred",
+    "reason": "Metadata the streaming shard cutter returns so a future exporter knows to close the previous shard before writing this row. Only specs read it today; the export runner (E-2/A-2) consumes it when it lands. Declared on the public format API so the exporter can rely on it."
+  },
+  "packages/data-package/src/volume.ts#PlannedEntry.volumeIndex": {
+    "kind": "deferred",
+    "reason": "Ordinal of the volume an entry was assigned to, returned by the streaming volume planner for the future exporter to build per-volume manifests. Only specs read it today; the export runner consumes it when it lands."
+  },
+  "packages/data-package/src/volume.ts#PlannedEntry.oversize": {
+    "kind": "deferred",
+    "reason": "Flags an entry larger than the volume byte budget so the future exporter can route it to an oversize path instead of a normal media volume. Only specs read it today; the export runner consumes it when it lands."
+  },
   "packages/field-ui/src/collab/results-doc-lineage.ts#DiscardedStoreInfo.serverGen": {
     "kind": "deferred",
     "reason": "Stored with the discarded-store backup slot (web-lineage-store.ts spreads the whole info object into IndexedDB, so no `.serverGen` read exists) as a diagnostic of which server generation replaced the store; nothing in the product reads the slot back yet, only tests do."
@@ -66,22 +78,6 @@
   "packages/field-ui/src/testing/fake-resources.ts#FakeTemplateSearch.searches": {
     "kind": "record",
     "reason": "The ordered list of template searches the editor issued on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
-  "server/services/data-package/read.service.ts#ReadRowsResult.rowsScanned": {
-    "kind": "invisible-read",
-    "reason": "Rows examined per page, consumed by the /rows response serialization (returned as `data: page`, declared in RowsResponseSchema) and asserted by read.service.spec.ts. The application daily budget is disabled by owner decision, so nothing computes a rate from it in-process; it still travels to the desktop client as measurement data for a future budget re-enable."
-  },
-  "packages/data-package/src/shard.ts#ShardPlacement.opensShard": {
-    "kind": "deferred",
-    "reason": "Metadata the streaming shard cutter returns so a future exporter knows to close the previous shard before writing this row. Only specs read it today; the export runner (E-2/A-2) consumes it when it lands. Declared on the public format API so the exporter can rely on it."
-  },
-  "packages/data-package/src/volume.ts#PlannedEntry.volumeIndex": {
-    "kind": "deferred",
-    "reason": "Ordinal of the volume an entry was assigned to, returned by the streaming volume planner for the future exporter to build per-volume manifests. Only specs read it today; the export runner consumes it when it lands."
-  },
-  "packages/data-package/src/volume.ts#PlannedEntry.oversize": {
-    "kind": "deferred",
-    "reason": "Flags an entry larger than the volume byte budget so the future exporter can route it to an oversize path instead of a normal media volume. Only specs read it today; the export runner consumes it when it lands."
   },
   "server/cron/types.ts#CronJob.maxBatch": {
     "kind": "invisible-read",
@@ -159,10 +155,6 @@
     "kind": "wire-shape",
     "reason": "The messaging provider's own identifier for the entity an event is about, carried through from Telnyx and Twilio. Ours to pass on and to log, not to interpret."
   },
-  "server/lib/migration-intake/bundle.ts#MigrationBundleV1.formatVersion": {
-    "kind": "wire-shape",
-    "reason": "The stored bundle's version discriminator, written by all three adapters. Nothing branches on it because there is one version so far, which is what it exists to make possible."
-  },
   "server/lib/page-timing.ts#PageTimingFields.wall_ms": {
     "kind": "wire-shape",
     "reason": "A field of the structured `page_timing` log line (see the Page timing section of CLAUDE.md). It is written into the log and read by the log aggregator and its dashboards, which live outside this repository; nothing in the app reads it back, by design."
@@ -222,6 +214,14 @@
   "server/services/data-export.service.ts#ExportManifest.photosEmbedded": {
     "kind": "wire-shape",
     "reason": "Part of the export manifest that travels with the archive and crosses the seam (portal reads the manifest on `cmd.subject.export`). The reader is the person holding the export, or portal's record of it."
+  },
+  "server/services/data-package/read.service.ts#TableDescriptor.rowCountAtSnapshot": {
+    "kind": "invisible-read",
+    "reason": "Per-table snapshot row count, returned in the /tables response (declared in TableDescriptorSchema) and asserted by read.service.spec.ts. The consumer is the desktop client in the apps/app repository, which sums these counts to show the pre-export estimate (exporter.ts parses and reduces rowCountAtSnapshot); that consumer lives in another repo, so no in-tree read exists. Dropping it would leave the client estimate at zero."
+  },
+  "server/services/data-package/read.service.ts#ReadRowsResult.rowsScanned": {
+    "kind": "invisible-read",
+    "reason": "Rows examined per page, consumed by the /rows response serialization (returned as `data: page`, declared in RowsResponseSchema) and asserted by read.service.spec.ts. The application daily budget is disabled by owner decision, so nothing computes a rate from it in-process; it still travels to the desktop client as measurement data for a future budget re-enable."
   },
   "server/services/inspection/inspection-analytics.service.ts#RepairListEntry.recommendationLabel": {
     "kind": "wire-shape",

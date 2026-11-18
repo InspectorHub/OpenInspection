@@ -105,6 +105,11 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     // mechanism for getting INTO the account, so none may be switched off.
     { id: 'password-reset',       label: 'Password reset',          category: 'transactional', required: true,  channels: ['email'], audience: ['staff', 'agent'] },
     { id: 'step-up-code',         label: 'Confirmation code',       category: 'transactional', required: true,  channels: ['email'], audience: ['staff'] },
+    // An account-security notice: the owner is told that an export using their
+    // authorization has begun, so they can spot one they did not start and
+    // cancel it. Never switchable — muting it would hide exactly the event the
+    // message exists to surface. No data-package contents travel with it.
+    { id: 'data-export-start',    label: 'Data export started',     category: 'transactional', required: true,  channels: ['email'], audience: ['staff'] },
     { id: 'workspace-invitation', label: 'Workspace invitation',    category: 'transactional', required: true,  channels: ['email'], audience: ['staff'] },
     { id: 'agent-invite',         label: 'Partner agent invite',    category: 'transactional', required: true,  channels: ['email'], audience: ['agent'] },
     { id: 'agent-login-link',     label: 'Agent sign-in link',      category: 'transactional', required: true,  channels: ['email'], audience: ['agent'] },

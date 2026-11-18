@@ -9,18 +9,20 @@
  * file only proves the routes wire those services to the right identity, token
  * and header.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { AppError, ErrorCode } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import type { Role } from '../../../server/lib/auth/roles';
 import adminDataPackageRoutes from '../../../server/api/admin/admin-data-package';
+import * as buildEmailModule from '../../../server/lib/email/build-email-service';
 import { createTestDb } from '../db';
 import { d1For } from '../helpers/d1-binding';
 import { issueStepUpToken, STEP_UP_KV_PREFIX } from '../../../server/lib/auth/step-up';
-import { tenants, inspections } from '../../../server/lib/db/schema';
+import { tenants, inspections, inspectionResults, users, auditLogs } from '../../../server/lib/db/schema';
 import { tenantDataJobs } from '../../../server/lib/db/schema/data-package';
+import { encodeCursor } from '../../../server/lib/data-package/cursor';
 
 const SECRET = 'e1-route-test-secret';
 const TENANT = 'tenant-e1';
@@ -104,11 +106,22 @@ describe('data-package E-1 routes', () => {
             { id: TENANT, slug: 'e1', status: 'active', tier: 'free', deploymentMode: 'shared', maxUsers: 10, createdAt: new Date(SNAPSHOT - 100000) },
             { id: OTHER_TENANT, slug: 'e1o', status: 'active', tier: 'free', deploymentMode: 'shared', maxUsers: 10, createdAt: new Date(SNAPSHOT - 100000) },
         ]);
+        await db.insert(users).values({
+            id: USER, tenantId: TENANT, email: 'owner-e1@example.test', passwordHash: 'x',
+            role: 'owner', createdAt: new Date(SNAPSHOT - 100000),
+        } as never);
         await db.insert(inspections).values({
             id: 'insp-e1', tenantId: TENANT, propertyAddress: 'E1 Road', status: 'scheduled',
             date: '2026-01-01', createdAt: new Date(SNAPSHOT - 1000),
         } as never);
+        // createJob now fires a best-effort confirmation email; stub the transport
+        // so route tests stay isolated (and silent) regardless of env bindings.
+        vi.spyOn(buildEmailModule, 'buildTenantEmailService').mockResolvedValue({
+            sendEmail: vi.fn().mockResolvedValue({ delivered: true }),
+        } as never);
     });
+
+    afterEach(() => vi.restoreAllMocks());
 
     /** Create a job through the route and return its id + job token. */
     async function createJob(over: RouteOpts = {}) {
@@ -219,11 +232,13 @@ describe('data-package E-1 routes', () => {
         });
         expect(res.status).toBe(200);
         expect(res.headers.get('X-Dp-Budget')).toContain('profile=worker-free');
-        const body = await res.json() as { data: { table: string; maxPageRows: number }[]; snapshotAt: number };
+        const body = await res.json() as { data: { table: string; maxPageRows: number; rowCountAtSnapshot: number }[]; snapshotAt: number };
         const names = body.data.map((t) => t.table);
         expect(names).toContain('inspections');
         expect(names).not.toContain('tenant_data_jobs');
         expect(body.data.find((t) => t.table === 'inspections')!.maxPageRows).toBe(48);
+        // Seeded tenant has one inspection before the job snapshot.
+        expect(body.data.find((t) => t.table === 'inspections')!.rowCountAtSnapshot).toBe(1);
     });
 
     it('reads one tenant-scoped keyset page within the job watermark', async () => {
@@ -236,6 +251,41 @@ describe('data-package E-1 routes', () => {
         expect(body.data.rows.map((r) => r.id)).toEqual(['insp-e1']);
         expect(body.data.rows.every((r) => r.tenant_id === TENANT)).toBe(true);
         expect(body.data.next).toBeNull();
+    });
+
+    it('reads a large blob column chunk with byte headers, scoped to the tenant', async () => {
+        const { jobId, jobToken } = (await createJob()).data;
+        await db.insert(inspectionResults).values({
+            id: 'res-e1', tenantId: TENANT, inspectionId: 'insp-e1',
+            data: '{}' as any, ydocState: Buffer.from('y'.repeat(5000)),
+            lastSyncedAt: new Date(SNAPSHOT - 10),
+        } as never);
+        const rowKey = encodeURIComponent(encodeCursor(['res-e1']));
+        const url = `/data-package/jobs/${jobId}/tables/inspection_results/rows/${rowKey}/columns/ydoc_state?offset=0&len=1024`;
+        const res = await call(url, { method: 'GET', headers: { 'X-Data-Job': jobToken } });
+        expect(res.status).toBe(200);
+        expect(res.headers.get('X-Total-Bytes')).toBe('5000');
+        expect(res.headers.get('X-Next-Offset')).toBe('1024');
+        const buf = Buffer.from(await res.arrayBuffer());
+        expect(buf.length).toBe(1024);
+        expect(buf.toString()).toBe('y'.repeat(1024));
+
+        // Last chunk has no next offset.
+        const last = await call(
+            `/data-package/jobs/${jobId}/tables/inspection_results/rows/${rowKey}/columns/ydoc_state?offset=4096&len=1024`,
+            { method: 'GET', headers: { 'X-Data-Job': jobToken } },
+        );
+        expect(last.status).toBe(200);
+        expect(last.headers.get('X-Next-Offset')).toBeNull();
+        expect(Buffer.from(await last.arrayBuffer()).length).toBe(904);
+
+        // A forged cursor for another tenant's row key resolves to nothing here.
+        const forged = encodeURIComponent(encodeCursor(['res-other']));
+        const miss = await call(
+            `/data-package/jobs/${jobId}/tables/inspection_results/rows/${forged}/columns/ydoc_state?offset=0&len=10`,
+            { method: 'GET', headers: { 'X-Data-Job': jobToken } },
+        );
+        expect(miss.status).toBe(404);
     });
 
     it('renews the lease and returns a fresh job token on heartbeat', async () => {
@@ -336,6 +386,41 @@ describe('data-package E-1 routes', () => {
         const after = await call(`/data-package/jobs/${jobId}`, { method: 'GET' });
         const state = await after.json() as { data: { status: string } };
         expect(state.data.status).toBe('running');
+    });
+
+    it('audits a device-label change on resume, with both labels', async () => {
+        const { jobId } = (await createJob()).data; // lease holder = 'office-laptop'
+        await db.update(tenantDataJobs).set({ leaseExpiresAt: new Date(SNAPSHOT - 1) }).where(eq(tenantDataJobs.id, jobId));
+
+        const res = await call(`/data-package/jobs/${jobId}/resume`, {
+            method: 'POST', headers: { 'x-data-device-label': 'new-device' },
+        });
+        expect(res.status).toBe(200);
+
+        // The audit is awaited, so it is readable immediately.
+        const rows = await db.select().from(auditLogs).where(eq(auditLogs.tenantId, TENANT)).all();
+        const change = rows.find((r: any) => (r.metadata as any)?.phase === 'resume_device_change');
+        expect(change, 'expected a resume_device_change audit row').toBeTruthy();
+        expect(change.action).toBe('data.export');
+        expect((change.metadata as any).jobId).toBe(jobId);
+        expect((change.metadata as any).previousDeviceLabel).toBe('office-laptop');
+        expect((change.metadata as any).deviceLabel).toBe('new-device');
+    });
+
+    it('does not audit resume when the device label is unchanged or absent', async () => {
+        const { jobId } = (await createJob()).data; // lease holder = 'office-laptop'
+        await db.update(tenantDataJobs).set({ leaseExpiresAt: new Date(SNAPSHOT - 1) }).where(eq(tenantDataJobs.id, jobId));
+
+        // No header → falls back to the recorded holder, so no change.
+        expect((await call(`/data-package/jobs/${jobId}/resume`, { method: 'POST' })).status).toBe(200);
+        // Same label as the holder → still no change.
+        await db.update(tenantDataJobs).set({ leaseExpiresAt: new Date(SNAPSHOT - 1) }).where(eq(tenantDataJobs.id, jobId));
+        expect((await call(`/data-package/jobs/${jobId}/resume`, {
+            method: 'POST', headers: { 'x-data-device-label': 'office-laptop' },
+        })).status).toBe(200);
+
+        const rows = await db.select().from(auditLogs).where(eq(auditLogs.tenantId, TENANT)).all();
+        expect(rows.some((r: any) => (r.metadata as any)?.phase === 'resume_device_change')).toBe(false);
     });
 
     it('refuses to resume a job that exists only in another tenant', async () => {
