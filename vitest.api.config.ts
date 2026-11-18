@@ -34,6 +34,9 @@ export default defineConfig({
       // unlike the type-only `@core/api-types` it needs a runtime alias.
       '@core/offline-package': path.resolve(__dirname, 'packages/offline-package/index.ts'),
       '@core/data-package': path.resolve(__dirname, 'packages/data-package/index.ts'),
+      // The offline verifier script imports the published package name; in tests
+      // resolve it to the same TS source (dist is a gitignored build artifact).
+      '@inspectorhub/data-package': path.resolve(__dirname, 'packages/data-package/index.ts'),
       // Pure editor logic that the server also imports (`@core/field-ui/shared/*`).
       '@core/field-ui': path.resolve(__dirname, 'packages/field-ui/src'),
     },

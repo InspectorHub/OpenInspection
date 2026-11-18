@@ -89,3 +89,18 @@ describe("settings → data: the export buttons point at routes that exist", () 
         }
     });
 });
+
+describe("settings → data: the complete-package entry", () => {
+    it("opens the desktop app via its registered protocol and links to job status", async () => {
+        const { container } = renderPage();
+        expect(await hrefOf("Open in desktop app")).toBe("io.inspectorhub.app://");
+        expect(await hrefOf("View export status")).toBe("/settings/data/jobs");
+        // The web offers no in-browser export driver: no form posts an export here.
+        expect(screen.queryByRole("button", { name: /export/i })).toBeNull();
+        // The explanation is neutral (no internal mechanism/billing) and warns
+        // that the export runs locally and produces a personal-data file.
+        const text = container.textContent ?? "";
+        expect(text).toMatch(/runs on your computer/i);
+        expect(text).toMatch(/personal information/i);
+    });
+});

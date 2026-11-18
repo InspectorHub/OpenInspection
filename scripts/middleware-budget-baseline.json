@@ -6,8 +6,8 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 166,
-    "dollarMethods": 601,
+    "files": 167,
+    "dollarMethods": 604,
     "apiWorker": 11
   },
   "fanOut": {
@@ -561,6 +561,10 @@
     },
     "app/routes/settings-contractor-types.tsx": {
       "dollarMethods": 6,
+      "apiWorker": 0
+    },
+    "app/routes/settings-data-jobs.tsx": {
+      "dollarMethods": 2,
       "apiWorker": 0
     },
     "app/routes/settings-data.tsx": {
