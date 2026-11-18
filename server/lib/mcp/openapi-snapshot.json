@@ -19915,17 +19915,28 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the data-package job this request acts on",
+          "description": "Id of the data-package job this request resumes",
           "schema": {
             "type": "string",
-            "description": "Id of the data-package job this request acts on"
+            "description": "Id of the data-package job this request resumes"
+          }
+        },
+        {
+          "name": "x-data-device-label",
+          "in": "header",
+          "required": false,
+          "description": "Non-PII label of the device reclaiming the lease; audited when it differs from the recorded lease holder. Up to 128 characters.",
+          "schema": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "Non-PII label of the device reclaiming the lease; audited when it differs from the recorded lease holder. Up to 128 characters."
           }
         }
       ],
       "body": null
     },
     "summary": "Resume a data-package job after its lease lapses",
-    "description": "Reclaims a tenant job whose lease has lapsed and returns a fresh X-Data-Job token. No step-up: the job was already authorized at start, so a still-valid bearer resumes it (an accepted trade-off for multi-hour exports). The job must be younger than 14 days and still active. Only an owner may call it."
+    "description": "Reclaims a tenant job whose lease has lapsed and returns a fresh X-Data-Job token. No step-up: the job was already authorized at start, so a still-valid bearer resumes it (an accepted trade-off for multi-hour exports). The job must be younger than 14 days and still active. An optional X-Data-Device-Label is audited when it differs from the recorded lease holder. Only an owner may call it."
   },
   {
     "operationId": "returnReport",

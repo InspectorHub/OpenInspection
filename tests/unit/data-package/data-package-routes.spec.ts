@@ -9,17 +9,18 @@
  * file only proves the routes wire those services to the right identity, token
  * and header.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { AppError, ErrorCode } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import type { Role } from '../../../server/lib/auth/roles';
 import adminDataPackageRoutes from '../../../server/api/admin/admin-data-package';
+import * as buildEmailModule from '../../../server/lib/email/build-email-service';
 import { createTestDb } from '../db';
 import { d1For } from '../helpers/d1-binding';
 import { issueStepUpToken, STEP_UP_KV_PREFIX } from '../../../server/lib/auth/step-up';
-import { tenants, inspections } from '../../../server/lib/db/schema';
+import { tenants, inspections, users, auditLogs } from '../../../server/lib/db/schema';
 import { tenantDataJobs } from '../../../server/lib/db/schema/data-package';
 
 const SECRET = 'e1-route-test-secret';
@@ -104,11 +105,22 @@ describe('data-package E-1 routes', () => {
             { id: TENANT, slug: 'e1', status: 'active', tier: 'free', deploymentMode: 'shared', maxUsers: 10, createdAt: new Date(SNAPSHOT - 100000) },
             { id: OTHER_TENANT, slug: 'e1o', status: 'active', tier: 'free', deploymentMode: 'shared', maxUsers: 10, createdAt: new Date(SNAPSHOT - 100000) },
         ]);
+        await db.insert(users).values({
+            id: USER, tenantId: TENANT, email: 'owner-e1@example.test', passwordHash: 'x',
+            role: 'owner', createdAt: new Date(SNAPSHOT - 100000),
+        } as never);
         await db.insert(inspections).values({
             id: 'insp-e1', tenantId: TENANT, propertyAddress: 'E1 Road', status: 'scheduled',
             date: '2026-01-01', createdAt: new Date(SNAPSHOT - 1000),
         } as never);
+        // createJob now fires a best-effort confirmation email; stub the transport
+        // so route tests stay isolated (and silent) regardless of env bindings.
+        vi.spyOn(buildEmailModule, 'buildTenantEmailService').mockResolvedValue({
+            sendEmail: vi.fn().mockResolvedValue({ delivered: true }),
+        } as never);
     });
+
+    afterEach(() => vi.restoreAllMocks());
 
     /** Create a job through the route and return its id + job token. */
     async function createJob(over: RouteOpts = {}) {
@@ -336,6 +348,41 @@ describe('data-package E-1 routes', () => {
         const after = await call(`/data-package/jobs/${jobId}`, { method: 'GET' });
         const state = await after.json() as { data: { status: string } };
         expect(state.data.status).toBe('running');
+    });
+
+    it('audits a device-label change on resume, with both labels', async () => {
+        const { jobId } = (await createJob()).data; // lease holder = 'office-laptop'
+        await db.update(tenantDataJobs).set({ leaseExpiresAt: new Date(SNAPSHOT - 1) }).where(eq(tenantDataJobs.id, jobId));
+
+        const res = await call(`/data-package/jobs/${jobId}/resume`, {
+            method: 'POST', headers: { 'x-data-device-label': 'new-device' },
+        });
+        expect(res.status).toBe(200);
+
+        // The audit is awaited, so it is readable immediately.
+        const rows = await db.select().from(auditLogs).where(eq(auditLogs.tenantId, TENANT)).all();
+        const change = rows.find((r: any) => (r.metadata as any)?.phase === 'resume_device_change');
+        expect(change, 'expected a resume_device_change audit row').toBeTruthy();
+        expect(change.action).toBe('data.export');
+        expect((change.metadata as any).jobId).toBe(jobId);
+        expect((change.metadata as any).previousDeviceLabel).toBe('office-laptop');
+        expect((change.metadata as any).deviceLabel).toBe('new-device');
+    });
+
+    it('does not audit resume when the device label is unchanged or absent', async () => {
+        const { jobId } = (await createJob()).data; // lease holder = 'office-laptop'
+        await db.update(tenantDataJobs).set({ leaseExpiresAt: new Date(SNAPSHOT - 1) }).where(eq(tenantDataJobs.id, jobId));
+
+        // No header → falls back to the recorded holder, so no change.
+        expect((await call(`/data-package/jobs/${jobId}/resume`, { method: 'POST' })).status).toBe(200);
+        // Same label as the holder → still no change.
+        await db.update(tenantDataJobs).set({ leaseExpiresAt: new Date(SNAPSHOT - 1) }).where(eq(tenantDataJobs.id, jobId));
+        expect((await call(`/data-package/jobs/${jobId}/resume`, {
+            method: 'POST', headers: { 'x-data-device-label': 'office-laptop' },
+        })).status).toBe(200);
+
+        const rows = await db.select().from(auditLogs).where(eq(auditLogs.tenantId, TENANT)).all();
+        expect(rows.some((r: any) => (r.metadata as any)?.phase === 'resume_device_change')).toBe(false);
     });
 
     it('refuses to resume a job that exists only in another tenant', async () => {

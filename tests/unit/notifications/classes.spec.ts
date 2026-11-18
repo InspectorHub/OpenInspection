@@ -32,6 +32,9 @@ const NEVER_OFF = [
     'client-portal-login',
     // The code that lets an owner with no password confirm a sensitive action; muting it would lock them out of it.
     'step-up-code',
+    // Account-security notice that an export authorized by this owner began;
+    // muting it would hide the event the message exists to surface.
+    'data-export-start',
     'agreement-request', 'agreement-signed', 'evidence-pack', 'payment-request',
     // The receipt is the same harm as the invoice, from the other side: it is
     // the only record we produce of money the recipient has already paid.

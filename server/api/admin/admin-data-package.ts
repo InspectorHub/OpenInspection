@@ -21,6 +21,8 @@ import { Errors } from '../../lib/errors';
 import type { HonoConfig } from '../../types/hono';
 import { SERVER_CONTRACT_VERSION } from '../../lib/native/client-version';
 import { DataPackageJobService, JOB_LEASE_TTL_MS } from '../../services/data-package/job.service';
+import { notifyExportStartBestEffort } from '../../services/data-package/export-notification.service';
+import { auditResumeDeviceChange, resumeDeviceLabel } from '../../services/data-package/resume-audit.service';
 import { DataPackageReadService } from '../../services/data-package/read.service';
 import { DataPackageMediaService } from '../../services/data-package/media.service';
 import { authorizeDataJob } from '../../lib/data-package/job-access';
@@ -28,12 +30,13 @@ import { schemaFingerprint } from '../../lib/data-package/fingerprint';
 import { TABLES_WITHOUT_KEYSET, type ReadProfile } from '../../lib/data-package/read-metadata';
 import {
     CreateJobRequestSchema, CreateJobResponseSchema, HeartbeatResponseSchema,
-    ResumeResponseSchema, CompleteJobRequestSchema, JobStateResponseSchema,
+    CompleteJobRequestSchema, JobStateResponseSchema,
     JobListResponseSchema, TablesResponseSchema, RowsResponseSchema,
     SimpleResponseSchema,
 } from '../../lib/validations/data-package.schema';
 import { mediaRoute, mediaObjectRoute } from './data-package-media.routes';
 import { cancelJobRoute } from './data-package-web.routes';
+import { resumeRoute } from './data-package-resume.routes';
 
 // ── Route definitions ────────────────────────────────────────────────────────
 
@@ -81,21 +84,6 @@ const heartbeatRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: HeartbeatResponseSchema } }, description: 'Lease renewed' },
         401: { description: 'Invalid or expired X-Data-Job token' },
         409: { description: 'Lease held by another device, or expired (JOB_LEASE_EXPIRED)' },
-    },
-}, { scopes: ['admin'], tier: 'extended' }));
-
-const resumeRoute = createRoute(withMcpMetadata({
-    method: 'post', path: '/data-package/jobs/:id/resume', operationId: 'resumeDataPackageJob',
-    summary: 'Resume a data-package job after its lease lapses',
-    description: 'Reclaims a tenant job whose lease has lapsed and returns a fresh X-Data-Job token. No step-up: the job was already authorized at start, so a still-valid bearer resumes it (an accepted trade-off for multi-hour exports). The job must be younger than 14 days and still active. Only an owner may call it.',
-    tags: ['admin'],
-    middleware: [requireRole('owner')],
-    request: { params: JobIdParam },
-    responses: {
-        200: { content: { 'application/json': { schema: ResumeResponseSchema } }, description: 'Job resumed' },
-        401: { description: 'Not signed in' },
-        404: { description: 'Not this company\'s job' },
-        409: { description: 'Job is terminal or too old to resume' },
     },
 }, { scopes: ['admin'], tier: 'extended' }));
 
@@ -232,7 +220,7 @@ function budgetHeader(c: Context<HonoConfig>, profile: ReadProfile) {
 const app = createApiRouter();
 
 app.openapi(createJobRoute, async (c) => {
-    const { tenantId, userId } = envOf(c);
+    const { tenantId, userId, db } = envOf(c);
     await checkRateLimit(c, 'data-job-create');
     const body = c.req.valid('json');
     const snapshotAt = Date.now();
@@ -241,6 +229,10 @@ app.openapi(createJobRoute, async (c) => {
         createdBy: userId, ...(body.packageId ? { packageId: body.packageId } : {}),
     });
     auditFromContext(c, 'data.export', 'bulk_export', { metadata: { phase: 'start', kind: body.kind, jobId: job.id } });
+    // §9B.1 — best-effort owner confirmation; a mail failure never fails the job.
+    notifyExportStartBestEffort(c, db, {
+        tenantId, userId, deviceLabel: body.deviceLabel, jobId: job.id, startedAt: snapshotAt,
+    });
     const profile = await resolveProfile(c);
     budgetHeader(c, profile);
     if (TABLES_WITHOUT_KEYSET.length) {
@@ -287,7 +279,11 @@ app.openapi(resumeRoute, async (c) => {
     // to hold the bearer. No step-up: the job was already authorized at start.
     const existing = await svc.get(tenantId, jobId);
     if (!existing) throw Errors.NotFound('Data job not found.');
-    const resumed = await svc.resume(tenantId, jobId, existing.leaseHolder ?? 'resumed');
+    const deviceLabel = resumeDeviceLabel(c.req.header('X-Data-Device-Label'), existing.leaseHolder);
+    await auditResumeDeviceChange(c, existing.leaseHolder && deviceLabel !== existing.leaseHolder
+        ? { jobId, previousDeviceLabel: existing.leaseHolder, deviceLabel }
+        : null);
+    const resumed = await svc.resume(tenantId, jobId, deviceLabel);
     return c.json({ success: true as const, data: { jobToken: resumed.jobToken, leaseExpiresAt: new Date(resumed.job.leaseExpiresAt?.getTime() ?? Date.now() + JOB_LEASE_TTL_MS).toISOString() } }, 200);
 });
 
