@@ -2,6 +2,7 @@ import { eq, and, desc, inArray } from 'drizzle-orm';
 // `templates` is deliberately absent: #307 removed the live-template fallback,
 // so nothing in this file reads the templates row any more.
 import { inspections, inspectionResults, users, tenantConfigs, tenants, inspectionServices, agreements, agreementRequests, agreementSigners, invoices, contacts } from '../../lib/db/schema';
+import { isImportedAndArchivedSigned } from '../data-package/archived-evidence.service';
 import { Errors } from '../../lib/errors';
 import { applyAutoSignatureOnPublish, type AutoSignActor } from '../../lib/inspection/auto-sign';
 import { markReportPublished, resolvePublishTargetReport } from '../../lib/inspection/report-notifications';
@@ -128,7 +129,13 @@ export class InspectionPublishService extends InspectionSubService {
                     eq(agreementRequests.status, 'signed'),
                 ))
                 .limit(1);
-            if (signed.length === 0) reason = 'agreement';
+            if (signed.length === 0) {
+                // J5 — a restored inspection's agreement was archived
+                // byte-for-byte, not written to the live table. A verified
+                // archived signature satisfies the leg; unlocked_at stays null.
+                const archivedSigned = await isImportedAndArchivedSigned(db, this.r2, tenantId, inspectionId);
+                if (!archivedSigned) reason = 'agreement';
+            }
         }
         // Computed independently of `reason` so the dual-gate (agreement AND
         // payment) case can route to combined checkout.
