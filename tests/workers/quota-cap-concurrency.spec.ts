@@ -36,10 +36,17 @@ async function seedSchema(): Promise<void> {
     await b.DB.exec(
         'CREATE TABLE IF NOT EXISTS usage_counters (tenant_id TEXT NOT NULL, metric TEXT NOT NULL, period_key TEXT NOT NULL, value INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL, PRIMARY KEY (tenant_id, metric, period_key));',
     );
+    // The guard's cap query excludes restored inspections via a NOT EXISTS on
+    // import_id_map. This minimal fixture must carry that table too (empty is
+    // fine — no imported rows here) or the guard fails with "no such table".
+    await b.DB.exec(
+        'CREATE TABLE IF NOT EXISTS import_id_map (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, package_id TEXT NOT NULL, table_name TEXT NOT NULL, source_id TEXT NOT NULL, new_id TEXT NOT NULL, created_at INTEGER NOT NULL);',
+    );
 }
 
 async function reset(): Promise<void> {
     await b.DB.exec('DELETE FROM usage_counters;');
+    await b.DB.exec('DELETE FROM import_id_map;');
     await b.DB.exec('DELETE FROM inspections;');
     await b.DB.exec('DELETE FROM tenants;');
     await b.DB.prepare('INSERT INTO tenants (id, slug, tier, created_at) VALUES (?, ?, ?, ?)')

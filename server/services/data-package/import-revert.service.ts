@@ -173,7 +173,14 @@ export class DataPackageRevertService {
                 // owner edited. Keep the mapping and report, so a later step
                 // retries instead of losing data. Narrow the match to the exact
                 // SQLite/D1 "no such column: updated_at" shape.
-                if (!/no such column:\s*updated_at/i.test(String(err))) {
+                // Drizzle's D1 driver wraps the driver error as `Error: Failed
+                // query: ...` with the real message in `cause.message`; the
+                // better-sqlite3 driver surfaces it directly. Check both. Wordings
+                // vary (`no such column: updated_at` / `... "updated_at"`); the
+                // probe SELECTs only updated_at (id/tenant_id already proved
+                // present), so any "no such column" here means that column.
+                const causeMsg = (err as { cause?: { message?: string } })?.cause?.message ?? '';
+                if (!/no such column/i.test(String(err) + ' ' + causeMsg)) {
                     result.errors.push({ table, newId: m.newId, code: 'probe_failed' });
                     continue;
                 }
