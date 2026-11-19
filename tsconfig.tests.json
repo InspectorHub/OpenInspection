@@ -99,15 +99,28 @@
         // passes in 14.5s. `package.json` is unchanged and still correct. If a later
         // batch reds this pass with `Ineffective mark-compacts near heap limit`
         // and nothing in the diff explains it, this is why — bisect cold and
-        // move the number, do not reach for 4096, which is exactly the value at
-        // which a lost `references` (see below) stops being caught in seconds.
+        // move the number.
+        //
+        // ⚠️ LATER RATCHET (owner decision 2026-11-19): the spec tree grew far
+        // past the sizes above (~697 -> 1825 root spec files; ~4238 files in the
+        // full program). Re-bisected COLD on upstream/main with build-info
+        // deleted: a genuine full compile now needs ~3.58 GB / ~51 s; 3072 MB
+        // OOMs (`Ineffective mark-compacts near heap limit`), 4096 MB passes.
+        // This was NOT introduced by the data-package work (that added ~75 MB /
+        // +2%): the committed 3072 cap had simply fallen below the real need.
+        // `package.json` now carries 4096 (measured floor plus headroom).
+        //
+        // CONSEQUENCE — this cap no longer acts as the fast `references` sentinel
+        // it once was (at 3072 a lost `references` died in seconds; at 4096 a
+        // source-compile of the ~790 server files might pass slowly instead).
+        // That risk is now accepted by the owner. Guard `references` by review
+        // and by the api-program build time rather than by this heap ceiling.
         //
         // Why not leave it generous: the failure this cap is really guarding
         // against is losing `references` below. `references` is NOT inherited
         // through `extends`, and when it goes missing this stops consuming the
         // api project's `.d.ts` and starts SOURCE-COMPILING ~790 server files
-        // instead — which needs well over 2048 MB. At 1024 that mistake dies
-        // in seconds; at 4096 it might just get slower and pass.
+        // instead — which needs well over 2048 MB. See the accepted-risk note above.
 
         // `paths` is re-declared in full because `extends` REPLACES the whole
         // object rather than merging it: the base config's `~/*` and
