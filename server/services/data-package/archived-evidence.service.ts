@@ -18,6 +18,7 @@ import { importArchives, importIdMap } from '../../lib/db/schema/data-package';
 import { r2Get } from '../../lib/r2/objects';
 import { EVIDENCE_ARCHIVE_KEY } from './import-archive.service';
 import { verifyEvidenceChainDetailed, type PackEvent, type PackKey, type ChainVerdict } from '../../lib/esign/chain-verify';
+import { base64UrlDecode } from '../signing-key.service';
 
 /** An original esign row as stored in the package's evidence file. */
 export interface ArchivedEsignRow {
@@ -73,6 +74,28 @@ export async function loadArchivedEvidence(
  * archived signature counts as the signed leg — without unlocking or writing
  * any live signing row.
  */
+/**
+ * All archived signing keys for a tenant (from any package's evidence file),
+ * keyed by fingerprint. Used when a report version names a key the live key
+ * table does not hold — the version was signed by the source workspace.
+ */
+export async function archivedKeysForTenant(
+    db: ReturnType<typeof drizzle>, bucket: R2Bucket, tenantId: string,
+): Promise<PackKey[]> {
+    const archives = await db.select().from(importArchives)
+        .where(eq(importArchives.tenantId, tenantId)).all();
+    const out: PackKey[] = [];
+    for (const archive of archives) {
+        const obj = await r2Get(bucket, EVIDENCE_ARCHIVE_KEY(tenantId, archive.packageId));
+        if (!obj) continue;
+        try {
+            const parsed = JSON.parse(await obj.text()) as Partial<ArchivedEvidence>;
+            if (Array.isArray(parsed.keys)) out.push(...parsed.keys);
+        } catch { /* a corrupt archive contributes no keys */ }
+    }
+    return out;
+}
+
 async function hasValidArchivedEvidence(
     db: ReturnType<typeof drizzle>, bucket: R2Bucket, tenantId: string,
 ): Promise<boolean> {
@@ -140,4 +163,39 @@ export async function verifyArchivedEnvelope(
         }));
     const verdict = await verifyEvidenceChainDetailed(chain, archive.keys);
     return { verdict, events: chain.length };
+}
+
+function pemToDer(pem: string): Uint8Array {
+    const body = pem.replace(/-----BEGIN [^-]+-----/, '').replace(/-----END [^-]+-----/, '').replace(/\s/g, '');
+    const bin = atob(body);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+    return out;
+}
+
+/**
+ * Verify an Ed25519 signature over `signedText` with the archived key whose
+ * fingerprint matches, when the live key table has no such key. Returns null
+ * when no archived key matches (caller keeps keyMissing=true), true/false for
+ * a verification that actually ran.
+ */
+export async function verifySignatureWithArchivedKeys(
+    fingerprint: string,
+    signature: string,
+    signedText: string,
+    keys: readonly PackKey[],
+): Promise<boolean | null> {
+    const match = keys.find((k) => k.fingerprint === fingerprint);
+    if (!match) return null;
+    try {
+        const key = await crypto.subtle.importKey(
+            'spki', pemToDer(match.pem) as unknown as ArrayBuffer,
+            { name: 'Ed25519' }, false, ['verify'],
+        );
+        return await crypto.subtle.verify(
+            { name: 'Ed25519' }, key,
+            base64UrlDecode(signature) as unknown as ArrayBuffer,
+            new TextEncoder().encode(signedText),
+        );
+    } catch { return null; }
 }

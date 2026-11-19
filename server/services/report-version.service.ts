@@ -20,6 +20,8 @@ import { CredentialService } from './credential.service';
 import { resolveProfile } from '../lib/report-style/resolve';
 import { sha256Hex } from '../lib/sha256';
 import { SigningKeyService, base64UrlEncode, base64UrlDecode } from './signing-key.service';
+import type { PackKey } from '../lib/esign/chain-verify';
+import { verifySignatureWithArchivedKeys } from './data-package/archived-evidence.service';
 
 export interface SnapshotResult {
     versionNumber: number;
@@ -262,7 +264,7 @@ export class ReportVersionService {
         ) as unknown as Record<string, unknown>;
     }
 
-    async verifyByToken(token: string) {
+    async verifyByToken(token: string, archivedKeys: readonly PackKey[] = []) {
         const db = this.getDrizzle();
         const row = await db.select().from(reportVersions)
             .where(eq(reportVersions.verificationToken, token)).get();
@@ -284,16 +286,24 @@ export class ReportVersionService {
             const pub = row.keyFingerprint
                 ? await signing.getPublicKeyByFingerprint(row.tenantId, row.keyFingerprint)
                 : null;
-            // No key on file for this row: unverifiable, which is a different
-            // finding from a signature that failed. Kept apart so the page can
-            // stop short of blaming the document.
-            keyMissing = !pub;
             if (pub) {
                 signatureValid = await crypto.subtle.verify(
                     { name: 'Ed25519' }, pub.publicKey,
                     base64UrlDecode(row.signature!) as unknown as ArrayBuffer,
                     new TextEncoder().encode(recomputed),
                 );
+            } else if (row.keyFingerprint) {
+                // J5 — a restored report was signed by the SOURCE workspace's
+                // key, absent from this tenant's live table. Verify with the
+                // matching key from the byte-identical archive; null means no
+                // archived key matched (still keyMissing), never fabricated.
+                const archived = await verifySignatureWithArchivedKeys(
+                    row.keyFingerprint, row.signature!, recomputed, archivedKeys,
+                );
+                keyMissing = archived === null;
+                signatureValid = archived === true;
+            } else {
+                keyMissing = true;
             }
         }
 
