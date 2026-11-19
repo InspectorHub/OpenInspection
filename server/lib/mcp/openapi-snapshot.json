@@ -20256,6 +20256,45 @@
     "description": "Transitions reportStatus from submitted → in_progress. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
+    "operationId": "revertDataPackageImportStep",
+    "method": "POST",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/revert/step",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package import job",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package import job"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant and job",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant and job"
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/DataPackageImportRevertStepRequest"
+      }
+    },
+    "summary": "Undo one step of a data-package import",
+    "description": "Removes one bounded batch of rows/media the import wrote, in child-first order, leaving rows the owner edited and identity roots intact. Client loops until `done`. Requires a valid X-Data-Job token, an owner and a step-up."
+  },
+  {
     "operationId": "revertImportRun",
     "method": "POST",
     "pathTemplate": "/api/imports/{batchId}/revert",

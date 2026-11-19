@@ -139,6 +139,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'data.import': { family: 'starter_content', label: 'audit_action_data_import', meta: {}, status: { kind: 'live' } },
     'data.import.preview': { family: 'bulk_import', label: 'audit_action_data_import_preview', meta: { jobId: 'id', counts: 'name', sha256: 'name' }, status: { kind: 'live' } },
     'data.import.apply': { family: 'bulk_import', label: 'audit_action_data_import_apply', meta: { jobId: 'id', counts: 'name', sha256: 'name' }, status: { kind: 'live' } },
+    'data.import.revert': { family: 'bulk_import', label: 'audit_action_data_import_revert', meta: { jobId: 'id', counts: 'name', sha256: 'name' }, status: { kind: 'live' } },
     'defect_category.created': { family: 'defect_category', label: 'audit_action_defect_category_created', meta: { name: 'name' }, status: { kind: 'live' } },
     'defect_category.deleted': { family: 'defect_category', label: 'audit_action_defect_category_deleted', meta: {}, status: { kind: 'live' } },
     'defect_category.updated': { family: 'defect_category', label: 'audit_action_defect_category_updated', meta: {}, status: { kind: 'live' } },

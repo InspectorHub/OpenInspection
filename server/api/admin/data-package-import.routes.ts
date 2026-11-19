@@ -14,6 +14,7 @@ import { requireStepUp } from '../../lib/auth/step-up';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { DataPackagePreflightService } from '../../services/data-package/preflight.service';
 import { DataPackageApplyService } from '../../services/data-package/import-apply.service';
+import { DataPackageRevertService } from '../../services/data-package/import-revert.service';
 import { auditFromContext } from '../../lib/audit';
 import { authorize, envOf } from './data-package-route-helpers';
 import { getDeploymentProfile } from '../../lib/deployment-profile';
@@ -66,6 +67,22 @@ const BatchResponse = z.object({
     }),
 }).openapi('DataPackageImportBatchResponse');
 
+const RevertStepBody = z.object({
+    limit: z.number().int().min(1).max(1000).optional().describe('Max mappings to process in this step'),
+}).openapi('DataPackageImportRevertStepRequest');
+
+const RevertStepResponse = z.object({
+    success: z.literal(true),
+    data: z.object({
+        done: z.boolean(),
+        processed: z.number().int(),
+        deleted: z.record(z.string(), z.number().int()),
+        kept: z.array(z.object({ table: z.string(), newId: z.string(), reason: z.string() })),
+        mediaDeleted: z.number().int(),
+        errors: z.array(z.object({ table: z.string(), newId: z.string(), code: z.string() })),
+    }),
+}).openapi('DataPackageImportRevertStepResponse');
+
 const importPlanRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/data-package/jobs/:id/import/plan', operationId: 'getDataPackageImportPlan',
     summary: 'Get the referential write order for import',
@@ -105,6 +122,18 @@ const applyBatchRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['admin'], tier: 'extended' }));
 
+const revertStepRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/data-package/jobs/:id/revert/step', operationId: 'revertDataPackageImportStep',
+    summary: 'Undo one step of a data-package import',
+    description: 'Removes one bounded batch of rows/media the import wrote, in child-first order, leaving rows the owner edited and identity roots intact. Client loops until `done`. Requires a valid X-Data-Job token, an owner and a step-up.',
+    tags: ['admin'], middleware: [requireRole('owner'), requireStepUp('data-import-revert')],
+    request: { params: JobIdParam, headers: JobTokenHeader, body: { content: { 'application/json': { schema: RevertStepBody } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: RevertStepResponse } }, description: 'Revert step result' },
+        401: { description: 'Invalid token or step-up' },
+    },
+}, { scopes: ['admin'], tier: 'extended' }));
+
 const archiveListRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/data-package/jobs/:id/import/archives', operationId: 'listDataPackageImportArchives',
     summary: 'List imported evidence archives',
@@ -130,7 +159,7 @@ const archiveDetailRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['admin'], tier: 'extended' }));
 
-export const adminDataPackageImportRouteConfigs = [importPlanRoute, preflightRoute, applyBatchRoute, archiveListRoute, archiveDetailRoute] as const;
+export const adminDataPackageImportRouteConfigs = [importPlanRoute, preflightRoute, applyBatchRoute, revertStepRoute, archiveListRoute, archiveDetailRoute] as const;
 
 const app = createApiRouter();
 
@@ -175,6 +204,19 @@ app.openapi(applyBatchRoute, async (c) => {
     const result = await svc.applyBatch(job.tenantId, job.packageId ?? jobId, body.table, body.rows);
     auditFromContext(c, 'data.import.apply', 'bulk_import', {
         metadata: { jobId, counts: String((result.created[body.table] ?? 0) + (result.skipped[body.table] ?? 0)), sha256: job.sha256 ?? '' },
+    });
+    return c.json({ success: true as const, data: result }, 200);
+});
+
+app.openapi(revertStepRoute, async (c) => {
+    const jobId = c.req.valid('param').id;
+    const { job, db } = await authorize(c, jobId);
+    const body = c.req.valid('json');
+    const svc = new DataPackageRevertService(db, c.env.PHOTOS);
+    const result = await svc.revertStep(job.tenantId, job.packageId ?? jobId, body.limit);
+    const counts = Object.values(result.deleted).reduce((a, b) => a + b, 0);
+    auditFromContext(c, 'data.import.revert', 'bulk_import', {
+        metadata: { jobId, counts: String(counts), sha256: job.sha256 ?? '' },
     });
     return c.json({ success: true as const, data: result }, 200);
 });

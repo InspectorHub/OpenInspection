@@ -13,7 +13,7 @@ import { AppError } from '../../../server/lib/errors';
 import adminDataPackageRoutes from '../../../server/api/admin/admin-data-package';
 import adminDataPackageImportRoutes from '../../../server/api/admin/data-package-import.routes';
 import { tenants, auditLogs } from '../../../server/lib/db/schema';
-import { tenantDataJobs } from '../../../server/lib/db/schema/data-package';
+import { tenantDataJobs, importIdMap } from '../../../server/lib/db/schema/data-package';
 import { signJobToken } from '../../../server/lib/data-package/job-token';
 import { schemaFingerprint } from '../../../server/lib/data-package/fingerprint';
 import { issueStepUpToken } from '../../../server/lib/auth/step-up';
@@ -46,7 +46,8 @@ describe('data-package import routes', () => {
         a.route('/api/admin', adminDataPackageImportRoutes);
         return a;
     }
-    const env = () => ({ DB: dbD1, JWT_SECRET: SECRET, TENANT_CACHE: kv, APP_MODE: 'standalone' } as never);
+    const photosBucket = { delete: async () => {}, put: async () => ({}) } as never;
+    const env = () => ({ DB: dbD1, JWT_SECRET: SECRET, TENANT_CACHE: kv, PHOTOS: photosBucket, APP_MODE: 'standalone' } as never);
     const call = (path: string, init?: RequestInit) => app().request(`/api/admin${path}`, init, env());
     const json = (body: unknown, headers: Record<string, string> = {}) => ({
         method: 'POST', headers: { 'content-type': 'application/json', 'X-Data-Job': token, ...headers },
@@ -113,6 +114,32 @@ describe('data-package import routes', () => {
         expect(rows[0]!.tenantId).toBe(TENANT); // forged value ignored
         const audits = await db.select().from(auditLogs).all();
         expect(audits.some((x: any) => x.action === 'data.import.apply')).toBe(true);
+    });
+
+    it('reverts one step with step-up and audits data.import.revert', async () => {
+        // Seed a mapped row as if the apply engine wrote it.
+        await db.insert(contacts).values({
+            id: 'c-r', tenantId: TENANT, name: 'A', email: 'a@x.test', createdAt: new Date(1_700_000_000_000),
+        } as never);
+        await db.insert(importIdMap).values({
+            id: 'map-r', tenantId: TENANT, packageId: 'pkg-imp', tableName: 'contacts',
+            sourceId: 'c-r', newId: 'c-r', createdAt: new Date(1_700_000_000_000),
+        } as never);
+        const { token: stepUp } = await issueStepUpToken(kv, {
+            userId: USER, tenantId: TENANT, action: 'data-import-revert',
+        });
+        const noStep = await call(`/data-package/jobs/${JOB}/revert/step`, json({}, {
+            'X-Step-Up-Token': 'bogus',
+        }));
+        expect(noStep.status).toBe(403); // bad step-up
+        const r = await call(`/data-package/jobs/${JOB}/revert/step`, json({}, { 'X-Step-Up-Token': stepUp }));
+        expect(r.status).toBe(200);
+        const result = await r.json() as any;
+        expect(result.data.done).toBe(true);
+        expect(result.data.deleted.contacts).toBe(1);
+        expect(await db.select().from(contacts).all()).toHaveLength(0);
+        const audits = await db.select().from(auditLogs).all();
+        expect(audits.some((x: any) => x.action === 'data.import.revert')).toBe(true);
     });
 
     it('lists archives and 404s a missing one (read-only viewer)', async () => {
