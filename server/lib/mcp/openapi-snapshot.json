@@ -8439,6 +8439,54 @@
     "description": "Counts the tenant's canned comments that recommend this contractor type. Advisory only -- the delete is never blocked, because the reference is soft by design and published reports store the resolved label rather than the id."
   },
   {
+    "operationId": "getDataPackageImportArchive",
+    "method": "GET",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/import/archives/:packageId",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package import job",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package import job"
+          }
+        },
+        {
+          "name": "packageId",
+          "in": "path",
+          "required": true,
+          "description": "Package whose evidence archive is inspected",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Package whose evidence archive is inspected"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant and job",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant and job"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Inspect one imported evidence archive",
+    "description": "Reads back the archived evidence bytes and re-runs the chain verifier over them. Read-only: no signing record is created or modified. Requires a valid X-Data-Job token and an owner."
+  },
+  {
     "operationId": "getDataPackageImportPlan",
     "method": "GET",
     "pathTemplate": "/api/admin/data-package/jobs/:id/import/plan",
@@ -12278,6 +12326,43 @@
     },
     "summary": "List tenant custom holidays",
     "description": "Returns custom company closed days for the holiday catalog."
+  },
+  {
+    "operationId": "listDataPackageImportArchives",
+    "method": "GET",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/import/archives",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package import job",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package import job"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant and job",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant and job"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List imported evidence archives",
+    "description": "Lists the byte-identical evidence archives restored into this workspace. Read-only: no signing record is created or modified. Requires a valid X-Data-Job token and an owner."
   },
   {
     "operationId": "listDataPackageJobs",

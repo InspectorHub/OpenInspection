@@ -8,6 +8,7 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
+import { eq, and } from 'drizzle-orm';
 import { requireRole } from '../../lib/middleware/rbac';
 import { requireStepUp } from '../../lib/auth/step-up';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
@@ -18,6 +19,10 @@ import { authorize, envOf } from './data-package-route-helpers';
 import { getDeploymentProfile } from '../../lib/deployment-profile';
 import { schemaFingerprint } from '../../lib/data-package/fingerprint';
 import { IMPORT_TIERS } from '../../lib/data-package/import-plan';
+import { importArchives } from '../../lib/db/schema/data-package';
+import { EVIDENCE_ARCHIVE_KEY } from '../../services/data-package/import-archive.service';
+import { verifyEvidenceChainDetailed, type PackEvent, type PackKey } from '../../lib/esign/chain-verify';
+import { r2Get } from '../../lib/r2/objects';
 
 const JobIdParam = z.object({ id: z.string().describe('Id of the data-package import job') });
 const JobTokenHeader = z.object({ 'x-data-job': z.string().describe('Short-lived X-Data-Job token bound to this tenant and job') });
@@ -100,7 +105,32 @@ const applyBatchRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['admin'], tier: 'extended' }));
 
-export const adminDataPackageImportRouteConfigs = [importPlanRoute, preflightRoute, applyBatchRoute] as const;
+const archiveListRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/data-package/jobs/:id/import/archives', operationId: 'listDataPackageImportArchives',
+    summary: 'List imported evidence archives',
+    description: 'Lists the byte-identical evidence archives restored into this workspace. Read-only: no signing record is created or modified. Requires a valid X-Data-Job token and an owner.',
+    tags: ['admin'], middleware: [requireRole('owner')],
+    request: { params: JobIdParam, headers: JobTokenHeader },
+    responses: {
+        200: { description: 'Archive list' },
+        401: { description: 'Invalid X-Data-Job token' },
+    },
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const archiveDetailRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/data-package/jobs/:id/import/archives/:packageId', operationId: 'getDataPackageImportArchive',
+    summary: 'Inspect one imported evidence archive',
+    description: 'Reads back the archived evidence bytes and re-runs the chain verifier over them. Read-only: no signing record is created or modified. Requires a valid X-Data-Job token and an owner.',
+    tags: ['admin'], middleware: [requireRole('owner')],
+    request: { params: JobIdParam.extend({ packageId: z.string().min(1).describe('Package whose evidence archive is inspected') }), headers: JobTokenHeader },
+    responses: {
+        200: { description: 'Archive detail and verification verdict' },
+        401: { description: 'Invalid X-Data-Job token' },
+        404: { description: 'Archive not found' },
+    },
+}, { scopes: ['admin'], tier: 'extended' }));
+
+export const adminDataPackageImportRouteConfigs = [importPlanRoute, preflightRoute, applyBatchRoute, archiveListRoute, archiveDetailRoute] as const;
 
 const app = createApiRouter();
 
@@ -147,6 +177,41 @@ app.openapi(applyBatchRoute, async (c) => {
         metadata: { jobId, counts: String((result.created[body.table] ?? 0) + (result.skipped[body.table] ?? 0)), sha256: job.sha256 ?? '' },
     });
     return c.json({ success: true as const, data: result }, 200);
+});
+
+app.openapi(archiveListRoute, async (c) => {
+    const { id: jobId } = c.req.valid('param');
+    const { job, db } = await authorize(c, jobId);
+    const rows = await db.select().from(importArchives)
+        .where(eq(importArchives.tenantId, job.tenantId)).all();
+    return c.json({ success: true as const, data: {
+        archives: rows.map((r) => ({
+            packageId: r.packageId, sha256: r.sha256,
+            counts: r.counts ? JSON.parse(r.counts) : null,
+            createdAt: new Date(r.createdAt).toISOString(),
+        })),
+    } }, 200);
+});
+
+app.openapi(archiveDetailRoute, async (c) => {
+    const { id: jobId, packageId } = c.req.valid('param');
+    const { job, db } = await authorize(c, jobId);
+    const rows = await db.select().from(importArchives).where(and(
+        eq(importArchives.tenantId, job.tenantId), eq(importArchives.packageId, packageId),
+    )).limit(1).all();
+    const row = rows[0];
+    if (!row) return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Archive not found.' } }, 404);
+    const obj = await r2Get(c.env.PHOTOS, EVIDENCE_ARCHIVE_KEY(job.tenantId, packageId));
+    if (!obj) return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Archive bytes not found.' } }, 404);
+    const parsed = JSON.parse(await obj.text()) as { events: PackEvent[]; keys: PackKey[] };
+    const verdict = await verifyEvidenceChainDetailed(parsed.events ?? [], parsed.keys ?? []);
+    return c.json({ success: true as const, data: {
+        packageId: row.packageId, sha256: row.sha256,
+        counts: row.counts ? JSON.parse(row.counts) : null,
+        sourceIds: row.sourceIds ? JSON.parse(row.sourceIds) : [],
+        createdAt: new Date(row.createdAt).toISOString(),
+        verdict,
+    } }, 200);
 });
 
 export default app;

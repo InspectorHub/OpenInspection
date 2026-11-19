@@ -115,6 +115,14 @@ describe('data-package import routes', () => {
         expect(audits.some((x: any) => x.action === 'data.import.apply')).toBe(true);
     });
 
+    it('lists archives and 404s a missing one (read-only viewer)', async () => {
+        const list = await call(`/data-package/jobs/${JOB}/import/archives`, { headers: { 'X-Data-Job': token } });
+        expect(list.status).toBe(200);
+        expect((await list.json() as any).data.archives).toEqual([]);
+        const detail = await call(`/data-package/jobs/${JOB}/import/archives/no-such`, { headers: { 'X-Data-Job': token } });
+        expect(detail.status).toBe(404);
+    });
+
     it('refuses all three without a job token', async () => {
         const base = { headers: { 'content-type': 'application/json' }, method: 'POST' };
         const s1 = (await call(`/data-package/jobs/${JOB}/import/preflight`, { ...base, body: JSON.stringify(preflightBody()) })).status;
