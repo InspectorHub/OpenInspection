@@ -9,9 +9,9 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 117 |
-| Columns | 1335 |
-| Indexes (excluding primary keys) | 259 |
+| Tables | 118 |
+| Columns | 1342 |
+| Indexes (excluding primary keys) | 262 |
 | Database foreign keys (all legacy, frozen) | 51 |
 | Columns carrying a source comment | 619 (46%) |
 
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants` · `verify_export_attempts`
 
-That is 14 of 117. If a table you just added appears here,
+That is 14 of 118. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 224 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 225 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -975,6 +975,30 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_idempotency_expires` (expires_at)
+
+---
+
+## `import_id_map`
+
+<sub>server/lib/db/schema/data-package.ts · 7 columns · primary key `id`</sub>
+
+> Row-level import identity map. For every row an import creates or maps, one row records (package, table, source id) -> new id.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `package_id` | text | NN UQ IX |  |  | *App-layer reference to another row — no database foreign key.* |
+| `table_name` | text | NN UQ IX |  |  | *A name.* |
+| `source_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
+| `new_id` | text | NN IX |  |  | *App-layer reference to another row — no database foreign key.* |
+| `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
+
+**Indexes**
+
+- **UNIQUE** `uq_import_id_map_source` (tenant_id, package_id, table_name, source_id)
+- `idx_import_id_map_new_id` (tenant_id, table_name, new_id)
+- `idx_import_id_map_package` (tenant_id, package_id)
 
 ---
 

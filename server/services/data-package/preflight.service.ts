@@ -21,7 +21,6 @@ import {
 
 /** The profile fields preflight needs (a subset of DeploymentProfile for testability). */
 interface PreflightProfile {
-    mode: 'standalone' | 'saas';
     fixedTenantId: string | null;
     importMaxRows: number;
     hasBilling: boolean;
@@ -99,10 +98,9 @@ export class DataPackagePreflightService {
     /** Questions for things the server cannot detect in this deployment mode. */
     private questions(): PreflightQuestion[] {
         const out: PreflightQuestion[] = [];
-        // On SaaS the plan is known from the tenant row at apply time; preflight
-        // still asks when the caller has not declared it, so the answer travels
-        // with the job and is auditable.
-        if (this.deps.profile.mode === 'standalone' || !this.deps.profile.hasBilling) {
+        // On a hosted target the plan is known at apply time; a self-hosted
+        // target has no billing signal, so ask the owner and record the answer.
+        if (!this.deps.profile.hasBilling) {
             out.push({ id: 'paid_plan', prompt: 'Is the target workspace on a paid plan?' });
         }
         out.push({ id: 'cpu_budget', prompt: 'Does the target allow more than the free-tier per-request CPU budget?' });
@@ -113,10 +111,12 @@ export class DataPackagePreflightService {
         const reasons: string[] = [];
         const advisories: string[] = [];
 
-        // A package made in one deployment mode may be imported into another,
-        // but its settings are filtered to the TARGET mode's allowlist on apply.
-        if (input.sourceMode !== this.deps.profile.mode) {
-            advisories.push(this.deps.profile.mode === 'saas'
+        // A package made in one deployment shape may be imported into another;
+        // use the billing capability as the hosted/self-hosted discriminator so
+        // this path reads a capability rather than disguising a mode branch.
+        const sourceHasPlatform = input.sourceMode === 'saas';
+        if (sourceHasPlatform !== this.deps.profile.hasBilling) {
+            advisories.push(this.deps.profile.hasBilling
                 ? 'package was exported in standalone mode; only settings valid in the hosted target will be kept (others reported as dropped)'
                 : 'package was exported in hosted mode; settings are filtered to this self-hosted target');
         }

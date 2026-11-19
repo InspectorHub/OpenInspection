@@ -16,7 +16,6 @@ import { NO_STARTER_CONTENT } from '../../../server/services/starter-content/con
 const TENANT = 'tenant-target';
 const SOURCE = 'tenant-source';
 const profile = {
-    mode: 'standalone' as const,
     fixedTenantId: SOURCE, // keep-ids precondition: target configured id == source
     importMaxRows: 1_000,
     hasBilling: false,
