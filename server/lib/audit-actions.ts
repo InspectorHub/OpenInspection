@@ -139,6 +139,8 @@ export type AuditAction =
     | 'rating_system.deleted'
     | 'data.export'
     | 'data.import'
+    | 'data.import.preview'
+    | 'data.import.apply'
     // Import runs. Ten, not one: a run is a sequence of separate decisions by
     // separate people, and a trail that recorded them all as 'data.import'
     // could not answer the question it exists for — who chose this. The last

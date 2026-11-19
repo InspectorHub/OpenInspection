@@ -443,6 +443,45 @@
     "description": "Mints the sealed double-opt-in token for the contact row the notice is addressed to — the agent's own contact in the sending company. Keyed to a notice the caller already owns, so it cannot be aimed at anyone else."
   },
   {
+    "operationId": "applyDataPackageImportBatch",
+    "method": "POST",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/import/batches",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package import job",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package import job"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant and job",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant and job"
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/DataPackageImportBatchRequest"
+      }
+    },
+    "summary": "Apply one batch of package rows",
+    "description": "Writes one batch of one table in referential order, idempotent by source id, tenant-scoped from the job. Bad rows are reported, not fatal. Requires a valid X-Data-Job token, an owner and a step-up."
+  },
+  {
     "operationId": "applyImportRun",
     "method": "POST",
     "pathTemplate": "/api/imports/{batchId}/apply",
@@ -5803,6 +5842,7 @@
               "audit_log",
               "availability_override",
               "bulk_export",
+              "bulk_import",
               "calendar_connection",
               "client",
               "comment",
@@ -8397,6 +8437,43 @@
     },
     "summary": "Count what deleting a contractor type would orphan",
     "description": "Counts the tenant's canned comments that recommend this contractor type. Advisory only -- the delete is never blocked, because the reference is soft by design and published reports store the resolved label rather than the id."
+  },
+  {
+    "operationId": "getDataPackageImportPlan",
+    "method": "GET",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/import/plan",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package import job",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package import job"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant and job",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant and job"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Get the referential write order for import",
+    "description": "Returns the table tiers the importer writes in, so each row is applied after its package-table parents. Read-only. Requires a valid X-Data-Job token and an owner."
   },
   {
     "operationId": "getDataPackageJob",
@@ -18214,6 +18291,45 @@
     },
     "summary": "Save integration secrets (POST alias)",
     "description": "POST alias for PUT /secrets. Accepts the same body."
+  },
+  {
+    "operationId": "preflightDataPackageImport",
+    "method": "POST",
+    "pathTemplate": "/api/admin/data-package/jobs/:id/import/preflight",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the data-package import job",
+          "schema": {
+            "type": "string",
+            "description": "Id of the data-package import job"
+          }
+        },
+        {
+          "name": "x-data-job",
+          "in": "header",
+          "required": true,
+          "description": "Short-lived X-Data-Job token bound to this tenant and job",
+          "schema": {
+            "type": "string",
+            "description": "Short-lived X-Data-Job token bound to this tenant and job"
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/DataPackagePreflightRequest"
+      }
+    },
+    "summary": "Preflight a declared package against the target workspace",
+    "description": "Checks format/version window, column fingerprint, row cap, blank-target keep-ids precondition and estimates D1 writes/days. Read-only: no package row is written. Requires a valid X-Data-Job token and an owner."
   },
   {
     "operationId": "previewCalendarBlockConflicts",
