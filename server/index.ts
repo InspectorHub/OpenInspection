@@ -12,6 +12,7 @@ import { inspectorPaletteMiddleware } from './lib/middleware/inspector-palette';
 import { touchLastActiveMiddleware } from './lib/middleware/touch-last-active';
 import { registerReportAuthoringGuard } from './lib/inspection/report-authoring-guard';
 import { registerPublishedReportLockGuard } from './lib/inspection/report-lock-guard';
+import { registerImportedInspectionGuard } from './lib/inspection/imported-inspection-guard';
 import { registerInspectionScopeGuards } from './lib/middleware/inspection-scope';
 import { tenantRouter } from './features/tenant-routing';
 import { diMiddleware } from './lib/middleware/di';
@@ -295,6 +296,8 @@ registerInspectionScopeGuards(app);
 registerReportAuthoringGuard(app);
 // Right after the capability guard: a published report's content is not written until "Edit and republish".
 registerPublishedReportLockGuard(app);
+// After the other inspection guards: an inspection restored from a package is an immutable copy.
+registerImportedInspectionGuard(app);
 
 // API Routes
 
