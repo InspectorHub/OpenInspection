@@ -164,6 +164,6 @@ export { verifyExportAttempts } from './verify-export-attempts';
 export type { VerifyExportAttempt } from './verify-export-attempts';
 // One export or import of a company's data package: stage, resumable cursor, sizes, lease. One active job per company.
 export {
-    tenantDataJobs, importIdMap, DATA_JOB_KINDS, DATA_JOB_STATUSES, DATA_JOB_STAGES, DATA_JOB_ERROR_CODES, DATA_JOB_TEXT_MAX_CHARS,
+    tenantDataJobs, importIdMap, importArchives, DATA_JOB_KINDS, DATA_JOB_STATUSES, DATA_JOB_STAGES, DATA_JOB_ERROR_CODES, DATA_JOB_TEXT_MAX_CHARS,
 } from './data-package';
-export type { TenantDataJob, NewTenantDataJob, ImportIdMapRow, NewImportIdMapRow } from './data-package';
+export type { TenantDataJob, NewTenantDataJob, ImportIdMapRow, NewImportIdMapRow, ImportArchiveRow, NewImportArchiveRow } from './data-package';

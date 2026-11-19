@@ -9,11 +9,11 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 118 |
-| Columns | 1342 |
-| Indexes (excluding primary keys) | 263 |
+| Tables | 119 |
+| Columns | 1349 |
+| Indexes (excluding primary keys) | 265 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 619 (46%) |
+| Columns carrying a source comment | 622 (46%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants` · `verify_export_attempts`
 
-That is 14 of 118. If a table you just added appears here,
+That is 14 of 119. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 225 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 226 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -975,6 +975,29 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_idempotency_expires` (expires_at)
+
+---
+
+## `import_archives`
+
+<sub>server/lib/db/schema/data-package.ts · 7 columns · primary key `id`</sub>
+
+> One row per imported evidence/history archive. The archive BYTES live in R2 under `evidence-archives/<tenantId>/<packageId>/`; this row is the ledger: the package's own sha256 and counts, plus the source ids whose evidence is preserved.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `package_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
+| `sha256` | text | NN |  |  | sha256 of the archived evidence bytes |
+| `counts` | text |  |  |  | serialized per-file counts (opaque to the DB) |
+| `source_ids` | text |  |  |  | serialized source ids whose evidence is archived |
+| `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
+
+**Indexes**
+
+- **UNIQUE** `uq_import_archives_package` (tenant_id, package_id)
+- `idx_import_archives_tenant_id` (tenant_id, id)
 
 ---
 

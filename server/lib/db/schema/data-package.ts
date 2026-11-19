@@ -128,3 +128,27 @@ export const importIdMap = sqliteTable('import_id_map', {
 
 export type ImportIdMapRow = typeof importIdMap.$inferSelect;
 export type NewImportIdMapRow = typeof importIdMap.$inferInsert;
+
+/**
+ * One row per imported evidence/history archive. The archive BYTES live in R2
+ * under `evidence-archives/<tenantId>/<packageId>/`; this row is the ledger:
+ * the package's own sha256 and counts, plus the source ids whose evidence is
+ * preserved. No signing row is written to any live table — the archive is a
+ * byte-identical copy verified with the same chain verifier as an evidence pack.
+ * The row is never removed by revert: imported evidence stays auditable.
+ */
+export const importArchives = sqliteTable('import_archives', {
+    id:         text('id').primaryKey(),
+    tenantId:   text('tenant_id').notNull(),
+    packageId:  text('package_id').notNull(),
+    sha256:     text('sha256').notNull(),          // sha256 of the archived evidence bytes
+    counts:     text('counts'),                    // serialized per-file counts (opaque to the DB)
+    sourceIds:  text('source_ids'),                // serialized source ids whose evidence is archived
+    createdAt:  integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    uniqueIndex('uq_import_archives_package').on(t.tenantId, t.packageId),
+    index('idx_import_archives_tenant_id').on(t.tenantId, t.id),
+]);
+
+export type ImportArchiveRow = typeof importArchives.$inferSelect;
+export type NewImportArchiveRow = typeof importArchives.$inferInsert;

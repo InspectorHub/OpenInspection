@@ -10,7 +10,7 @@ import {
     verifyExportAttempts, syncOutbox, parkedCmdEvents, processedCmdEvents, processedWebhookEvents,
     idempotencyKeys, nativeClientSeen, offlineImportApplied, inspectionTombstones, notifications,
     notificationPreferences, tenantCustomHolidays, permissionTemplates, migrationBatches, migrationRows,
-    integrationTestResults, tenantDataJobs, importIdMap,
+    integrationTestResults, tenantDataJobs, importIdMap, importArchives,
 } from '../db/schema';
 import {
     archiveTable, exportTable, outTable, partialTable, withholdTable,
@@ -146,4 +146,5 @@ export const TENANT_FAMILY: readonly ClassifiedTable[] = [
     outTable(integrationTestResults, 'direct', EPHEMERAL),
     outTable(tenantDataJobs, 'direct', 'Lease and progress ledger of in-flight data-package jobs. It records the source deployment\'s device labels, expirations and byte counts, and the job records are not transferred; the destination creates its own jobs when it runs an export or import.'),
     outTable(importIdMap, 'direct', 'Import identity map: source-to-new id anchors from a restore, local to the destination. The destination rebuilds its own map; source mappings are not transferred.'),
+    outTable(importArchives, 'direct', 'Ledger of byte-identical evidence archives restored from a package. The archive bytes live in R2 and are not tenant data to be exported again; the destination keeps its own archives.'),
 ];
