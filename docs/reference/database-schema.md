@@ -11,7 +11,7 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 |---|---|
 | Tables | 118 |
 | Columns | 1342 |
-| Indexes (excluding primary keys) | 262 |
+| Indexes (excluding primary keys) | 263 |
 | Database foreign keys (all legacy, frozen) | 51 |
 | Columns carrying a source comment | 619 (46%) |
 
@@ -986,7 +986,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `package_id` | text | NN UQ IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `table_name` | text | NN UQ IX |  |  | *A name.* |
@@ -999,6 +999,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - **UNIQUE** `uq_import_id_map_source` (tenant_id, package_id, table_name, source_id)
 - `idx_import_id_map_new_id` (tenant_id, table_name, new_id)
 - `idx_import_id_map_package` (tenant_id, package_id)
+- `idx_import_id_map_tenant_id` (tenant_id, id)
 
 ---
 

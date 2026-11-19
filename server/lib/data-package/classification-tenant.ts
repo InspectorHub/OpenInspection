@@ -10,7 +10,7 @@ import {
     verifyExportAttempts, syncOutbox, parkedCmdEvents, processedCmdEvents, processedWebhookEvents,
     idempotencyKeys, nativeClientSeen, offlineImportApplied, inspectionTombstones, notifications,
     notificationPreferences, tenantCustomHolidays, permissionTemplates, migrationBatches, migrationRows,
-    integrationTestResults, tenantDataJobs,
+    integrationTestResults, tenantDataJobs, importIdMap,
 } from '../db/schema';
 import {
     archiveTable, exportTable, outTable, partialTable, withholdTable,
@@ -145,4 +145,5 @@ export const TENANT_FAMILY: readonly ClassifiedTable[] = [
     outTable(migrationRows, 'direct', 'Staging of earlier vendor imports; holds other parties\' personal data. Not part of the tenant record.'),
     outTable(integrationTestResults, 'direct', EPHEMERAL),
     outTable(tenantDataJobs, 'direct', 'Lease and progress ledger of in-flight data-package jobs. It records the source deployment\'s device labels, expirations and byte counts, and the job records are not transferred; the destination creates its own jobs when it runs an export or import.'),
+    outTable(importIdMap, 'direct', 'Import identity map: source-to-new id anchors from a restore, local to the destination. The destination rebuilds its own map; source mappings are not transferred.'),
 ];

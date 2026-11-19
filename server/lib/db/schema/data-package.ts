@@ -118,6 +118,8 @@ export const importIdMap = sqliteTable('import_id_map', {
 }, (t) => [
     // One mapping per (package, table, source row) — the idempotency/replay key.
     uniqueIndex('uq_import_id_map_source').on(t.tenantId, t.packageId, t.tableName, t.sourceId),
+    // Tenant-led paging index (the per-table export/scan convention).
+    index('idx_import_id_map_tenant_id').on(t.tenantId, t.id),
     // Quota / read-only checks ask "which imported inspections live here" by new id.
     index('idx_import_id_map_new_id').on(t.tenantId, t.tableName, t.newId),
     // Revert lists all rows a package wrote.
