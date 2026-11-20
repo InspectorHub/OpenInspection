@@ -15,6 +15,9 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { DataPackagePreflightService } from '../../services/data-package/preflight.service';
 import { DataPackageApplyService } from '../../services/data-package/import-apply.service';
 import { DataPackageRevertService } from '../../services/data-package/import-revert.service';
+import { DataPackageMediaImportService } from '../../services/data-package/import-media.service';
+import { DataPackageArchiveImportService } from '../../services/data-package/import-archive.service';
+import { readBoundedBody } from '../../lib/bounded-body';
 import { auditFromContext } from '../../lib/audit';
 import { authorize, envOf } from './data-package-route-helpers';
 import { getDeploymentProfile } from '../../lib/deployment-profile';
@@ -27,6 +30,37 @@ import { r2Get } from '../../lib/r2/objects';
 
 const JobIdParam = z.object({ id: z.string().describe('Id of the data-package import job') });
 const JobTokenHeader = z.object({ 'x-data-job': z.string().describe('Short-lived X-Data-Job token bound to this tenant and job') });
+
+/** One media object's bytes travel in the body; its metadata in the query. A
+ *  single object is bounded well below the Worker body limit (photos/videos are
+ *  individually stored objects). */
+const MEDIA_OBJECT_MAX_BYTES = 64 * 1024 * 1024;
+const MediaQuery = z.object({
+    key: z.string().min(1).max(1024).describe('Source object key from the package media index'),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/).describe('SHA-256 hex digest of the media bytes'),
+    bytes: z.coerce.number().int().nonnegative().describe('Declared byte length of the media object'),
+    content_type: z.string().min(1).max(128).describe('MIME content type of the media object'),
+    entry: z.string().min(1).max(1024).describe('Zip entry name the media was read from'),
+    volume: z.string().min(1).max(256).describe('Package volume name containing this media object'),
+}).openapi('DataPackageMediaUploadQuery');
+// Events are validated with the exact PackEvent shape the chain verifier reads.
+// A missing `prevHash` would make verifyEvidenceChainDetailed call
+// `prev.slice(0,12)` on undefined and throw; strict validation turns that into
+// a 400 instead of a 500. Fields mirror `PackEvent` (camelCase) — the same shape
+// DataPackageArchiveImportService stores and the import-archive tests use.
+const ArchiveEvent = z.object({
+    id: z.string(),
+    event: z.string(),
+    payloadJson: z.string(),
+    prevHash: z.string().nullable(),
+    hash: z.string(),
+    signature: z.string(),
+    keyFingerprint: z.string(),
+});
+const ArchiveBody = z.object({
+    events: z.array(ArchiveEvent).max(100000),
+    keys: z.array(z.object({ fingerprint: z.string(), pem: z.string() })).max(10000),
+}).openapi('DataPackageArchiveUploadRequest');
 
 const PreflightBody = z.object({
     formatVersion: z.number().int(),
@@ -159,7 +193,37 @@ const archiveDetailRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['admin'], tier: 'extended' }));
 
-export const adminDataPackageImportRouteConfigs = [importPlanRoute, preflightRoute, applyBatchRoute, revertStepRoute, archiveListRoute, archiveDetailRoute] as const;
+const mediaUploadRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/data-package/jobs/:id/import/media', operationId: 'uploadDataPackageImportMedia',
+    summary: 'Upload one media object for the import',
+    description: 'Copies one package media object into R2 under the target tenant, verifying its sha256 on write. Metadata is in the query string; raw bytes in the body with Content-Length. Requires a valid X-Data-Job token, an owner and a step-up.',
+    tags: ['admin'], middleware: [requireRole('owner'), requireStepUp('data-import-apply')],
+    request: {
+        params: JobIdParam, headers: JobTokenHeader, query: MediaQuery,
+        body: { content: { 'application/octet-stream': { schema: z.string() } } },
+    },
+    responses: {
+        200: { description: 'Media stored (or already imported)' },
+        400: { description: 'Malformed request' },
+        411: { description: 'Content-Length required' },
+        413: { description: 'Object too large' },
+        422: { description: 'Checksum mismatch / unsafe key / write failed' },
+    },
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const archiveUploadRoute = createRoute(withMcpMetadata({
+    method: 'put', path: '/data-package/jobs/:id/import/archive', operationId: 'uploadDataPackageImportArchive',
+    summary: 'Upload the evidence archive for the import',
+    description: 'Stores the package evidence (events + signing keys) as a byte-identical R2 object plus a ledger row, verified with the same chain verifier as a downloadable pack. Idempotent by (tenant, package). Requires a valid X-Data-Job token, an owner and a step-up.',
+    tags: ['admin'], middleware: [requireRole('owner'), requireStepUp('data-import-apply')],
+    request: { params: JobIdParam, headers: JobTokenHeader, body: { content: { 'application/json': { schema: ArchiveBody } } } },
+    responses: {
+        200: { description: 'Archive stored (or already archived) with verification verdict' },
+        400: { description: 'Malformed body' },
+    },
+}, { scopes: ['admin'], tier: 'extended' }));
+
+export const adminDataPackageImportRouteConfigs = [importPlanRoute, preflightRoute, applyBatchRoute, revertStepRoute, mediaUploadRoute, archiveUploadRoute, archiveListRoute, archiveDetailRoute] as const;
 
 const app = createApiRouter();
 
@@ -219,6 +283,56 @@ app.openapi(revertStepRoute, async (c) => {
         metadata: { jobId, counts: String(counts), sha256: job.sha256 ?? '' },
     });
     return c.json({ success: true as const, data: result }, 200);
+});
+
+app.openapi(mediaUploadRoute, async (c) => {
+    const jobId = c.req.valid('param').id;
+    const { job, db } = await authorize(c, jobId);
+    const q = c.req.valid('query');
+    const body = await readBoundedBody(c.req.raw, MEDIA_OBJECT_MAX_BYTES, 413);
+    if (!body.ok) return c.json({ success: false, error: { code: 'BAD_BODY', message: 'Media body missing, malformed or too large.' } }, body.status);
+    const svc = new DataPackageMediaImportService(db, c.env.PHOTOS, {
+        now: () => Date.now(), genId: () => crypto.randomUUID(), keepIds: false,
+    });
+    const result = await svc.importOne(job.tenantId, job.packageId ?? jobId, {
+        key: q.key, entry: q.entry, bytes: q.bytes, sha256: q.sha256,
+        volume: q.volume, content_type: q.content_type, referenced_by: [],
+    }, body.bytes);
+    if (result.ok) {
+        auditFromContext(c, 'data.import.apply', 'bulk_import', {
+            metadata: { jobId, counts: '1', sha256: result.sha256 },
+        });
+        return c.json({ success: true as const, data: { ok: true, newKey: result.newKey, sha256: result.sha256 } }, 200);
+    }
+    if (result.code === 'already_imported') {
+        return c.json({ success: true as const, data: { ok: false, code: result.code } }, 200);
+    }
+    return c.json({ success: false, error: { code: 'MEDIA_REJECTED', message: 'Media object rejected.', reason: result.code } }, 422);
+});
+
+app.openapi(archiveUploadRoute, async (c) => {
+    const jobId = c.req.valid('param').id;
+    const { job, db } = await authorize(c, jobId);
+    const body = c.req.valid('json');
+    const events: PackEvent[] = body.events;
+    const keys = body.keys;
+    // Source ids are the distinct event ids the archived chain covers; they let
+    // the read-side viewer attribute archived evidence to envelope ids.
+    const sourceIds = [...new Set(events.map((e) => e.id))];
+    const bytes = new TextEncoder().encode(JSON.stringify({ events, keys }));
+    const svc = new DataPackageArchiveImportService(db, c.env.PHOTOS, {
+        now: () => Date.now(), genId: () => crypto.randomUUID(),
+    });
+    const result = await svc.archive(job.tenantId, job.packageId ?? jobId, events, keys, bytes, sourceIds);
+    if (!result.ok) {
+        return c.json({ success: true as const, data: { ok: false, code: result.code } }, 200);
+    }
+    auditFromContext(c, 'data.import.apply', 'bulk_import', {
+        metadata: { jobId, counts: String(events.length), sha256: result.sha256 },
+    });
+    return c.json({ success: true as const, data: {
+        ok: true, verdict: result.verdict, sha256: result.sha256, key: result.key,
+    } }, 200);
 });
 
 app.openapi(archiveListRoute, async (c) => {

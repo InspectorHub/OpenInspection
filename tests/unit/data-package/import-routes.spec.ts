@@ -18,6 +18,7 @@ import { signJobToken } from '../../../server/lib/data-package/job-token';
 import { schemaFingerprint } from '../../../server/lib/data-package/fingerprint';
 import { issueStepUpToken } from '../../../server/lib/auth/step-up';
 import { contacts } from '../../../server/lib/db/schema';
+import { sha256Hex } from '../../../server/lib/sha256';
 
 const TENANT = 't-import';
 const USER = 'u-import';
@@ -46,7 +47,18 @@ describe('data-package import routes', () => {
         a.route('/api/admin', adminDataPackageImportRoutes);
         return a;
     }
-    const photosBucket = { delete: async () => {}, put: async () => ({}) } as never;
+    const bucketObjects = new Map<string, Uint8Array>();
+    const photosBucket = {
+        delete: async (k: string) => { bucketObjects.delete(k); },
+        put: async (k: string, bytes: ArrayBuffer | Uint8Array) => {
+            bucketObjects.set(k, new Uint8Array(bytes as ArrayBuffer));
+            return {};
+        },
+        get: async (k: string) => {
+            const b = bucketObjects.get(k);
+            return b ? { text: async () => new TextDecoder().decode(b) } : null;
+        },
+    } as never;
     const env = () => ({ DB: dbD1, JWT_SECRET: SECRET, TENANT_CACHE: kv, PHOTOS: photosBucket, APP_MODE: 'standalone' } as never);
     const call = (path: string, init?: RequestInit) => app().request(`/api/admin${path}`, init, env());
     const json = (body: unknown, headers: Record<string, string> = {}) => ({
@@ -58,6 +70,7 @@ describe('data-package import routes', () => {
         const setup = createTestDb();
         db = setup.db;
         dbD1 = d1For(setup.db);
+        bucketObjects.clear();
         const store = new Map<string, string>();
         kv = {
             get: async (k: string) => store.get(k) ?? null,
@@ -160,5 +173,107 @@ describe('data-package import routes', () => {
         expect(s1).toBeGreaterThanOrEqual(400);
         expect(s2).toBeGreaterThanOrEqual(400);
         expect(s3).toBeGreaterThanOrEqual(400);
+    });
+
+    // --- media upload (POST /import/media) -----------------------------------
+    const mediaQuery = (sha: string) =>
+        `?key=${encodeURIComponent('t/insp/i1/photos/a.jpg')}&sha256=${sha}&bytes=5&content_type=image%2Fjpeg&entry=media%2Fa.jpg&volume=media-001.zip`;
+    const rawPost = (body: Uint8Array, headers: Record<string, string> = {}) => ({
+        method: 'POST' as const,
+        headers: {
+            'content-type': 'application/octet-stream', 'content-length': String(body.length),
+            'X-Data-Job': token, ...headers,
+        },
+        body: body as unknown as BodyInit,
+    });
+
+    it('uploads media bytes to R2 under the target tenant (step-up gated)', async () => {
+        const bytes = new TextEncoder().encode('abcde');
+        const sha = await sha256Hex(bytes);
+        const { token: stepUp } = await issueStepUpToken(kv, {
+            userId: USER, tenantId: TENANT, action: 'data-import-apply',
+        });
+        const noStep = await call(`/data-package/jobs/${JOB}/import/media${mediaQuery(sha)}`, rawPost(bytes));
+        expect(noStep.status).toBe(403);
+        const r = await call(`/data-package/jobs/${JOB}/import/media${mediaQuery(sha)}`, rawPost(bytes, { 'X-Step-Up-Token': stepUp }));
+        expect(r.status).toBe(200);
+        const data = (await r.json() as any).data;
+        expect(data.ok).toBe(true);
+        expect(data.newKey).toContain(TENANT);
+        expect(bucketObjects.has(data.newKey)).toBe(true);
+    });
+
+    it('rejects media whose sha256 does not match the bytes (422)', async () => {
+        const bytes = new TextEncoder().encode('abcde');
+        const { token: stepUp } = await issueStepUpToken(kv, {
+            userId: USER, tenantId: TENANT, action: 'data-import-apply',
+        });
+        const r = await call(`/data-package/jobs/${JOB}/import/media${mediaQuery('f'.repeat(64))}`, rawPost(bytes, { 'X-Step-Up-Token': stepUp }));
+        expect(r.status).toBe(422);
+        expect(bucketObjects.size).toBe(0);
+    });
+
+    it('requires Content-Length for media upload (411)', async () => {
+        const bytes = new TextEncoder().encode('abcde');
+        const sha = await sha256Hex(bytes);
+        const { token: stepUp } = await issueStepUpToken(kv, {
+            userId: USER, tenantId: TENANT, action: 'data-import-apply',
+        });
+        const init = rawPost(bytes, { 'X-Step-Up-Token': stepUp });
+        const headers = { ...init.headers } as Record<string, string>;
+        delete headers['content-length'];
+        const r = await call(`/data-package/jobs/${JOB}/import/media${mediaQuery(sha)}`, { ...init, headers });
+        expect(r.status).toBe(411);
+    });
+
+    // --- archive upload (PUT /import/archive) --------------------------------
+    it('uploads an evidence archive and returns a verdict (step-up gated, idempotent)', async () => {
+        const bytes = new TextEncoder().encode(JSON.stringify({ events: [], keys: [] }));
+        const { token: stepUp } = await issueStepUpToken(kv, {
+            userId: USER, tenantId: TENANT, action: 'data-import-apply',
+        });
+        const body = { events: [], keys: [] };
+        const put = (headers: Record<string, string> = {}) => ({
+            method: 'PUT' as const,
+            headers: { 'content-type': 'application/json', 'X-Data-Job': token, ...headers },
+            body: JSON.stringify(body),
+        });
+        const noStep = await call(`/data-package/jobs/${JOB}/import/archive`, put());
+        expect(noStep.status).toBe(403);
+        const r = await call(`/data-package/jobs/${JOB}/import/archive`, put({ 'X-Step-Up-Token': stepUp }));
+        expect(r.status).toBe(200);
+        const data = (await r.json() as any).data;
+        expect(data.ok).toBe(true);
+        expect(data.verdict).toBeDefined();
+        expect(bucketObjects.has(`evidence-archives/${TENANT}/pkg-imp/`)).toBe(true);
+        // replay: step-up is single-use, so mint another for the second call
+        const { token: stepUp2 } = await issueStepUpToken(kv, {
+            userId: USER, tenantId: TENANT, action: 'data-import-apply',
+        });
+        const again = await call(`/data-package/jobs/${JOB}/import/archive`, put({ 'X-Step-Up-Token': stepUp2 }));
+        expect((await again.json() as any).data.ok).toBe(false);
+    });
+
+    it('rejects a malformed archive body (400)', async () => {
+        const { token: stepUp } = await issueStepUpToken(kv, {
+            userId: USER, tenantId: TENANT, action: 'data-import-apply',
+        });
+        const r = await call(`/data-package/jobs/${JOB}/import/archive`, {
+            method: 'PUT', headers: { 'content-type': 'application/json', 'X-Data-Job': token, 'X-Step-Up-Token': stepUp },
+            body: JSON.stringify({ events: 'not-an-array', keys: [] }),
+        });
+        expect(r.status).toBe(400);
+    });
+
+    it('rejects an event missing prevHash before the verifier can crash (400, not 500)', async () => {
+        const { token: stepUp } = await issueStepUpToken(kv, {
+            userId: USER, tenantId: TENANT, action: 'data-import-apply',
+        });
+        const badEvent = { id: 'e1', event: 'signer.signed', payloadJson: '{}', hash: 'h', signature: 's', keyFingerprint: 'f' };
+        const r = await call(`/data-package/jobs/${JOB}/import/archive`, {
+            method: 'PUT', headers: { 'content-type': 'application/json', 'X-Data-Job': token, 'X-Step-Up-Token': stepUp },
+            body: JSON.stringify({ events: [badEvent], keys: [] }),
+        });
+        expect(r.status).toBe(400);
     });
 });
