@@ -8,6 +8,22 @@ import { logger } from '../../lib/logger';
 import { FREE_TIER_CAPS, allowanceWindow, type AiCappedMetric, type AiTierCaps, type TenantPlan } from './policy';
 
 /**
+ * A row restored from a data package is not a NEW inspection and must not eat
+ * the free-tier monthly allowance. The import writes an anchor into
+ * `import_id_map` (table_name='inspections', new_id=<the live row id>), so the
+ * cap's row-count subqueries exclude any inspection whose id is such a new_id.
+ *
+ * Correlated on tenant_id and scoped to table_name so an unrelated map row
+ * (another tenant, or a media/child-table mapping) cannot exempt an inspection.
+ * No new `?` bind parameters: the predicate is a fixed literal plus column
+ * correlations, so the numbered placeholders in the guard's statements keep
+ * their positions. `i` is the inspections alias already present in every COUNT
+ * below.
+ */
+const EXCLUDE_IMPORTED_INSPECTIONS =
+  `AND NOT EXISTS (SELECT 1 FROM import_id_map m WHERE m.tenant_id = i.tenant_id AND m.table_name = 'inspections' AND m.new_id = i.id)`;
+
+/**
  * Free-tier usage-quota guard. Two calling shapes:
  *  - `consumeInspection` — atomic increment-if-below-cap, called at inspection
  *    creation. Free+enforced tenants are blocked at the cap; every other tier
@@ -93,7 +109,12 @@ export class PlanQuotaGuard {
    *  counts rows and the caller inserts them only after this returns, N looped
    *  calls all read the same count and all pass — a 3-sub request would take a
    *  tenant from 3 inspections to 6. One call with `count: 3` is the same single
-   *  statement and admits the batch only if the whole batch fits. */
+   *  statement and admits the batch only if the whole batch fits.
+   *
+   *  Restored inspections do not count. Their ids are `new_id` anchors in
+   *  `import_id_map` (table_name='inspections'), and every row-count predicate
+   *  below excludes them — bringing back a tenant's own history is not the same
+   *  as that tenant creating a new inspection this month. */
   async consumeInspection(tenantId: string, count = 1): Promise<void> {
     const tier = await readTenantTier(this.db, tenantId);
 
@@ -131,12 +152,12 @@ export class PlanQuotaGuard {
     const res = await this.db.prepare(
       `INSERT INTO usage_counters (tenant_id, metric, period_key, value, updated_at)
        SELECT ?1, 'inspections', 'lifetime', cnt.n + ?4, ?2
-       FROM (SELECT COUNT(*) AS n FROM inspections i WHERE i.tenant_id = ?1 AND i.created_at >= ?5) AS cnt
+       FROM (SELECT COUNT(*) AS n FROM inspections i WHERE i.tenant_id = ?1 AND i.created_at >= ?5 ${EXCLUDE_IMPORTED_INSPECTIONS}) AS cnt
        WHERE cnt.n + ?4 <= ?3
        ON CONFLICT(tenant_id, metric, period_key)
-       DO UPDATE SET value = (SELECT COUNT(*) FROM inspections i WHERE i.tenant_id = excluded.tenant_id AND i.created_at >= ?5) + ?4,
+       DO UPDATE SET value = (SELECT COUNT(*) FROM inspections i WHERE i.tenant_id = excluded.tenant_id AND i.created_at >= ?5 ${EXCLUDE_IMPORTED_INSPECTIONS}) + ?4,
                      updated_at = excluded.updated_at
-       WHERE (SELECT COUNT(*) FROM inspections i WHERE i.tenant_id = excluded.tenant_id AND i.created_at >= ?5) + ?4 <= ?3`,
+       WHERE (SELECT COUNT(*) FROM inspections i WHERE i.tenant_id = excluded.tenant_id AND i.created_at >= ?5 ${EXCLUDE_IMPORTED_INSPECTIONS}) + ?4 <= ?3`,
     ).bind(tenantId, now.getTime(), cap, count, monthStart).run();
 
     if (res.meta.changes === 0) {
@@ -152,8 +173,9 @@ export class PlanQuotaGuard {
     if (!this.opts.enforced || (await readTenantTier(this.db, tenantId)) !== 'free') return;
     const cap = FREE_TIER_CAPS.inspections;
     const now = new Date();
-    const row = await this.db.prepare('SELECT COUNT(*) AS n FROM inspections i WHERE i.tenant_id = ?1 AND i.created_at >= ?2')
-      .bind(tenantId, monthStartUtcMs(now)).first<{ n: number }>();
+    const row = await this.db.prepare(
+      `SELECT COUNT(*) AS n FROM inspections i WHERE i.tenant_id = ?1 AND i.created_at >= ?2 ${EXCLUDE_IMPORTED_INSPECTIONS}`,
+    ).bind(tenantId, monthStartUtcMs(now)).first<{ n: number }>();
     if ((row?.n ?? 0) + count > cap) throw Errors.QuotaExhausted({ metric: 'inspections', used: cap, cap, billingPortalUrl: this.opts.billingPortalUrl, ...allowanceWindow(now) });
   }
 

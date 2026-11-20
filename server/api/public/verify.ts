@@ -11,6 +11,7 @@ import { buildRenderReportUrl } from '../../lib/public-urls';
 import { getBookingHost, resolveTenantSlug } from '../../lib/url';
 import { isReportPublished } from '../../lib/status/report-status';
 import { getDrizzle } from '../../lib/route-helpers';
+import { verifyArchivedEnvelope } from '../../services/data-package/archived-evidence.service';
 import { resolveTurnstileSiteKey } from '../../lib/middleware/bot-protection';
 
 // Public e-sign verifier (Spec 5H P2, court-friendly). Reuses the raw siblings'
@@ -152,7 +153,32 @@ app.openapi(verifyRoute, async (c) => {
     // Each call re-verifies the whole chain, so an anonymous caller is counted per network (the key and document links are, too).
     await checkRateLimit(c, 'verify-public');
     const data = await loadVerifyData(c, envelopeId);
-    if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Envelope not found' } }, 404);
+    if (!data) {
+        // J5 — a restored envelope has no live agreement/esign/key rows. Its
+        // evidence is a byte-identical archive; verify the chain from there
+        // rather than answering 404. Fields the archive does not carry (name,
+        // snapshot, signer roster) stay null — never fabricated.
+        const archived = await verifyArchivedEnvelope(getDrizzle(c), c.env.PHOTOS, c.get('tenantId') || null, envelopeId);
+        if (!archived) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Envelope not found' } }, 404);
+        return c.json({
+            success: true as const,
+            data: {
+                envelopeId, // projection-allow: the envelope id the public verifier was asked about, echoed back
+                documentTitle: null,
+                clientName: null,
+                chainValid: archived.verdict.problems.length === 0,
+                chainReason: archived.verdict.problems[0]?.reason ?? null, // projection-allow: one of the chain verifier's fixed reason codes
+                keyFingerprint: archived.verdict.fingerprintsUsed[0] ?? null, // projection-allow: the archived key fingerprint, public by design
+                keyAlgorithm: 'Ed25519',
+                eventCount: archived.events, // projection-allow: count of verified events in this envelope's archived chain
+                contentSnapshot: null,
+                contentHash: null,
+                signers: [],
+                languageDisclosureCurrent: false,
+                turnstileSiteKey: resolveTurnstileSiteKey(c.env), // projection-allow: the public widget site key the verifier page needs
+            },
+        }, 200);
+    }
     return c.json({
         success: true as const,
         data: {

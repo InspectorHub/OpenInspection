@@ -5,6 +5,7 @@ import * as schema from './db/schema';
 import type { HonoConfig } from '../types/hono';
 import { isReportPublished } from './status/report-status';
 import { resolveTenantSlug } from './url';
+import { archivedKeysForTenant } from '../services/data-package/archived-evidence.service';
 
 /**
  * Spec 5H P2 — Public verifier (no-auth, court-friendly) data loader.
@@ -91,9 +92,18 @@ export async function loadVerifyKeys(c: Context<HonoConfig>, envelopeId: string)
  * verification_token. No PII beyond the masked property address is exposed.
  */
 export async function loadReportVerifyData(c: Context<HonoConfig>, token: string) {
-    const verify = await c.var.services.reportVersion.verifyByToken(token);
-    if (!verify) return null;
+    // J5 — a restored report's signing key lives in the byte-identical archive,
+    // not this tenant's live key table. Load archived keys for the token's
+    // tenant up front so verifyByToken can fall back to them when needed.
+    let archivedKeys: Awaited<ReturnType<typeof archivedKeysForTenant>> = [];
     const db = drizzle(c.env.DB, { schema });
+    const versionRow = await db.select({ tenantId: schema.reportVersions.tenantId })
+        .from(schema.reportVersions).where(eq(schema.reportVersions.verificationToken, token)).get();
+    if (versionRow?.tenantId && c.env.PHOTOS) {
+        archivedKeys = await archivedKeysForTenant(db, c.env.PHOTOS, versionRow.tenantId);
+    }
+    const verify = await c.var.services.reportVersion.verifyByToken(token, archivedKeys);
+    if (!verify) return null;
     const ins = await db.select({
         propertyAddress: schema.inspections.propertyAddress,
         reportStatus: schema.inspections.reportStatus,

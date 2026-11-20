@@ -1,0 +1,5 @@
+{
+  "formatVersion": 1,
+  "description": "Known column-set fingerprints accepted by the importer besides the current schema fingerprint (computed at runtime from the classification). Each release that changes the exportable column set appends the superseded fingerprint here, with the format version and a note, so older packages can still be recognised as a known shape rather than refused as unknown. An empty list means this is the first committed layout.",
+  "fingerprints": []
+}

@@ -147,6 +147,18 @@
     "kind": "invisible-read",
     "reason": "Names the tenant_configs column carrying a per-tenant override in YEARS, where 0 means indefinite. retention-report-pdfs.ts reads exactly that column, resolving one window per distinct tenant. Not a property read for the same reason as its sibling - the executor hardcodes it - and now pinned by tests/unit/privacy/retention-logs.spec.ts: an override shorter than the default must delete, a longer one must keep, 0 must keep forever, and a missing config row must fall back to the disclosed default rather than to indefinite. CORRECTION: this entry used to say \"no manifest-driven sweep exists - the only runtime sweep in the tree is the hand-written e-sign one\". Both halves were false."
   },
+  "server/lib/data-package/import-plan.ts#ImportPlan.tierOf": {
+    "kind": "wire-shape",
+    "reason": "Tier index per table, returned by buildImportPlan alongside the flat order. Consumed by the apply orchestrator (next task) to write rows tier by tier and to check a row's parents were written first; preview tests also assert tier ordering against the schema's foreign keys. Carries an int, no data."
+  },
+  "server/lib/data-package/import-report.ts#ImportReportData.droppedSettings": {
+    "kind": "wire-shape",
+    "reason": "Column names filtered out by the target-mode settings allowlist, part of the import report JSON stored on the job and shown in the preview/apply result. Filled by filterSettings results and read by the report UI/tests; carries names only, never setting values."
+  },
+  "server/lib/data-package/import-report.ts#ImportReportData.sanitizedFields": {
+    "kind": "wire-shape",
+    "reason": "Field names whose HTML was sanitized on import, part of the import report JSON stored on the job and shown to the owner. Filled by the row sanitizer and read by the report UI/tests; carries names only, never the row content."
+  },
   "server/lib/google-calendar.ts#GoogleTokenResponse.token_type": {
     "kind": "wire-shape",
     "reason": "The OAuth token response as the provider sends it — Google here, Intuit in `qbo.schema.ts`. Declared so the shape is honest about what arrives; nothing needs to branch on a value that is always \"Bearer\"."

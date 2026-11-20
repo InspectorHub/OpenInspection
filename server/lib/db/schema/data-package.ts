@@ -93,3 +93,62 @@ export const tenantDataJobs = sqliteTable('tenant_data_jobs', {
 
 export type TenantDataJob = typeof tenantDataJobs.$inferSelect;
 export type NewTenantDataJob = typeof tenantDataJobs.$inferInsert;
+
+/**
+ * Row-level import identity map. For every row an import creates or maps, one row
+ * records (package, table, source id) -> new id. It is the anchor for apply
+ * idempotency (a mapped row is skipped on replay), revert (the delete list), the
+ * free-tier quota exclusion (an inspection whose id is a `new_id` here is
+ * imported, not a new inspection) and the read-only marker on imported records.
+ * The marker is never removed: to reuse an imported report the owner copies it
+ * into a NEW report, which is not in this map.
+ *
+ * No FK to the imported tables: the map outlives deletes and stays tenant-scoped.
+ * Ids are opaque strings; the service layer, not this schema, validates their
+ * shape. Every read/write is scoped by tenant_id from the verified session.
+ */
+export const importIdMap = sqliteTable('import_id_map', {
+    id:         text('id').primaryKey(),
+    tenantId:   text('tenant_id').notNull(),
+    packageId:  text('package_id').notNull(),
+    tableName:  text('table_name').notNull(),
+    sourceId:   text('source_id').notNull(),
+    newId:      text('new_id').notNull(),
+    createdAt:  integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    // One mapping per (package, table, source row) — the idempotency/replay key.
+    uniqueIndex('uq_import_id_map_source').on(t.tenantId, t.packageId, t.tableName, t.sourceId),
+    // Tenant-led paging index (the per-table export/scan convention).
+    index('idx_import_id_map_tenant_id').on(t.tenantId, t.id),
+    // Quota / read-only checks ask "which imported inspections live here" by new id.
+    index('idx_import_id_map_new_id').on(t.tenantId, t.tableName, t.newId),
+    // Revert lists all rows a package wrote.
+    index('idx_import_id_map_package').on(t.tenantId, t.packageId),
+]);
+
+export type ImportIdMapRow = typeof importIdMap.$inferSelect;
+export type NewImportIdMapRow = typeof importIdMap.$inferInsert;
+
+/**
+ * One row per imported evidence/history archive. The archive BYTES live in R2
+ * under `evidence-archives/<tenantId>/<packageId>/`; this row is the ledger:
+ * the package's own sha256 and counts, plus the source ids whose evidence is
+ * preserved. No signing row is written to any live table — the archive is a
+ * byte-identical copy verified with the same chain verifier as an evidence pack.
+ * The row is never removed by revert: imported evidence stays auditable.
+ */
+export const importArchives = sqliteTable('import_archives', {
+    id:         text('id').primaryKey(),
+    tenantId:   text('tenant_id').notNull(),
+    packageId:  text('package_id').notNull(),
+    sha256:     text('sha256').notNull(),          // sha256 of the archived evidence bytes
+    counts:     text('counts'),                    // serialized per-file counts (opaque to the DB)
+    sourceIds:  text('source_ids'),                // serialized source ids whose evidence is archived
+    createdAt:  integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    uniqueIndex('uq_import_archives_package').on(t.tenantId, t.packageId),
+    index('idx_import_archives_tenant_id').on(t.tenantId, t.id),
+]);
+
+export type ImportArchiveRow = typeof importArchives.$inferSelect;
+export type NewImportArchiveRow = typeof importArchives.$inferInsert;

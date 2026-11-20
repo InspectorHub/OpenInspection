@@ -82,6 +82,11 @@ export enum ErrorCode {
     // republish" first. Nothing was written, so a client that holds the edit (an offline phone) keeps it and asks
     // the person. `details.inspectionId` names the inspection. Distinct from CONFLICT so that 409 can be told apart.
     REPORT_PUBLISHED = 'REPORT_PUBLISHED',
+    // A write reached an inspection restored from a data package. Such a record
+    // is an immutable copy: no content write may change it. `details.inspectionId`
+    // names it; no row content is ever included. Distinct from REPORT_PUBLISHED
+    // so the two 409 reasons can be told apart.
+    IMPORTED_INSPECTION_READ_ONLY = 'IMPORTED_INSPECTION_READ_ONLY',
     // An offline package would create an inspection that an earlier import of the
     // same package already created and that has since been deleted. Importing it
     // again would bring the deleted inspection back, so the whole package is
@@ -182,6 +187,8 @@ export const Errors = {
     // `inspectionIds` is set when several were refused at once (an offline package); `inspectionId` is the first.
     ReportPublished: (inspectionId: string, inspectionIds: readonly string[] = [inspectionId]) =>
         new AppError(409, ErrorCode.REPORT_PUBLISHED, 'Report is published. Update and republish?', { inspectionId, inspectionIds }),
+    ImportedInspectionReadOnly: (inspectionId: string) =>
+        new AppError(409, ErrorCode.IMPORTED_INSPECTION_READ_ONLY, 'This inspection was restored from a data package and cannot be changed. Copy it as a new inspection to edit.', { inspectionId }),
     UnprocessableEntity: (msg: string, details?: unknown) =>
         new AppError(422, ErrorCode.UNPROCESSABLE_ENTITY, msg, details),
     RateLimited: (msg: string = 'Too many attempts. Please try again later.') => new AppError(429, ErrorCode.RATE_LIMITED, msg),
