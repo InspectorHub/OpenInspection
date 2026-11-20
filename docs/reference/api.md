@@ -925,8 +925,21 @@ to the verified tenant on every call. Application-layer daily budgets are off:
 - `GET /api/admin/data-package/jobs/:id/media?cursor=&limit=` — one page of media objects under the tenant prefix, excluding platform prefixes.
 - `GET /api/admin/data-package/jobs/:id/media/object?key=<relative-key>` — stream one object with `Range` support (`206`/`416`, `Accept-Ranges`, `ETag`, `Cache-Control: no-store`).
 
-See [the format reference](./data-package-format.md) for the archive layout and
-[the operating guide](../operate/data-package.md) for the offline verifier.
+The same job ledger powers restoring a package into this workspace. These
+endpoints are owner-only and need `X-Data-Job`; writes additionally need a
+short-lived `X-Step-Up-Token`:
+
+- `GET /api/admin/data-package/jobs/:id/import/plan` — read the import plan derived from the package.
+- `POST /api/admin/data-package/jobs/:id/import/preflight` — validate every row against the destination schema and report what would be added, skipped or mode-invalid, without writing rows.
+- `POST /api/admin/data-package/jobs/:id/import/batches` — apply one bounded batch of rows. Requires `X-Step-Up-Token` for `data-import-apply`.
+- `POST /api/admin/data-package/jobs/:id/import/media` — copy one media object (metadata in the query string, raw bytes in the body), verifying its digest on write. Requires `X-Step-Up-Token` for `data-import-apply`.
+- `PUT /api/admin/data-package/jobs/:id/import/archive` — store the byte-identical evidence archive. Requires `X-Step-Up-Token` for `data-import-apply`.
+- `GET /api/admin/data-package/jobs/:id/import/archives` / `.../archives/:packageId` — list and read back imported evidence archives; the detail view re-runs the chain verifier. Read-only: no signing record is created or modified.
+- `POST /api/admin/data-package/jobs/:id/revert/step` — undo an import one bounded step at a time, deleting everything it created. Requires `X-Step-Up-Token` for `data-import-revert`.
+
+See [the format reference](./data-package-format.md) for the archive layout,
+[the operating guide](../operate/data-package.md) for the offline verifier, and
+[the move guide](../operate/move-to-self-host.md) for the end-to-end flow.
 
 ---
 

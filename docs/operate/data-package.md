@@ -6,6 +6,12 @@ hashing, zipping and verification on the operator's machine. Operators who need
 to hand a package to a customer, or confirm one is intact, use the offline
 verifier described below.
 
+The same format can be **restored** into another deployment you control. The
+destination verifies the package locally, previews what it would write, applies
+it in bounded batches, and can undo the whole import. For the end-to-end flow —
+what moves, what does not, rehearsing, and cut-over — see
+[Moving a company to your own deployment](move-to-self-host.md).
+
 ## What the server exposes
 
 Owner-only endpoints under `/api/admin/data-package/`, authenticated with a

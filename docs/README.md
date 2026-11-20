@@ -26,6 +26,7 @@ deferred.
 | [`quickstart.md`](quickstart.md) | Empty Cloudflare account to a workspace you can log into, in about 20 minutes |
 | [`operate/deploy.md`](operate/deploy.md) | First-time production deploy — one-click, CLI, and what gets provisioned; checking a new deployment with the preflight script; data retention; importing an offline package from a device that could not sync |
 | [`operate/upgrade.md`](operate/upgrade.md) | Move an existing deployment to a newer release (forward-only) — including the one-time reconcile a rebuilt baseline needs |
+| [`operate/move-to-self-host.md`](operate/move-to-self-host.md) | Move a company's records and photos from one deployment to another you run yourself with a verifiable data package: what moves and what does not, standing up the destination, rehearsing, undoing an import, and cut-over |
 | [`operate/sms-compliance.md`](operate/sms-compliance.md) | Privacy/Terms pages, carrier registration, TCPA/CTIA wording |
 | [`operate/rotate-jwt-keyring.md`](operate/rotate-jwt-keyring.md) | Rotating the ES256 JWT keyring without invalidating live sessions |
 | [`operate/security-headers.md`](operate/security-headers.md) | Response security headers on pages and the API, the report-only CSP, reading `csp_report` log lines, tightening to enforcement |
@@ -78,6 +79,7 @@ conventions common to all of them: [`integrations/README.md`](integrations/READM
 | [`develop/setup.md`](develop/setup.md) | Run it locally, the command table, how to add a page or an endpoint |
 | [`develop/architecture.md`](develop/architecture.md) | Single-worker architecture, request flow, module map, the shared mode-aware editor surfaces, cost model |
 | [`develop/testing.md`](develop/testing.md) | Five suites, where a spec lives, how to run each one |
+| [`develop/data-package-move-handoff.md`](develop/data-package-move-handoff.md) | Dual-instance move E2E, large-tenant fixture generator, restore/undo timing harness, and the owner-verified Chrome checklist |
 | [`develop/gates.md`](develop/gates.md) | The conformance gates — the registry, the two rungs, and the conventions a new gate has to meet |
 | [`develop/public-response-projection.md`](develop/public-response-projection.md) | How a route reachable without signing in builds its response from a field list, the helper, the gate and the escape comment |
 | [`develop/integration-adapters.md`](develop/integration-adapters.md) | Writing code that talks to somebody else's API — shape, credentials, failure recording, contract tests |
