@@ -26,6 +26,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Unused API routes that no client called: `PUT /api/event-types/:id`, `DELETE /api/event-types/:id`, `POST /api/event-types/seed`, `GET /api/events/upcoming`, `GET /api/calendar/connections/:id/calendars`, `GET /api/inspections/{id}/full`, `GET /api/inspections/{id}/sign-status`, the `statusFlags` object on dashboard rows, `POST /api/auth/setup/skip` and `POST /api/auth/onboarding/flag`. Missing default event types are filled in by `POST /api/admin/data/install-bundled-content`; the signed state of an inspection is still returned as `signedByClient` by the inspection read.
 * The unreachable `feature-disabled` page and its translation strings.
 
+## [2.7.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.6.0...openinspection-v2.7.0) (2026-11-20)
+
+
+### Features
+
+* add worker read API for tenant data package export ([9ab5f96](https://github.com/InspectorHub/OpenInspection/commit/9ab5f962b9204bd919b016c096b57293c2c8b206))
+* **auth:** add step-up re-authentication for sensitive owner actions ([56fcc98](https://github.com/InspectorHub/OpenInspection/commit/56fcc983ecf76e4107369714c52b744ff926b73e))
+* **auth:** let native step-up clients use a token header ([409292a](https://github.com/InspectorHub/OpenInspection/commit/409292ad35790e38d5aec6c7c0bbb0bdfcacf34b))
+* **collab:** add a verified purge of the old Durable Objects after the jurisdiction migration ([a63eb7d](https://github.com/InspectorHub/OpenInspection/commit/a63eb7da2dc3de51ad740b5e61fd4fdd8f022f4c))
+* **data-package:** add a leased tenant_data_jobs ledger ([4057662](https://github.com/InspectorHub/OpenInspection/commit/4057662775cecfd45263f2379a5999ae50b27ad0))
+* **data-package:** add data-endpoint authorization boundary for E-1 ([6cb5e98](https://github.com/InspectorHub/OpenInspection/commit/6cb5e98f7cf06cfb5d902d0e95691c6826ee462a))
+* **data-package:** add domain-separated job token for E-1 read API ([db50b05](https://github.com/InspectorHub/OpenInspection/commit/db50b05591cfef90ac7e144b5344311c7620f617))
+* **data-package:** add E-1 read API routes ([75953c4](https://github.com/InspectorHub/OpenInspection/commit/75953c482b15b690848148d85dc9f4730f0f920f))
+* **data-package:** add E-2 media listing and Range download API ([c06d89b](https://github.com/InspectorHub/OpenInspection/commit/c06d89b39dfb21e8461b0d6f8e32f89c6baaac3c))
+* **data-package:** add evidence archive service and read-only viewer ([3cacdde](https://github.com/InspectorHub/OpenInspection/commit/3cacddefe8d2cf549b54e1576145111686524cc9))
+* **data-package:** add format upgrader registry and known-fingerprint rules ([e98422e](https://github.com/InspectorHub/OpenInspection/commit/e98422ea7c8154811bffd52ec636f9c2c46529e9))
+* **data-package:** add import id-map table and service ([38a9b52](https://github.com/InspectorHub/OpenInspection/commit/38a9b52c7ce996484a908c171185b7205f17714a))
+* **data-package:** add import plan, settings filter, sanitizer and report ([0155d94](https://github.com/InspectorHub/OpenInspection/commit/0155d94009175dcf1b3e1c3b248d284e838e6fb0))
+* **data-package:** add import plan/preflight/batch routes and audit ([c022fb7](https://github.com/InspectorHub/OpenInspection/commit/c022fb7452acee14d32baf8218f911ec716cc208))
+* **data-package:** add import preflight service (J2b) ([9393e55](https://github.com/InspectorHub/OpenInspection/commit/9393e55f5a1d077470f495fb9ac157c3049a02de))
+* **data-package:** add import_archives ledger for restored evidence ([6cada58](https://github.com/InspectorHub/OpenInspection/commit/6cada582124c9b8a6c925c3170801c7ce95001dd))
+* **data-package:** add lease/job service for E-1 read API ([c8a56d1](https://github.com/InspectorHub/OpenInspection/commit/c8a56d1964c58c6e6893eb4e7c1cc51a7ce97eae))
+* **data-package:** add media and archive upload routes for the importer ([21cbe9c](https://github.com/InspectorHub/OpenInspection/commit/21cbe9c7a9718a49ec96b6e9f89a30bd1bdbfccc))
+* **data-package:** add media import service for restores ([b4ca0bb](https://github.com/InspectorHub/OpenInspection/commit/b4ca0bb8c1c11154e0892ab9bc2a6c8c8de2f440))
+* **data-package:** add media kind and worker-runtime Range tests ([17473e6](https://github.com/InspectorHub/OpenInspection/commit/17473e6bdc3dc4d1785278312665221753580b08))
+* **data-package:** add offline verifier and public format docs ([b830861](https://github.com/InspectorHub/OpenInspection/commit/b8308614b8f845c92b039d3ffbc390e307732aad))
+* **data-package:** add read metadata for the worker read API ([de45138](https://github.com/InspectorHub/OpenInspection/commit/de4513899690f4863eab687e47e1b124bf2ce8fa))
+* **data-package:** add row reader for E-1 export API ([5fc7838](https://github.com/InspectorHub/OpenInspection/commit/5fc7838dabe06596001da0dc0b80ba3bf2fa126f))
+* **data-package:** add stateless keyset cursor codec for E-1 rows ([6e9eb15](https://github.com/InspectorHub/OpenInspection/commit/6e9eb154c8b3b5a794c6fcb40cceef4b92ed47d1))
+* **data-package:** add strict per-table row schemas for import ([3dfe910](https://github.com/InspectorHub/OpenInspection/commit/3dfe910b8e4cb880dd8c1b212f36e60094bce322))
+* **data-package:** add the batched import apply engine ([20b97f4](https://github.com/InspectorHub/OpenInspection/commit/20b97f489972eee1f8779a1d28af903488f7caa6))
+* **data-package:** add the package format libraries ([23236fe](https://github.com/InspectorHub/OpenInspection/commit/23236fe3a071d7282ed345fb42762660bf0850e5))
+* **data-package:** add web desktop-app entry and job status page ([a9f02a4](https://github.com/InspectorHub/OpenInspection/commit/a9f02a4e48412c6abb8b04c571f30dfa2fb3abb5))
+* **data-package:** central read-only gate for imported inspections ([71d131e](https://github.com/InspectorHub/OpenInspection/commit/71d131e7019ed6a5e2b07c8c21fa9cf2b5c56a13))
+* **data-package:** classify every table and column for the tenant data export ([0c716d2](https://github.com/InspectorHub/OpenInspection/commit/0c716d204a56d4a520f7b1f63d6031175de31ac6))
+* **data-package:** confirm exports by email and audit resume device changes ([e91b325](https://github.com/InspectorHub/OpenInspection/commit/e91b325d838c371960b06661a01f94e2752a0245))
+* **data-package:** expose large blob column chunk read endpoint ([4dbe4d9](https://github.com/InspectorHub/OpenInspection/commit/4dbe4d9c9b99bd1d634322617303b41b1e9e1067))
+* **data-package:** keep media hashes in a streamed index instead of the manifest ([d5e4b6b](https://github.com/InspectorHub/OpenInspection/commit/d5e4b6b59d53fdbb7c260aacbc74d6752c04aeef))
+* **data-package:** native import engine, preflight and apply API ([b36740c](https://github.com/InspectorHub/OpenInspection/commit/b36740c5e0d4c6a06b9555e41920b412490f7445))
+* **data-package:** native import engine, preflight and apply API ([#466](https://github.com/InspectorHub/OpenInspection/issues/466)) ([b36740c](https://github.com/InspectorHub/OpenInspection/commit/b36740c5e0d4c6a06b9555e41920b412490f7445))
+* **data-package:** return snapshot row counts, fix CI notification label ([ba52afc](https://github.com/InspectorHub/OpenInspection/commit/ba52afc4d55520e2bda8958508cec4f93d503d67))
+* **data-package:** revert an import and exclude restored inspections from the free cap (E-7) ([704812d](https://github.com/InspectorHub/OpenInspection/commit/704812d4775eb01b64fe78e168bfd16893466d28))
+* **data-package:** verify restored evidence from the archive (J5) ([309bc8c](https://github.com/InspectorHub/OpenInspection/commit/309bc8c2ec04d032026103907ae01f2508088e38))
+* **data-package:** verify restored report versions with archived keys (J5) ([b4602f4](https://github.com/InspectorHub/OpenInspection/commit/b4602f479de96ef386b2fcf17d6936c887fd0bb4))
+* **inspections:** add an endpoint that copies a report into a new inspection ([c3951db](https://github.com/InspectorHub/OpenInspection/commit/c3951db35ae7033859b87fdd1449a4dce2d059a7))
+* **ops:** add a dependency-free preflight for a freshly deployed instance ([5f4b1d7](https://github.com/InspectorHub/OpenInspection/commit/5f4b1d73518b2a253728ae5af08c8620f957ef67))
+* **setup:** let the first-run setup start without the starter content ([cf3305c](https://github.com/InspectorHub/OpenInspection/commit/cf3305c887ad71cd7ccb025b74b046dd287ecfc3))
+* tenant data-package export API, web entry and offline verifier ([f4a2e1a](https://github.com/InspectorHub/OpenInspection/commit/f4a2e1a7c7e13d928c3be337a5e3a38136c7e173))
+* tenant data-package export confirmation and audit ([c98eb0f](https://github.com/InspectorHub/OpenInspection/commit/c98eb0f95ad06f3317d55ae45b6e49948423b7ac))
+
+
+### Bug Fixes
+
+* **automation:** escape substituted values in HTML email bodies and sandbox the template preview ([b47b8e9](https://github.com/InspectorHub/OpenInspection/commit/b47b8e9e6e776ce6cb133b234a5d761c99ed61b2))
+* **automation:** fill inspector and company names in messages and preview ([f8c3b67](https://github.com/InspectorHub/OpenInspection/commit/f8c3b678980e5a61eaa35ef66416b79c65a54271))
+* **automation:** keep the tenant-scoping baseline keys stable when naming tokens ([8c84eb2](https://github.com/InspectorHub/OpenInspection/commit/8c84eb2de572eb1ff2dddcd8888beb5aa6781a7c))
+* **automation:** render inspector and company names in queued messages and give the template preview sample values ([3a905ba](https://github.com/InspectorHub/OpenInspection/commit/3a905bad65ef43c43f3c6423185f242e24f08e64))
+* **ci:** raise type-check:tests heap to 4096 MB ([c5c0fe4](https://github.com/InspectorHub/OpenInspection/commit/c5c0fe40542e012ba70227ea35f02057a645c5b3))
+* **collab:** close the review findings on the post-migration purge ([f4898a1](https://github.com/InspectorHub/OpenInspection/commit/f4898a1e1df131e3b784dd4e0a9a196e0ffd13a7))
+* **data-package:** add import_id_map tenant index and classification ([72999bd](https://github.com/InspectorHub/OpenInspection/commit/72999bd4adfdb19aabe4334dbd8ced5952764dd8))
+* **data-package:** classify tenant_data_jobs as out after merge ([eebc2f2](https://github.com/InspectorHub/OpenInspection/commit/eebc2f251d2cc08847293b5f7ce832b7d1a89cb1))
+* **data-package:** clear CI gates after the integration merge ([5c50458](https://github.com/InspectorHub/OpenInspection/commit/5c50458a5394bca233e02e23abae580ba9edf99b))
+* **data-package:** clear CI gates from the web status page and verifier ([86eaf5e](https://github.com/InspectorHub/OpenInspection/commit/86eaf5eca843e92308e8b2f30daf095c267c2936))
+* **data-package:** make E-7 revert robust to D1 error wrapping and quota test fixture (CI) ([a2e59cd](https://github.com/InspectorHub/OpenInspection/commit/a2e59cdf572046ac7bd2f9de83db304d4ad12da4))
+* **data-package:** preserve owner-edited restored inspections through revert ([c7000bb](https://github.com/InspectorHub/OpenInspection/commit/c7000bb06e0b2e4f46ad6e96911763bd140497c1))
+* **data-package:** satisfy pre-push gates for the E-1 read API ([002497d](https://github.com/InspectorHub/OpenInspection/commit/002497d1b296847511354196e4a827018bfa1d10))
+* **deps:** close minimatch and hono advisories ([3b03520](https://github.com/InspectorHub/OpenInspection/commit/3b03520ff403f801b7c2fb69f160d57b4cfc3d33))
+* **deps:** close minimatch and hono Dependabot advisories ([38c4c17](https://github.com/InspectorHub/OpenInspection/commit/38c4c171eab5a5e979adb2da85ac5dc53cec7c78))
+* **field-ui:** the editor's auto-advance fallback matches the server default ([fc14a58](https://github.com/InspectorHub/OpenInspection/commit/fc14a582a47480d49e40220fff568b90542ff6e1))
+* **field-ui:** the editor's auto-advance fallback matches the server default ([8ae84b5](https://github.com/InspectorHub/OpenInspection/commit/8ae84b54242d4d998734afc770e01edf1ce78af8))
+* **templates:** close the review findings on the unwrap migration ([eac6833](https://github.com/InspectorHub/OpenInspection/commit/eac68330bdc42a321560dd0aeb83d11c82f79232))
+* **templates:** store template schemas as JSON objects ([8ac3b88](https://github.com/InspectorHub/OpenInspection/commit/8ac3b88ca2cf6f6c5a4d538d8d92143e964695bb))
+* **templates:** store template schemas as JSON objects and unwrap the ones stored as text ([1f42985](https://github.com/InspectorHub/OpenInspection/commit/1f429854dd6b521ec41a06a58a530cf1c9a736a5))
+
+
+### Performance Improvements
+
+* **db:** index tenant tables by paging key, drop redundant single-column indexes ([8a484f5](https://github.com/InspectorHub/OpenInspection/commit/8a484f5450ae4722783aef8832e46242e89988f9))
+
+
+### Reverts
+
+* **data-package:** make E-7 revert delete all imported rows unconditionally ([36edced](https://github.com/InspectorHub/OpenInspection/commit/36edcedaeaab2ed50e0b1786056b5d063983f77f))
+
 ## [2.6.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.5.0...openinspection-v2.6.0) (2026-11-10)
 
 
