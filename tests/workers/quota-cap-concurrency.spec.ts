@@ -40,7 +40,7 @@ async function seedSchema(): Promise<void> {
     // import_id_map. This minimal fixture must carry that table too (empty is
     // fine — no imported rows here) or the guard fails with "no such table".
     await b.DB.exec(
-        'CREATE TABLE IF NOT EXISTS import_id_map (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, package_id TEXT NOT NULL, table_name TEXT NOT NULL, source_id TEXT NOT NULL, new_id TEXT NOT NULL, created_at INTEGER NOT NULL);',
+        'CREATE TABLE IF NOT EXISTS import_id_map (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, package_id TEXT NOT NULL, table_name TEXT NOT NULL, source_id TEXT NOT NULL, new_id TEXT NOT NULL, created_at INTEGER NOT NULL, is_kept INTEGER NOT NULL DEFAULT 0);',
     );
 }
 

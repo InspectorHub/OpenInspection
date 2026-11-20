@@ -100,8 +100,13 @@ export type NewTenantDataJob = typeof tenantDataJobs.$inferInsert;
  * idempotency (a mapped row is skipped on replay), revert (the delete list), the
  * free-tier quota exclusion (an inspection whose id is a `new_id` here is
  * imported, not a new inspection) and the read-only marker on imported records.
- * The marker is never removed: to reuse an imported report the owner copies it
- * into a NEW report, which is not in this map.
+ *
+ * `kept=1` marks a row the owner changed after the import (revert found a status
+ * timestamp past the import moment). Such a row is preserved by revert, drops out
+ * of the revert scope/done check, and keeps its import marker — so it stays
+ * read-only and quota-exempt. To reuse an imported report the owner still copies
+ * it into a NEW report, which is not in this map. The marker is never removed
+ * from a kept row; ordinary rows lose their mapping when revert deletes them.
  *
  * No FK to the imported tables: the map outlives deletes and stays tenant-scoped.
  * Ids are opaque strings; the service layer, not this schema, validates their
@@ -115,6 +120,9 @@ export const importIdMap = sqliteTable('import_id_map', {
     sourceId:   text('source_id').notNull(),
     newId:      text('new_id').notNull(),
     createdAt:  integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // Import row the owner changed after restore: revert preserves it and drops
+    // it from its scope, but the mapping stays so J14/quota exemption continues.
+    kept:       integer('is_kept', { mode: 'boolean' }).notNull().default(false),
 }, (t) => [
     // One mapping per (package, table, source row) — the idempotency/replay key.
     uniqueIndex('uq_import_id_map_source').on(t.tenantId, t.packageId, t.tableName, t.sourceId),

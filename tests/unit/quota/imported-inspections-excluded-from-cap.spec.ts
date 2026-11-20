@@ -38,8 +38,8 @@ describe('PlanQuotaGuard: imported inspections do NOT consume the free cap', () 
         guard = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
     });
 
-    /** Seed one inspection. `imported` additionally writes the id-map anchor. */
-    const seed = (id: string, imported: boolean) => {
+    /** Seed one inspection. `imported` writes the id-map anchor; `kept` marks it preserved-by-revert. */
+    const seed = (id: string, imported: boolean, kept = false) => {
         const now = Date.now();
         sqlite.prepare(
             `INSERT INTO inspections (id, tenant_id, property_address, date, created_at)
@@ -48,9 +48,9 @@ describe('PlanQuotaGuard: imported inspections do NOT consume the free cap', () 
         if (imported) {
             sqlite.prepare(
                 `INSERT INTO import_id_map
-                    (id, tenant_id, package_id, table_name, source_id, new_id, created_at)
-                 VALUES (?, 't1', ?, 'inspections', ?, ?, ?)`,
-            ).run(`map:${id}`, PKG, `src:${id}`, id, now);
+                    (id, tenant_id, package_id, table_name, source_id, new_id, created_at, is_kept)
+                 VALUES (?, 't1', ?, 'inspections', ?, ?, ?, ?)`,
+            ).run(`map:${id}`, PKG, `src:${id}`, id, now, kept ? 1 : 0);
         }
     };
 
@@ -71,6 +71,14 @@ describe('PlanQuotaGuard: imported inspections do NOT consume the free cap', () 
 
     it('assertInspectionRoom ignores restored inspections too', async () => {
         seedMany(CAP, true, 'restored');
+        await expect(guard.assertInspectionRoom('t1')).resolves.toBeUndefined();
+    });
+
+    it('a kept (preserved-by-revert) inspection keeps its quota exemption', async () => {
+        // Revert marks an owner-edited restored inspection kept=1 and leaves its
+        // mapping in place; the cap must still exclude it.
+        for (let i = 0; i < CAP; i++) seed(`kept-${i}`, true, true);
+        await expect(guard.consumeInspection('t1')).resolves.toBeUndefined();
         await expect(guard.assertInspectionRoom('t1')).resolves.toBeUndefined();
     });
 

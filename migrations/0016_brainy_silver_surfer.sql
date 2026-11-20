@@ -1,0 +1,1 @@
+ALTER TABLE `import_id_map` ADD `is_kept` integer DEFAULT false NOT NULL;

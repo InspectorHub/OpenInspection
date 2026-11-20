@@ -48,14 +48,17 @@ describe('DataPackageRevertService', () => {
     });
 
     /** Add an import_id_map anchor. `createdAt` defaults to the import time. */
-    const map = (table: string, newId: string, opts: { tenant?: string; pkg?: string; createdAt?: number } = {}) =>
+    const map = (table: string, newId: string, opts: { tenant?: string; pkg?: string; createdAt?: number; kept?: boolean } = {}) =>
         sqlite.prepare(
-            `INSERT INTO import_id_map (id, tenant_id, package_id, table_name, source_id, new_id, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO import_id_map (id, tenant_id, package_id, table_name, source_id, new_id, created_at, is_kept)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
             `map:${opts.tenant ?? TENANT}:${table}:${newId}`, opts.tenant ?? TENANT, opts.pkg ?? PKG,
-            table, `src:${newId}`, newId, opts.createdAt ?? IMPORT_TIME,
+            table, `src:${newId}`, newId, opts.createdAt ?? IMPORT_TIME, opts.kept ? 1 : 0,
         );
+
+    const keptOf = (newId: string): number | undefined =>
+        sqlite.prepare(`SELECT is_kept FROM import_id_map WHERE new_id = ?`).get(newId)?.is_kept;
 
     const contact = (id: string, tenant = TENANT) => sqlite.prepare(
         `INSERT INTO contacts (id, tenant_id, name, email, type, created_at) VALUES (?, ?, ?, ?, 'client', ?)`,
@@ -75,12 +78,20 @@ describe('DataPackageRevertService', () => {
         ).run(id, tenant, `user-${id}`, IMPORT_TIME, updatedAt);
     };
 
-    // `inspections` has updated_at in the Drizzle schema but NOT in the
-    // migration — the live table has no such column. Seed without it.
-    const inspection = (id: string, tenant = TENANT) => sqlite.prepare(
-        `INSERT INTO inspections (id, tenant_id, property_address, date, status, created_at)
-         VALUES (?, ?, 'x', '2026-01-01', 'scheduled', ?)`,
-    ).run(id, tenant, IMPORT_TIME);
+    // `inspections` has NO updated_at (schema or migration). Import-time change
+    // is detected via status timestamps that postdate the import moment.
+    const inspection = (
+        id: string,
+        stamps: { confirmedAt?: number | null; unlockedAt?: number | null; reportsGeneratedAt?: number | null } = {},
+        tenant = TENANT,
+    ) => sqlite.prepare(
+        `INSERT INTO inspections
+            (id, tenant_id, property_address, date, status, created_at, confirmed_at, unlocked_at, reports_generated_at)
+         VALUES (?, ?, 'x', '2026-01-01', 'scheduled', ?, ?, ?, ?)`,
+    ).run(
+        id, tenant, IMPORT_TIME,
+        stamps.confirmedAt ?? null, stamps.unlockedAt ?? null, stamps.reportsGeneratedAt ?? null,
+    );
 
     const rowCount = (table: string, id: string) =>
         sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE id = ?`).get(id).n;
@@ -117,6 +128,46 @@ describe('DataPackageRevertService', () => {
         expect(r.kept).toContainEqual({ table: 'inspector_credentials', newId: 'cred-edited', reason: 'modified_kept' });
         expect(rowCount('inspector_credentials', 'cred-clean')).toBe(0);
         expect(r.deleted.inspector_credentials).toBe(1);
+    });
+
+    it('keeps an inspection changed after import (status timestamp past import) and marks its mapping kept', async () => {
+        // confirmed_at postdates the import moment → owner/system changed it →
+        // preserve the row, mark the mapping kept (stays read-only + quota-exempt)
+        // and still finish the loop.
+        inspection('insp-confirmed', { confirmedAt: IMPORT_TIME + 10_000 });
+        inspection('insp-clean', { confirmedAt: IMPORT_TIME - 10_000 });
+        map('inspections', 'insp-confirmed'); map('inspections', 'insp-clean');
+        const r = await svc.revertStep(TENANT, PKG);
+        expect(rowCount('inspections', 'insp-confirmed')).toBe(1);
+        expect(r.kept).toContainEqual({ table: 'inspections', newId: 'insp-confirmed', reason: 'modified_kept' });
+        expect(keptOf('insp-confirmed')).toBe(1); // mapping preserved for exemption
+        expect(rowCount('inspections', 'insp-clean')).toBe(0);
+        expect(keptOf('insp-clean')).toBeUndefined(); // mapping deleted (no row left)
+        expect(r.deleted.inspections).toBe(1);
+        expect(r.done).toBe(true);               // kept mapping excluded from done
+    });
+
+    it('deletes an inspection whose status timestamps are all null or before import', async () => {
+        inspection('insp-null');
+        inspection('insp-past', { unlockedAt: IMPORT_TIME - 1, reportsGeneratedAt: IMPORT_TIME - 5 });
+        map('inspections', 'insp-null'); map('inspections', 'insp-past');
+        const r = await svc.revertStep(TENANT, PKG);
+        expect(r.errors).toEqual([]);
+        expect(r.deleted.inspections).toBe(2);
+        expect(rowCount('inspections', 'insp-null')).toBe(0);
+        expect(rowCount('inspections', 'insp-past')).toBe(0);
+        expect(r.done).toBe(true);
+    });
+
+    it('excludes kept mappings from the revert scope so the loop can finish', async () => {
+        // A pre-existing kept mapping (owner's data from a prior step) must not
+        // be reprocessed, must not block done, and its row must survive.
+        inspection('insp-kept', { unlockedAt: IMPORT_TIME + 5 });
+        map('inspections', 'insp-kept', { kept: true });
+        const r = await svc.revertStep(TENANT, PKG);
+        expect(r.processed).toBe(0);
+        expect(r.done).toBe(true);
+        expect(rowCount('inspections', 'insp-kept')).toBe(1);
     });
 
     it('protects identity roots: tenants and users are never deleted', async () => {
@@ -185,16 +236,16 @@ describe('DataPackageRevertService', () => {
         expect(second.done).toBe(true);
     });
 
-    it('deletes a mapped inspection via the exists-only path (no updated_at column in the live table)', async () => {
-        // Schema declares inspections.updated_at but the migration never added
-        // it, so the updated_at probe throws "no such column". The narrow catch
-        // must degrade to existence-only and still delete the mapped row.
-        inspection('insp-drift');
-        map('inspections', 'insp-drift');
+    it('keeps the exists-only fallback for non-inspection tables without updated_at', async () => {
+        // contacts has no updated_at; the narrow "no such column" catch must
+        // still degrade to existence-only and delete. (inspections no longer
+        // uses this path — it uses the status-timestamp judgement.)
+        contact('c-noupd');
+        map('contacts', 'c-noupd');
         const r = await svc.revertStep(TENANT, PKG);
         expect(r.errors).toEqual([]);
-        expect(r.deleted.inspections).toBe(1);
-        expect(rowCount('inspections', 'insp-drift')).toBe(0);
+        expect(r.deleted.contacts).toBe(1);
+        expect(rowCount('contacts', 'c-noupd')).toBe(0);
         expect(r.done).toBe(true);
     });
 
@@ -225,5 +276,29 @@ describe('DataPackageRevertService', () => {
         const retry = await svc.revertStep(TENANT, PKG);
         expect(retry.deleted.contacts).toBe(1);
         expect(retry.done).toBe(true);
+    });
+
+    it('a transient inspection-status probe error is reported without aborting the batch', async () => {
+        // The inspections status-timestamp probe must catch transient DB errors
+        // (locked row) as probe_failed and leave the mapping for retry, not
+        // throw out of the whole step.
+        inspection('insp-transient');
+        map('inspections', 'insp-transient');
+        let thrown = false;
+        const flakyDb = new Proxy(db, {
+            get(target, prop, receiver) {
+                if (prop === 'get' && !thrown) {
+                    thrown = true;
+                    return async () => { throw new Error('database is locked'); };
+                }
+                return Reflect.get(target, prop, receiver);
+            },
+        });
+        const flakySvc = new DataPackageRevertService(asScopedDbSource(flakyDb), bucket as any);
+        const r = await flakySvc.revertStep(TENANT, PKG);
+        expect(r.errors).toContainEqual({ table: 'inspections', newId: 'insp-transient', code: 'probe_failed' });
+        expect(rowCount('inspections', 'insp-transient')).toBe(1);
+        expect(mapCount()).toBe(1);
+        expect(r.done).toBe(false);
     });
 });
