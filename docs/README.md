@@ -26,6 +26,7 @@ deferred.
 | [`quickstart.md`](quickstart.md) | Empty Cloudflare account to a workspace you can log into, in about 20 minutes |
 | [`operate/deploy.md`](operate/deploy.md) | First-time production deploy — one-click, CLI, and what gets provisioned; checking a new deployment with the preflight script; data retention; importing an offline package from a device that could not sync |
 | [`operate/upgrade.md`](operate/upgrade.md) | Move an existing deployment to a newer release (forward-only) — including the one-time reconcile a rebuilt baseline needs |
+| [`operate/move-to-self-host.md`](operate/move-to-self-host.md) | Move a company's records and photos from one deployment to another you run yourself with a verifiable data package: what moves and what does not, standing up the destination, rehearsing, undoing an import, and cut-over |
 | [`operate/sms-compliance.md`](operate/sms-compliance.md) | Privacy/Terms pages, carrier registration, TCPA/CTIA wording |
 | [`operate/rotate-jwt-keyring.md`](operate/rotate-jwt-keyring.md) | Rotating the ES256 JWT keyring without invalidating live sessions |
 | [`operate/security-headers.md`](operate/security-headers.md) | Response security headers on pages and the API, the report-only CSP, reading `csp_report` log lines, tightening to enforcement |
