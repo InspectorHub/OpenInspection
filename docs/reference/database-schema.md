@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 119 |
-| Columns | 1350 |
+| Columns | 1349 |
 | Indexes (excluding primary keys) | 265 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 623 (46%) |
+| Columns carrying a source comment | 622 (46%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -1003,7 +1003,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `import_id_map`
 
-<sub>server/lib/db/schema/data-package.ts · 8 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/data-package.ts · 7 columns · primary key `id`</sub>
 
 > Row-level import identity map. For every row an import creates or maps, one row records (package, table, source id) -> new id.
 
@@ -1016,7 +1016,6 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `source_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
 | `new_id` | text | NN IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
-| `is_kept` | integer | NN | `false` |  | Import row the owner changed after restore: revert preserves it and drops it from its scope, but the mapping stays so J14/quota exemption continues. |
 
 **Indexes**
 

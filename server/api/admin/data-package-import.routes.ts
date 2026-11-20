@@ -125,7 +125,7 @@ const applyBatchRoute = createRoute(withMcpMetadata({
 const revertStepRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/data-package/jobs/:id/revert/step', operationId: 'revertDataPackageImportStep',
     summary: 'Undo one step of a data-package import',
-    description: 'Removes one bounded batch of rows/media the import wrote, in child-first order, leaving rows the owner edited and identity roots intact. Client loops until `done`. Requires a valid X-Data-Job token, an owner and a step-up.',
+    description: 'Irreversibly removes one bounded batch of every row/media the import wrote, in child-first order. This DELETES all imported rows unconditionally — including any the owner edited since the import — except protected identity roots (tenants/users). The evidence archive is kept for audit. Client loops until `done`. Requires a valid X-Data-Job token, an owner and a step-up.',
     tags: ['admin'], middleware: [requireRole('owner'), requireStepUp('data-import-revert')],
     request: { params: JobIdParam, headers: JobTokenHeader, body: { content: { 'application/json': { schema: RevertStepBody } } } },
     responses: {

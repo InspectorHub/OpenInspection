@@ -4,9 +4,8 @@
  * Every row an import creates or maps gets one (package, table, source id) ->
  * new id entry. The map is the anchor for apply idempotency (a mapped row is
  * skipped on replay), revert (the delete list), the free-tier quota exclusion
- * and the read-only marker on imported inspections. A `kept` mapping is one the
- * owner changed after restore: revert preserves it (it drops out of the revert
- * scope/done) and the marker stays so the row remains read-only and quota-exempt.
+ * and the read-only marker on imported inspections. The marker is never
+ * removed.
  *
  * Writes are idempotent via the DB unique index on
  * (tenant_id, package_id, table_name, source_id): replaying a key writes nothing
@@ -31,9 +30,8 @@ export interface ImportIdMapDeps {
 
 /** D1 caps bound parameters per statement at 100; leave headroom for the fixed predicates. */
 const MAX_LOOKUP_IDS = 90;
-/** import_id_map has 8 columns (kept uses its default); 12 rows × 8 columns
- *  stays under D1's 100 bound-parameter cap with headroom. */
-const MAX_INSERT_ROWS = 12;
+/** import_id_map has 7 columns, so at most floor(100 / 7) rows fit one INSERT. */
+const MAX_INSERT_ROWS = 14;
 
 export class ImportIdMapService {
     constructor(

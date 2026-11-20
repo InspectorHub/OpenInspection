@@ -113,13 +113,6 @@
       "when": 1795064170724,
       "tag": "0015_glorious_wildside",
       "breakpoints": true
-    },
-    {
-      "idx": 16,
-      "version": "6",
-      "when": 1795135206841,
-      "tag": "0016_brainy_silver_surfer",
-      "breakpoints": true
     }
   ]
 }
