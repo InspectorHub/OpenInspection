@@ -52,8 +52,13 @@ baseline rather than from the whole earlier history of the path.
 
 ## Trusted publisher (npmjs.com, package settings)
 
-Configure it after the first publish, shortly before merging the first Release
-PR, because the first CI publish must succeed within 2 days of saving it.
+The trusted-publisher entry below is configured on npmjs.com. The first version
+`0.1.0` was published by hand on 2026-11-17 (before the entry existed) and has no
+provenance; the `data-package-v0.1.0` tag and GitHub Release were added at the
+publishing commit to give release-please its changelog baseline. From `0.1.1` on,
+every version is published by `publish-data-package.yml` via OIDC and carries
+SLSA provenance. Keep the entry in place: a CI publish must succeed within 2 days
+of saving it, or the binding has to be configured again.
 
 | Field | Value |
 |---|---|
