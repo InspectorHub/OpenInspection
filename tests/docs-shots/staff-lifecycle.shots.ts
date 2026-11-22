@@ -203,6 +203,14 @@ test('sending the report, and the delivery record', async ({ page }) => {
     await expect(page.getByRole('dialog')).toBeHidden({ timeout: 30_000 });
     await page.reload();
 
+    // The Outbox block is a disclosure that starts collapsed; its per-recipient
+    // report-delivery list only mounts on expand and loads over a fetcher. Open
+    // it and wait for the "Report delivery" list to render before photographing,
+    // otherwise the picture is a folded shell ("1 delivered · 0 unread") and
+    // the reader never sees the delivery status the guide is teaching.
+    await page.getByRole('button', { name: 'Outbox' }).click();
+    await expect(page.getByText('Report delivery').first()).toBeVisible({ timeout: 30_000 });
+
     // The delivery record lives in the Communication panel, so photograph the
     // panel — same reasoning as the hub regions above, same unchanged id.
     await expect(page.getByRole('heading', { name: /^Communication$/i })).toBeVisible();
