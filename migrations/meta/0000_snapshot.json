@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "26c2df7a-c33c-4e4c-8664-877391a24305",
+  "id": "19867a56-a3ac-4445-ae5a-fd8966d4443c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_terms_acceptances": {
@@ -254,13 +254,6 @@
           ],
           "isUnique": true
         },
-        "idx_agreement_requests_tenant": {
-          "name": "idx_agreement_requests_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "idx_agreement_requests_inspection": {
           "name": "idx_agreement_requests_inspection",
           "columns": [
@@ -274,6 +267,14 @@
             "token_hash"
           ],
           "isUnique": true
+        },
+        "idx_agreement_requests_tenant_id": {
+          "name": "idx_agreement_requests_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -545,6 +546,14 @@
             "token_hash"
           ],
           "isUnique": true
+        },
+        "idx_agreement_signers_tenant_id": {
+          "name": "idx_agreement_signers_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -600,10 +609,11 @@
         }
       },
       "indexes": {
-        "idx_agreements_tenant": {
-          "name": "idx_agreements_tenant",
+        "idx_agreements_tenant_id": {
+          "name": "idx_agreements_tenant_id",
           "columns": [
-            "tenant_id"
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -702,6 +712,14 @@
             "created_at"
           ],
           "isUnique": false
+        },
+        "idx_ai_call_provenance_tenant_id": {
+          "name": "idx_ai_call_provenance_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -780,6 +798,14 @@
             "reviewed_by"
           ],
           "isUnique": true
+        },
+        "idx_ai_content_reviews_tenant_id": {
+          "name": "idx_ai_content_reviews_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -948,6 +974,14 @@
           ],
           "isUnique": true,
           "where": "event_id IS NOT NULL"
+        },
+        "idx_automation_logs_tenant_id": {
+          "name": "idx_automation_logs_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -1083,10 +1117,11 @@
         }
       },
       "indexes": {
-        "idx_automations_tenant": {
-          "name": "idx_automations_tenant",
+        "idx_automations_tenant_id": {
+          "name": "idx_automations_tenant_id",
           "columns": [
-            "tenant_id"
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -1172,6 +1207,14 @@
             "start_time"
           ],
           "isUnique": true
+        },
+        "idx_availability_tenant_id": {
+          "name": "idx_availability_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -1306,6 +1349,14 @@
             "external_id"
           ],
           "isUnique": true
+        },
+        "idx_availability_overrides_tenant_id": {
+          "name": "idx_availability_overrides_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -1431,6 +1482,14 @@
             "date"
           ],
           "isUnique": false
+        },
+        "idx_calendar_blocks_tenant_id": {
+          "name": "idx_calendar_blocks_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -1512,6 +1571,14 @@
           "columns": [
             "tenant_id",
             "connection_id"
+          ],
+          "isUnique": false
+        },
+        "idx_calendar_connection_read_calendars_tenant_id": {
+          "name": "idx_calendar_connection_read_calendars_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -1632,6 +1699,14 @@
             "user_id"
           ],
           "isUnique": false
+        },
+        "idx_calendar_connections_tenant_id": {
+          "name": "idx_calendar_connections_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -1730,6 +1805,14 @@
             "tenant_id",
             "user_id",
             "provider"
+          ],
+          "isUnique": false
+        },
+        "idx_calendar_external_links_tenant_id": {
+          "name": "idx_calendar_external_links_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -1942,17 +2025,18 @@
         }
       },
       "indexes": {
-        "idx_comments_tenant": {
-          "name": "idx_comments_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "idx_comments_library_id": {
           "name": "idx_comments_library_id",
           "columns": [
             "library_id"
+          ],
+          "isUnique": false
+        },
+        "idx_comments_tenant_id": {
+          "name": "idx_comments_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -2050,6 +2134,14 @@
             "token_hash"
           ],
           "isUnique": true
+        },
+        "idx_concierge_confirm_tokens_tenant_id": {
+          "name": "idx_concierge_confirm_tokens_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -2156,13 +2248,6 @@
         }
       },
       "indexes": {
-        "idx_crp_tenant": {
-          "name": "idx_crp_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "uq_crp_tenant_key": {
           "name": "uq_crp_tenant_key",
           "columns": [
@@ -2171,6 +2256,14 @@
           ],
           "isUnique": true,
           "where": "is_active = 1"
+        },
+        "idx_contact_role_profiles_tenant_id": {
+          "name": "idx_contact_role_profiles_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -2321,6 +2414,14 @@
             "agent_user_id"
           ],
           "isUnique": false
+        },
+        "idx_contacts_tenant_id": {
+          "name": "idx_contacts_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -2390,13 +2491,6 @@
         }
       },
       "indexes": {
-        "idx_contractor_types_tenant": {
-          "name": "idx_contractor_types_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "uq_contractor_types_tenant_trade": {
           "name": "uq_contractor_types_tenant_trade",
           "columns": [
@@ -2405,6 +2499,14 @@
           ],
           "isUnique": true,
           "where": "trade_slug IS NOT NULL"
+        },
+        "idx_contractor_types_tenant_id": {
+          "name": "idx_contractor_types_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -2609,6 +2711,14 @@
             "finding_key"
           ],
           "isUnique": false
+        },
+        "idx_cost_items_tenant_id": {
+          "name": "idx_cost_items_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -2681,10 +2791,11 @@
         }
       },
       "indexes": {
-        "idx_defect_categories_tenant": {
-          "name": "idx_defect_categories_tenant",
+        "idx_defect_categories_tenant_id": {
+          "name": "idx_defect_categories_tenant_id",
           "columns": [
-            "tenant_id"
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -2840,13 +2951,6 @@
         }
       },
       "indexes": {
-        "idx_discount_codes_tenant": {
-          "name": "idx_discount_codes_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "uq_discount_codes_code_tenant": {
           "name": "uq_discount_codes_code_tenant",
           "columns": [
@@ -2854,6 +2958,14 @@
             "tenant_id"
           ],
           "isUnique": true
+        },
+        "idx_discount_codes_tenant_id": {
+          "name": "idx_discount_codes_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -2977,6 +3089,14 @@
             "document_key"
           ],
           "isUnique": true
+        },
+        "idx_document_review_items_tenant_id": {
+          "name": "idx_document_review_items_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -3043,6 +3163,14 @@
           "columns": [
             "tenant_id",
             "email"
+          ],
+          "isUnique": false
+        },
+        "idx_email_suppressions_tenant_id": {
+          "name": "idx_email_suppressions_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -3151,6 +3279,14 @@
             "created_at"
           ],
           "isUnique": false
+        },
+        "idx_erasure_log_tenant_id": {
+          "name": "idx_erasure_log_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -3251,6 +3387,22 @@
           ],
           "isUnique": true,
           "where": "event NOT LIKE 'signer.%'"
+        },
+        "idx_esign_audit_logs_tenant_id": {
+          "name": "idx_esign_audit_logs_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
+        },
+        "idx_esign_audit_logs_tenant_created": {
+          "name": "idx_esign_audit_logs_tenant_created",
+          "columns": [
+            "tenant_id",
+            "created_at"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -3353,6 +3505,14 @@
             "slug"
           ],
           "isUnique": true
+        },
+        "idx_event_types_tenant_id": {
+          "name": "idx_event_types_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -3454,6 +3614,177 @@
           "name": "idempotency_keys_tenant_id_key_pk"
         }
       },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "import_archives": {
+      "name": "import_archives",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "package_id": {
+          "name": "package_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "counts": {
+          "name": "counts",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_ids": {
+          "name": "source_ids",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_import_archives_package": {
+          "name": "uq_import_archives_package",
+          "columns": [
+            "tenant_id",
+            "package_id"
+          ],
+          "isUnique": true
+        },
+        "idx_import_archives_tenant_id": {
+          "name": "idx_import_archives_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "import_id_map": {
+      "name": "import_id_map",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "package_id": {
+          "name": "package_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "table_name": {
+          "name": "table_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_id": {
+          "name": "source_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "new_id": {
+          "name": "new_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_import_id_map_source": {
+          "name": "uq_import_id_map_source",
+          "columns": [
+            "tenant_id",
+            "package_id",
+            "table_name",
+            "source_id"
+          ],
+          "isUnique": true
+        },
+        "idx_import_id_map_tenant_id": {
+          "name": "idx_import_id_map_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
+        },
+        "idx_import_id_map_new_id": {
+          "name": "idx_import_id_map_new_id",
+          "columns": [
+            "tenant_id",
+            "table_name",
+            "new_id"
+          ],
+          "isUnique": false
+        },
+        "idx_import_id_map_package": {
+          "name": "idx_import_id_map_package",
+          "columns": [
+            "tenant_id",
+            "package_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -3562,6 +3893,14 @@
             "token_hash"
           ],
           "isUnique": true
+        },
+        "idx_inspection_access_tokens_tenant_id": {
+          "name": "idx_inspection_access_tokens_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -3702,6 +4041,14 @@
             "inspection_id"
           ],
           "isUnique": false
+        },
+        "idx_inspection_events_tenant_id": {
+          "name": "idx_inspection_events_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -3817,6 +4164,15 @@
             "user_id"
           ],
           "isUnique": false
+        },
+        "idx_inspection_inspectors_tenant_inspection_id_user_id": {
+          "name": "idx_inspection_inspectors_tenant_inspection_id_user_id",
+          "columns": [
+            "tenant_id",
+            "inspection_id",
+            "user_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -3872,13 +4228,6 @@
         }
       },
       "indexes": {
-        "idx_tag_links_tenant": {
-          "name": "idx_tag_links_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "idx_tag_links_tag": {
           "name": "idx_tag_links_tag",
           "columns": [
@@ -3891,6 +4240,16 @@
           "columns": [
             "inspection_id",
             "item_id"
+          ],
+          "isUnique": false
+        },
+        "idx_inspection_item_tag_links_tenant_pk": {
+          "name": "idx_inspection_item_tag_links_tenant_pk",
+          "columns": [
+            "tenant_id",
+            "inspection_id",
+            "item_id",
+            "tag_id"
           ],
           "isUnique": false
         }
@@ -4021,17 +4380,18 @@
         }
       },
       "indexes": {
-        "idx_media_pool_tenant": {
-          "name": "idx_media_pool_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "idx_media_pool_inspection": {
           "name": "idx_media_pool_inspection",
           "columns": [
             "inspection_id"
+          ],
+          "isUnique": false
+        },
+        "idx_inspection_media_pool_tenant_id": {
+          "name": "idx_inspection_media_pool_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -4149,6 +4509,14 @@
           ],
           "isUnique": false,
           "where": "\"inspection_messages\".\"read_at\" IS NULL"
+        },
+        "idx_inspection_messages_tenant_id": {
+          "name": "idx_inspection_messages_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -4230,13 +4598,6 @@
         }
       },
       "indexes": {
-        "idx_ip_tenant": {
-          "name": "idx_ip_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "uq_ip_insp_contact_role": {
           "name": "uq_ip_insp_contact_role",
           "columns": [
@@ -4245,6 +4606,14 @@
             "role_profile_id"
           ],
           "isUnique": true
+        },
+        "idx_inspection_people_tenant_id": {
+          "name": "idx_inspection_people_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -4372,6 +4741,14 @@
             "client_email"
           ],
           "isUnique": false
+        },
+        "idx_inspection_requests_tenant_id": {
+          "name": "idx_inspection_requests_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -4461,13 +4838,6 @@
         }
       },
       "indexes": {
-        "idx_results_tenant": {
-          "name": "idx_results_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "idx_results_inspection": {
           "name": "idx_results_inspection",
           "columns": [
@@ -4481,6 +4851,14 @@
             "report_id"
           ],
           "isUnique": true
+        },
+        "idx_inspection_results_tenant_id": {
+          "name": "idx_inspection_results_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -4622,6 +5000,14 @@
             "inspection_service_id"
           ],
           "isUnique": false
+        },
+        "idx_inspection_service_pay_splits_tenant_id": {
+          "name": "idx_inspection_service_pay_splits_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -4691,17 +5077,18 @@
         }
       },
       "indexes": {
-        "idx_insp_services_tenant": {
-          "name": "idx_insp_services_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "idx_insp_services_insp": {
           "name": "idx_insp_services_insp",
           "columns": [
             "inspection_id"
+          ],
+          "isUnique": false
+        },
+        "idx_inspection_services_tenant_id": {
+          "name": "idx_inspection_services_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -4748,6 +5135,45 @@
         }
       },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "inspection_tombstones": {
+      "name": "inspection_tombstones",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inspection_id": {
+          "name": "inspection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "inspection_tombstones_tenant_id_inspection_id_pk": {
+          "columns": [
+            "tenant_id",
+            "inspection_id"
+          ],
+          "name": "inspection_tombstones_tenant_id_inspection_id_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -4821,6 +5247,14 @@
             "name"
           ],
           "isUnique": true
+        },
+        "idx_inspection_types_tenant_id": {
+          "name": "idx_inspection_types_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -4918,6 +5352,14 @@
           "name": "idx_inspection_units_parent",
           "columns": [
             "parent_unit_id"
+          ],
+          "isUnique": false
+        },
+        "idx_inspection_units_tenant_id": {
+          "name": "idx_inspection_units_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -5522,6 +5964,14 @@
             "id"
           ],
           "isUnique": false
+        },
+        "idx_inspections_tenant_id": {
+          "name": "idx_inspections_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -5672,17 +6122,18 @@
         }
       },
       "indexes": {
-        "idx_inspector_credentials_tenant": {
-          "name": "idx_inspector_credentials_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "idx_inspector_credentials_user": {
           "name": "idx_inspector_credentials_user",
           "columns": [
             "user_id"
+          ],
+          "isUnique": false
+        },
+        "idx_inspector_credentials_tenant_id": {
+          "name": "idx_inspector_credentials_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -5740,6 +6191,14 @@
             "zip_prefix"
           ],
           "isUnique": true
+        },
+        "idx_inspector_service_areas_tenant_id": {
+          "name": "idx_inspector_service_areas_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -5917,6 +6376,14 @@
             "invoice_number"
           ],
           "isUnique": true
+        },
+        "idx_invoices_tenant_id": {
+          "name": "idx_invoices_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -6190,6 +6657,14 @@
             "name",
             "channel",
             "locale"
+          ],
+          "isUnique": false
+        },
+        "idx_message_templates_tenant_id": {
+          "name": "idx_message_templates_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -6533,6 +7008,14 @@
             "expires_at"
           ],
           "isUnique": false
+        },
+        "idx_migration_batches_tenant_id": {
+          "name": "idx_migration_batches_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -6645,16 +7128,71 @@
           ],
           "isUnique": false
         },
-        "idx_migration_rows_tenant": {
-          "name": "idx_migration_rows_tenant",
+        "idx_migration_rows_tenant_id": {
+          "name": "idx_migration_rows_tenant_id",
           "columns": [
-            "tenant_id"
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "native_client_seen": {
+      "name": "native_client_seen",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "client_version": {
+          "name": "client_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "native_client_seen_tenant_id_platform_client_version_pk": {
+          "columns": [
+            "tenant_id",
+            "platform",
+            "client_version"
+          ],
+          "name": "native_client_seen_tenant_id_platform_client_version_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -6736,10 +7274,88 @@
             "channel"
           ],
           "isUnique": true
+        },
+        "idx_notification_preferences_tenant_id": {
+          "name": "idx_notification_preferences_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "offline_import_applied": {
+      "name": "offline_import_applied",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "op": {
+          "name": "op",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inspection_id": {
+          "name": "inspection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "applied_at": {
+          "name": "applied_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "applied_by": {
+          "name": "applied_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_offline_import_applied_age": {
+          "name": "idx_offline_import_applied_age",
+          "columns": [
+            "tenant_id",
+            "applied_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "offline_import_applied_tenant_id_idempotency_key_inspection_id_pk": {
+          "columns": [
+            "tenant_id",
+            "idempotency_key",
+            "inspection_id"
+          ],
+          "name": "offline_import_applied_tenant_id_idempotency_key_inspection_id_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -6870,6 +7486,14 @@
             "provider_ref"
           ],
           "isUnique": true
+        },
+        "idx_order_payments_tenant_id": {
+          "name": "idx_order_payments_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -6922,6 +7546,105 @@
           "columns": [
             "tenant_id",
             "r2_key"
+          ],
+          "isUnique": false
+        },
+        "idx_orphaned_media_tenant_id": {
+          "name": "idx_orphaned_media_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "permission_templates": {
+      "name": "permission_templates",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "base_role": {
+          "name": "base_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "overrides": {
+          "name": "overrides",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_permission_templates_name": {
+          "name": "uq_permission_templates_name",
+          "columns": [
+            "tenant_id",
+            "name"
+          ],
+          "isUnique": true,
+          "where": "archived_at IS NULL"
+        },
+        "idx_permission_templates_tenant_id": {
+          "name": "idx_permission_templates_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -7038,6 +7761,14 @@
             "share_token"
           ],
           "isUnique": true
+        },
+        "idx_psq_responses_tenant_id": {
+          "name": "idx_psq_responses_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -7200,6 +7931,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "qbo_display_name": {
+          "name": "qbo_display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -7220,6 +7958,14 @@
             "oi_id"
           ],
           "isUnique": true
+        },
+        "idx_qbo_entity_map_tenant_id": {
+          "name": "idx_qbo_entity_map_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -7310,7 +8056,16 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_qbo_sync_errors_tenant_id": {
+          "name": "idx_qbo_sync_errors_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -7400,6 +8155,14 @@
             "slug"
           ],
           "isUnique": true
+        },
+        "idx_rating_systems_tenant_id": {
+          "name": "idx_rating_systems_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -7538,6 +8301,14 @@
             "repair_request_id"
           ],
           "isUnique": false
+        },
+        "idx_repair_request_items_tenant_id": {
+          "name": "idx_repair_request_items_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -7641,6 +8412,14 @@
             "share_token"
           ],
           "isUnique": true
+        },
+        "idx_repair_requests_tenant_id": {
+          "name": "idx_repair_requests_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -7728,6 +8507,14 @@
           "columns": [
             "tenant_id",
             "inspection_id"
+          ],
+          "isUnique": false
+        },
+        "idx_report_exports_tenant_id": {
+          "name": "idx_report_exports_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -7836,13 +8623,6 @@
           ],
           "isUnique": true
         },
-        "idx_report_pdfs_tenant": {
-          "name": "idx_report_pdfs_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "idx_report_pdfs_status": {
           "name": "idx_report_pdfs_status",
           "columns": [
@@ -7856,6 +8636,14 @@
             "inspection_id",
             "type",
             "content_hash"
+          ],
+          "isUnique": false
+        },
+        "idx_report_pdfs_tenant_id": {
+          "name": "idx_report_pdfs_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -7977,6 +8765,14 @@
             "role"
           ],
           "isUnique": true
+        },
+        "idx_report_signoff_tenant_id": {
+          "name": "idx_report_signoff_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -8074,6 +8870,14 @@
             "locale"
           ],
           "isUnique": true
+        },
+        "idx_report_translations_tenant_id": {
+          "name": "idx_report_translations_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -8214,6 +9018,14 @@
             "verification_token"
           ],
           "isUnique": true
+        },
+        "idx_report_versions_tenant_id": {
+          "name": "idx_report_versions_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -8284,6 +9096,14 @@
             "access_token_id"
           ],
           "isUnique": true
+        },
+        "idx_report_views_tenant_id": {
+          "name": "idx_report_views_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -8396,13 +9216,6 @@
           ],
           "isUnique": false
         },
-        "idx_reports_tenant": {
-          "name": "idx_reports_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "uq_reports_primary": {
           "name": "uq_reports_primary",
           "columns": [
@@ -8410,6 +9223,14 @@
           ],
           "isUnique": true,
           "where": "kind = 'primary'"
+        },
+        "idx_reports_tenant_id": {
+          "name": "idx_reports_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -8450,10 +9271,12 @@
         }
       },
       "indexes": {
-        "idx_service_inspectors_tenant": {
-          "name": "idx_service_inspectors_tenant",
+        "idx_service_inspectors_tenant_service_id_user_id": {
+          "name": "idx_service_inspectors_tenant_service_id_user_id",
           "columns": [
-            "tenant_id"
+            "tenant_id",
+            "service_id",
+            "user_id"
           ],
           "isUnique": false
         }
@@ -8550,6 +9373,14 @@
           ],
           "isUnique": true,
           "where": "user_id IS NULL"
+        },
+        "idx_service_pay_rules_tenant_id": {
+          "name": "idx_service_pay_rules_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -8655,10 +9486,11 @@
         }
       },
       "indexes": {
-        "idx_services_tenant": {
-          "name": "idx_services_tenant",
+        "idx_services_tenant_id": {
+          "name": "idx_services_tenant_id",
           "columns": [
-            "tenant_id"
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -8792,6 +9624,14 @@
           ],
           "isUnique": true,
           "where": "retired_at IS NULL"
+        },
+        "idx_signing_keys_tenant_id": {
+          "name": "idx_signing_keys_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -8929,6 +9769,14 @@
             "created_at"
           ],
           "isUnique": false
+        },
+        "idx_sms_consent_log_tenant_id": {
+          "name": "idx_sms_consent_log_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -8988,6 +9836,14 @@
           "columns": [
             "tenant_id",
             "provider_message_id"
+          ],
+          "isUnique": false
+        },
+        "idx_sms_delivery_status_tenant_id": {
+          "name": "idx_sms_delivery_status_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -9109,6 +9965,14 @@
           "columns": [
             "tenant_id",
             "inspection_id"
+          ],
+          "isUnique": false
+        },
+        "idx_statutory_form_productions_tenant_id": {
+          "name": "idx_statutory_form_productions_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -9354,6 +10218,14 @@
             "name"
           ],
           "isUnique": true
+        },
+        "idx_tags_tenant_id": {
+          "name": "idx_tags_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -9459,17 +10331,18 @@
         }
       },
       "indexes": {
-        "idx_templates_tenant": {
-          "name": "idx_templates_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "idx_templates_rating_system": {
           "name": "idx_templates_rating_system",
           "columns": [
             "rating_system_id"
+          ],
+          "isUnique": false
+        },
+        "idx_templates_tenant_id": {
+          "name": "idx_templates_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -9547,12 +10420,206 @@
             "date"
           ],
           "isUnique": true
+        },
+        "idx_tenant_custom_holidays_tenant_id": {
+          "name": "idx_tenant_custom_holidays_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
+    },
+    "tenant_data_jobs": {
+      "name": "tenant_data_jobs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "stage": {
+          "name": "stage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cursor": {
+          "name": "cursor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "package_id": {
+          "name": "package_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "bytes": {
+          "name": "bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "counts": {
+          "name": "counts",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "error_code": {
+          "name": "error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lease_holder": {
+          "name": "lease_holder",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lease_expires_at": {
+          "name": "lease_expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "client_kind": {
+          "name": "client_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_tenant_data_jobs_active": {
+          "name": "uq_tenant_data_jobs_active",
+          "columns": [
+            "tenant_id"
+          ],
+          "isUnique": true,
+          "where": "status IN ('queued', 'running')"
+        },
+        "idx_tenant_data_jobs_tenant_id": {
+          "name": "idx_tenant_data_jobs_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
+        },
+        "idx_tenant_data_jobs_tenant_created": {
+          "name": "idx_tenant_data_jobs_tenant_created",
+          "columns": [
+            "tenant_id",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "idx_tenant_data_jobs_sweep": {
+          "name": "idx_tenant_data_jobs_sweep",
+          "columns": [
+            "status",
+            "lease_expires_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_tenant_data_jobs_cursor_len": {
+          "name": "ck_tenant_data_jobs_cursor_len",
+          "value": "\"tenant_data_jobs\".\"cursor\" IS NULL OR length(\"tenant_data_jobs\".\"cursor\") <= 4096"
+        },
+        "ck_tenant_data_jobs_counts_len": {
+          "name": "ck_tenant_data_jobs_counts_len",
+          "value": "\"tenant_data_jobs\".\"counts\" IS NULL OR length(\"tenant_data_jobs\".\"counts\") <= 4096"
+        }
+      }
     },
     "tenant_library_imports": {
       "name": "tenant_library_imports",
@@ -9623,6 +10690,14 @@
             "library_id"
           ],
           "isUnique": true
+        },
+        "idx_tenant_library_imports_tenant_id": {
+          "name": "idx_tenant_library_imports_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -9734,6 +10809,14 @@
             "library_id"
           ],
           "isUnique": false
+        },
+        "idx_tenant_marketplace_import_history_tenant_id": {
+          "name": "idx_tenant_marketplace_import_history_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -9801,6 +10884,253 @@
           "name": "usage_counters_tenant_id_metric_period_key_pk"
         }
       },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "verify_export_attempts": {
+      "name": "verify_export_attempts",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "window_ends_at": {
+          "name": "window_ends_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_verify_export_attempts_ends": {
+          "name": "idx_verify_export_attempts_ends",
+          "columns": [
+            "window_ends_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "video_upload_parts": {
+      "name": "video_upload_parts",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "media_id": {
+          "name": "media_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "part_number": {
+          "name": "part_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "etag": {
+          "name": "etag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "size_bytes": {
+          "name": "size_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "video_upload_parts_tenant_id_media_id_part_number_pk": {
+          "columns": [
+            "tenant_id",
+            "media_id",
+            "part_number"
+          ],
+          "name": "video_upload_parts_tenant_id_media_id_part_number_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "video_uploads": {
+      "name": "video_uploads",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inspection_id": {
+          "name": "inspection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "media_id": {
+          "name": "media_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "upload_id": {
+          "name": "upload_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "r2_key": {
+          "name": "r2_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "total_bytes": {
+          "name": "total_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "part_bytes": {
+          "name": "part_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "part_count": {
+          "name": "part_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "completing_at": {
+          "name": "completing_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_video_uploads_media": {
+          "name": "uq_video_uploads_media",
+          "columns": [
+            "tenant_id",
+            "media_id"
+          ],
+          "isUnique": true
+        },
+        "idx_video_uploads_sweep": {
+          "name": "idx_video_uploads_sweep",
+          "columns": [
+            "state",
+            "expires_at"
+          ],
+          "isUnique": false
+        },
+        "idx_video_uploads_tenant_id": {
+          "name": "idx_video_uploads_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -10422,6 +11752,22 @@
           "notNull": true,
           "autoincrement": false,
           "default": false
+        },
+        "offline_max_days": {
+          "name": "offline_max_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 30
+        },
+        "is_new_inspectors_view_all": {
+          "name": "is_new_inspectors_view_all",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
         }
       },
       "indexes": {},
@@ -10819,10 +12165,11 @@
         }
       },
       "indexes": {
-        "idx_tenant_slug_history_tenant": {
-          "name": "idx_tenant_slug_history_tenant",
+        "idx_tenant_slug_history_tenant_old_slug": {
+          "name": "idx_tenant_slug_history_tenant_old_slug",
           "columns": [
-            "tenant_id"
+            "tenant_id",
+            "old_slug"
           ],
           "isUnique": false
         }
@@ -10888,13 +12235,6 @@
         }
       },
       "indexes": {
-        "idx_invites_tenant": {
-          "name": "idx_invites_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "uq_tenant_invites_pending_email": {
           "name": "uq_tenant_invites_pending_email",
           "columns": [
@@ -10903,6 +12243,14 @@
           ],
           "isUnique": true,
           "where": "status = 'pending'"
+        },
+        "idx_tenant_invites_tenant_id": {
+          "name": "idx_tenant_invites_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -11172,6 +12520,14 @@
             "email"
           ],
           "isUnique": false
+        },
+        "idx_users_tenant_id": {
+          "name": "idx_users_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -11298,6 +12654,14 @@
             "entity_id"
           ],
           "isUnique": false
+        },
+        "idx_audit_logs_tenant_id": {
+          "name": "idx_audit_logs_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -11393,6 +12757,14 @@
             "tenant_id",
             "target",
             "tested_at"
+          ],
+          "isUnique": false
+        },
+        "idx_integration_test_results_tenant_id": {
+          "name": "idx_integration_test_results_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -11529,6 +12901,14 @@
             "tenant_id",
             "contact_id",
             "created_at"
+          ],
+          "isUnique": false
+        },
+        "idx_notifications_tenant_id": {
+          "name": "idx_notifications_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -11852,17 +13232,18 @@
         }
       },
       "indexes": {
-        "idx_destruction_tenant": {
-          "name": "idx_destruction_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "idx_destruction_destroyed_at": {
           "name": "idx_destruction_destroyed_at",
           "columns": [
             "destroyed_at"
+          ],
+          "isUnique": false
+        },
+        "idx_tenant_destruction_records_tenant_id": {
+          "name": "idx_tenant_destruction_records_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -11956,6 +13337,14 @@
             "tenant_id",
             "doc",
             "published_at"
+          ],
+          "isUnique": false
+        },
+        "idx_tenant_legal_versions_tenant_id": {
+          "name": "idx_tenant_legal_versions_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -12056,6 +13445,14 @@
             "accepted_at"
           ],
           "isUnique": false
+        },
+        "idx_account_acceptances_tenant_id": {
+          "name": "idx_account_acceptances_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -12136,6 +13533,14 @@
           "columns": [
             "tenant_id",
             "released_at"
+          ],
+          "isUnique": false
+        },
+        "idx_legal_holds_tenant_id": {
+          "name": "idx_legal_holds_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -12255,6 +13660,14 @@
             "inspection_id"
           ],
           "isUnique": false
+        },
+        "idx_client_uploads_tenant_id": {
+          "name": "idx_client_uploads_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -12323,6 +13736,14 @@
           "columns": [
             "tenant_id",
             "inspection_id"
+          ],
+          "isUnique": false
+        },
+        "idx_statutory_form_entries_tenant_id": {
+          "name": "idx_statutory_form_entries_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
           ],
           "isUnique": false
         }
@@ -12428,6 +13849,14 @@
             "inspection_id"
           ],
           "isUnique": true
+        },
+        "idx_statutory_inspection_details_tenant_id": {
+          "name": "idx_statutory_inspection_details_tenant_id",
+          "columns": [
+            "tenant_id",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},

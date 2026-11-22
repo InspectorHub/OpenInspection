@@ -24,7 +24,7 @@
     "declared name that the database no longer carries fails the gate as a stale allowlist, so",
     "these lists must be emptied again whenever a ledger is rewritten.",
     "",
-    "The `saas` list is the exception: after the 2026-10-13 rebuild its ledger still names the two forward files that rebuild folded in, and they are left in place on purpose.",
+    "The `saas` list is the exception: the ledger retains two names folded in by the 2026-10-13 rebuild and fifteen names folded in by the 2026-11-22 rebuild. They are left in place on purpose.",
     "",
     "ADD A NAME HERE ONLY IF you deliberately chose to leave the pre-rebuild rows in place, and",
     "only after confirming that the database's SCHEMA is current. This file silences a report; it",
@@ -32,7 +32,25 @@
     "docs/operate/upgrade.md instead — the ledger rewrite it describes leaves this file empty."
   ],
   "saas": {
-    "acceptedExtra": ["0001_integration_test_step.sql", "0002_automation_log_human_verified.sql"]
+    "acceptedExtra": [
+      "0001_integration_test_step.sql",
+      "0002_automation_log_human_verified.sql",
+      "0001_offline_max_days.sql",
+      "0002_offline_import_applied.sql",
+      "0003_qbo_display_name.sql",
+      "0004_permission_templates.sql",
+      "0005_new_inspectors_view_all.sql",
+      "0006_inspection_tombstones.sql",
+      "0007_video_upload_ledger.sql",
+      "0008_verify_export_attempts.sql",
+      "0009_templates_schema_unwrap.sql",
+      "0010_export_tenant_indexes.sql",
+      "0011_drop_redundant_tenant_indexes.sql",
+      "0012_tenant_data_jobs.sql",
+      "0013_curious_grey_gargoyle.sql",
+      "0014_rapid_makkari.sql",
+      "0015_glorious_wildside.sql"
+    ]
   },
   "local-d1": {
     "acceptedExtra": []

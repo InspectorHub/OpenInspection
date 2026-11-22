@@ -1,1 +1,0 @@
-ALTER TABLE `qbo_entity_map` ADD `qbo_display_name` text;
