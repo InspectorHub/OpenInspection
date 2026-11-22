@@ -110,7 +110,7 @@ apps/openinspection/
 │   ├── hooks/                     # React hooks
 │   ├── lib/                       # API client (hono/client over the in-process binding), session, helpers
 │   └── styles/tailwind.css        # Design System 0523 token layer
-├── migrations/                    # D1 SQL migrations (drizzle-kit schema-first: one regenerated 0000_baseline.sql, forward files on top)
+├── migrations/                    # D1 SQL: one regenerated 0000_baseline.sql now; future schema changes add forward files
 ├── tests/                         # unit / workers / contract / e2e — see develop/testing.md
 │                                  # (web unit specs are CO-LOCATED under app/; tests/web/ is retired)
 ├── packages/

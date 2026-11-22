@@ -65,9 +65,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_account_acceptances_user_doc_version` (user_id, doc, version)
 - `idx_account_acceptances_tenant` (tenant_id, accepted_at)
 - `idx_account_acceptances_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_account_acceptances_user_doc_version` (user_id, doc, version)
 
 ---
 
@@ -126,10 +126,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `idx_agreement_requests_verify_token` (verification_token)
 - `idx_agreement_requests_inspection` (inspection_id)
-- **UNIQUE** `idx_agreement_requests_token_hash` (token_hash)
 - `idx_agreement_requests_tenant_id` (tenant_id, id)
+- **UNIQUE** `idx_agreement_requests_token_hash` (token_hash)
+- **UNIQUE** `idx_agreement_requests_verify_token` (verification_token)
 
 ---
 
@@ -170,10 +170,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_agreement_signers_tenant_request` (tenant_id, request_id)
 - **UNIQUE** `idx_agreement_signers_request_email` (request_id, email)
-- **UNIQUE** `idx_agreement_signers_token_hash` (token_hash)
 - `idx_agreement_signers_tenant_id` (tenant_id, id)
+- `idx_agreement_signers_tenant_request` (tenant_id, request_id)
+- **UNIQUE** `idx_agreement_signers_token_hash` (token_hash)
 
 ---
 
@@ -240,8 +240,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_ai_content_reviews_ai_call` (ai_call_id)
-- **UNIQUE** `uq_ai_content_reviews_person_call` (tenant_id, artifact_type, artifact_id, ai_call_id, reviewed_by)
 - `idx_ai_content_reviews_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_ai_content_reviews_person_call` (tenant_id, artifact_type, artifact_id, ai_call_id, reviewed_by)
 
 ---
 
@@ -266,9 +266,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_audit_tenant_created` (tenant_id, created_at)
 - `idx_audit_entity` (entity_type, entity_id)
 - `idx_audit_logs_tenant_id` (tenant_id, id)
+- `idx_audit_tenant_created` (tenant_id, created_at)
 
 ---
 
@@ -299,10 +299,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_automation_logs_pending` (tenant_id, status, send_at)
 - `idx_automation_logs_insp` (inspection_id)
-- **UNIQUE** `uq_automation_logs_event` (automation_id, inspection_id, event_id, channel, recipient) — partial, `WHERE event_id IS NOT NULL`
+- `idx_automation_logs_pending` (tenant_id, status, send_at)
 - `idx_automation_logs_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_automation_logs_event` (automation_id, inspection_id, event_id, channel, recipient) — partial, `WHERE event_id IS NOT NULL`
 
 ---
 
@@ -350,8 +350,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `idx_availability_window_unique` (inspector_id, day_of_week, start_time)
 - `idx_availability_tenant_id` (tenant_id, id)
+- **UNIQUE** `idx_availability_window_unique` (inspector_id, day_of_week, start_time)
 
 ---
 
@@ -376,8 +376,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - **UNIQUE** `idx_avail_overrides_block_unique` (inspector_id, date) — partial, `WHERE is_available = 0 AND source IS NULL`
-- **UNIQUE** `uq_avail_overrides_external` (inspector_id, source, external_id)
 - `idx_availability_overrides_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_avail_overrides_external` (inspector_id, source, external_id)
 
 ---
 
@@ -401,8 +401,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_calendar_blocks_tenant_user_date` (tenant_id, user_id, date)
 - `idx_calendar_blocks_tenant_id` (tenant_id, id)
+- `idx_calendar_blocks_tenant_user_date` (tenant_id, user_id, date)
 
 ---
 
@@ -425,9 +425,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_conn_read_cal` (connection_id, external_calendar_id)
-- `idx_conn_read_cal_tenant` (tenant_id, connection_id)
 - `idx_calendar_connection_read_calendars_tenant_id` (tenant_id, id)
+- `idx_conn_read_cal_tenant` (tenant_id, connection_id)
+- **UNIQUE** `uq_conn_read_cal` (connection_id, external_calendar_id)
 
 ---
 
@@ -455,9 +455,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_calendar_connections_user_provider` (user_id, provider)
-- `idx_calendar_connections_tenant_user` (tenant_id, user_id)
 - `idx_calendar_connections_tenant_id` (tenant_id, id)
+- `idx_calendar_connections_tenant_user` (tenant_id, user_id)
+- **UNIQUE** `uq_calendar_connections_user_provider` (user_id, provider)
 
 ---
 
@@ -482,9 +482,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_calendar_external_links_entity` (tenant_id, provider, entity_type, entity_id)
-- `idx_calendar_external_links_user` (tenant_id, user_id, provider)
 - `idx_calendar_external_links_tenant_id` (tenant_id, id)
+- `idx_calendar_external_links_user` (tenant_id, user_id, provider)
+- **UNIQUE** `uq_calendar_external_links_entity` (tenant_id, provider, entity_type, entity_id)
 
 ---
 
@@ -588,9 +588,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_concierge_tokens_expiry` (expires_at)
 - **UNIQUE** `idx_concierge_confirm_token_hash` (token_hash)
 - `idx_concierge_confirm_tokens_tenant_id` (tenant_id, id)
+- `idx_concierge_tokens_expiry` (expires_at)
 
 ---
 
@@ -618,8 +618,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_crp_tenant_key` (tenant_id, key) — partial, `WHERE is_active = 1`
 - `idx_contact_role_profiles_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_crp_tenant_key` (tenant_id, key) — partial, `WHERE is_active = 1`
 
 ---
 
@@ -647,11 +647,11 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_contacts_type` (tenant_id, type)
-- **UNIQUE** `uq_contacts_tenant_email` (tenant_id, email) — partial, `WHERE email IS NOT NULL AND archived_at IS NULL`
-- **UNIQUE** `uq_contacts_tenant_agent_user` (tenant_id, agent_user_id) — partial, `WHERE agent_user_id IS NOT NULL AND archived_at IS NULL`
 - `idx_contacts_agent_user` (agent_user_id)
 - `idx_contacts_tenant_id` (tenant_id, id)
+- `idx_contacts_type` (tenant_id, type)
+- **UNIQUE** `uq_contacts_tenant_agent_user` (tenant_id, agent_user_id) — partial, `WHERE agent_user_id IS NOT NULL AND archived_at IS NULL`
+- **UNIQUE** `uq_contacts_tenant_email` (tenant_id, email) — partial, `WHERE email IS NOT NULL AND archived_at IS NULL`
 
 ---
 
@@ -672,8 +672,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_contractor_types_tenant_trade` (tenant_id, trade_slug) — partial, `WHERE trade_slug IS NOT NULL`
 - `idx_contractor_types_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_contractor_types_tenant_trade` (tenant_id, trade_slug) — partial, `WHERE trade_slug IS NOT NULL`
 
 ---
 
@@ -711,9 +711,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_cost_items_tenant_inspection` (tenant_id, inspection_id)
 - `idx_cost_items_finding_key` (finding_key)
 - `idx_cost_items_tenant_id` (tenant_id, id)
+- `idx_cost_items_tenant_inspection` (tenant_id, inspection_id)
 
 ---
 
@@ -757,8 +757,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_deployment_legal_versions_doc_hash` (doc, content_hash)
 - `idx_deployment_legal_versions_latest` (doc, published_at)
+- **UNIQUE** `uq_deployment_legal_versions_doc_hash` (doc, content_hash)
 
 ---
 
@@ -781,8 +781,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_discount_codes_code_tenant` (upper(code), tenant_id)
 - `idx_discount_codes_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_discount_codes_code_tenant` (upper(code), tenant_id)
 
 ---
 
@@ -829,8 +829,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_doc_review_inspection` (tenant_id, inspection_id)
-- **UNIQUE** `uq_doc_review_item` (inspection_id, document_key)
 - `idx_document_review_items_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_doc_review_item` (inspection_id, document_key)
 
 ---
 
@@ -923,10 +923,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_esign_audit_logs_request` (tenant_id, request_id, created_at)
 - **UNIQUE** `idx_esign_audit_logs_event_dedup` (tenant_id, request_id, event) — partial, `WHERE event NOT LIKE 'signer.%'`
-- `idx_esign_audit_logs_tenant_id` (tenant_id, id)
+- `idx_esign_audit_logs_request` (tenant_id, request_id, created_at)
 - `idx_esign_audit_logs_tenant_created` (tenant_id, created_at)
+- `idx_esign_audit_logs_tenant_id` (tenant_id, id)
 
 ---
 
@@ -950,8 +950,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_event_types_tenant_slug` (tenant_id, slug)
 - `idx_event_types_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_event_types_tenant_slug` (tenant_id, slug)
 
 ---
 
@@ -996,8 +996,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_import_archives_package` (tenant_id, package_id)
 - `idx_import_archives_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_import_archives_package` (tenant_id, package_id)
 
 ---
 
@@ -1019,10 +1019,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_import_id_map_source` (tenant_id, package_id, table_name, source_id)
 - `idx_import_id_map_new_id` (tenant_id, table_name, new_id)
 - `idx_import_id_map_package` (tenant_id, package_id)
 - `idx_import_id_map_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_import_id_map_source` (tenant_id, package_id, table_name, source_id)
 
 ---
 
@@ -1078,8 +1078,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_inspection_events_scheduled` (tenant_id, scheduled_at)
 - `idx_inspection_events_inspection` (inspection_id)
+- `idx_inspection_events_scheduled` (tenant_id, scheduled_at)
 - `idx_inspection_events_tenant_id` (tenant_id, id)
 
 ---
@@ -1120,9 +1120,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_tag_links_tag` (tag_id)
-- `idx_tag_links_inspection_item` (inspection_id, item_id)
 - `idx_inspection_item_tag_links_tenant_pk` (tenant_id, inspection_id, item_id, tag_id)
+- `idx_tag_links_inspection_item` (inspection_id, item_id)
+- `idx_tag_links_tag` (tag_id)
 
 ---
 
@@ -1152,8 +1152,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_media_pool_inspection` (inspection_id)
 - `idx_inspection_media_pool_tenant_id` (tenant_id, id)
+- `idx_media_pool_inspection` (inspection_id)
 
 ---
 
@@ -1179,10 +1179,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_msg_inspection` (inspection_id, created_at)
-- `idx_msg_contact` (tenant_id, contact_id, created_at)
-- `idx_msg_unread` (tenant_id, contact_id, from_role) — partial, `WHERE "inspection_messages"."read_at" IS NULL`
 - `idx_inspection_messages_tenant_id` (tenant_id, id)
+- `idx_msg_contact` (tenant_id, contact_id, created_at)
+- `idx_msg_inspection` (inspection_id, created_at)
+- `idx_msg_unread` (tenant_id, contact_id, from_role) — partial, `WHERE "inspection_messages"."read_at" IS NULL`
 
 ---
 
@@ -1203,8 +1203,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_ip_insp_contact_role` (inspection_id, contact_id, role_profile_id)
 - `idx_inspection_people_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_ip_insp_contact_role` (inspection_id, contact_id, role_profile_id)
 
 ---
 
@@ -1233,8 +1233,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_inspection_requests_tenant` (tenant_id, status, scheduled_at)
 - `idx_inspection_requests_email` (tenant_id, client_email)
+- `idx_inspection_requests_tenant` (tenant_id, status, scheduled_at)
 - `idx_inspection_requests_tenant_id` (tenant_id, id)
 
 ---
@@ -1257,9 +1257,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
+- `idx_inspection_results_tenant_id` (tenant_id, id)
 - `idx_results_inspection` (inspection_id)
 - **UNIQUE** `uq_results_report` (report_id)
-- `idx_inspection_results_tenant_id` (tenant_id, id)
 
 ---
 
@@ -1285,10 +1285,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_pay_split_line_user` (tenant_id, inspection_service_id, user_id) — partial, `WHERE corrects_split_id IS NULL`
-- `idx_pay_split_user` (tenant_id, user_id)
-- `idx_pay_split_line` (tenant_id, inspection_service_id)
 - `idx_inspection_service_pay_splits_tenant_id` (tenant_id, id)
+- `idx_pay_split_line` (tenant_id, inspection_service_id)
+- `idx_pay_split_user` (tenant_id, user_id)
+- **UNIQUE** `uq_pay_split_line_user` (tenant_id, inspection_service_id, user_id) — partial, `WHERE corrects_split_id IS NULL`
 
 ---
 
@@ -1347,8 +1347,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `idx_inspection_types_tenant_name` (tenant_id, name)
 - `idx_inspection_types_tenant_id` (tenant_id, id)
+- **UNIQUE** `idx_inspection_types_tenant_name` (tenant_id, name)
 
 ---
 
@@ -1371,9 +1371,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_inspection_units_tenant_inspection` (tenant_id, inspection_id)
 - `idx_inspection_units_parent` (parent_unit_id)
 - `idx_inspection_units_tenant_id` (tenant_id, id)
+- `idx_inspection_units_tenant_inspection` (tenant_id, inspection_id)
 
 ---
 
@@ -1462,13 +1462,13 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_inspections_request` (request_id)
-- `idx_inspections_tenant_status` (tenant_id, status)
-- `idx_inspections_tenant_date` (tenant_id, date)
 - `idx_inspections_inspector_date` (inspector_id, date)
+- `idx_inspections_request` (request_id)
 - `idx_inspections_root` (root_inspection_id)
 - `idx_inspections_tenant_created` (tenant_id, created_at, id)
+- `idx_inspections_tenant_date` (tenant_id, date)
 - `idx_inspections_tenant_id` (tenant_id, id)
+- `idx_inspections_tenant_status` (tenant_id, status)
 
 ---
 
@@ -1493,8 +1493,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_inspector_credentials_user` (user_id)
 - `idx_inspector_credentials_tenant_id` (tenant_id, id)
+- `idx_inspector_credentials_user` (user_id)
 
 ---
 
@@ -1514,8 +1514,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_inspector_service_areas` (tenant_id, user_id, zip_prefix)
 - `idx_inspector_service_areas_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_inspector_service_areas` (tenant_id, user_id, zip_prefix)
 
 ---
 
@@ -1539,8 +1539,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_integration_test_tenant_target` (tenant_id, target, tested_at)
 - `idx_integration_test_results_tenant_id` (tenant_id, id)
+- `idx_integration_test_tenant_target` (tenant_id, target, tested_at)
 
 ---
 
@@ -1573,10 +1573,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_invoices_inspection` (inspection_id)
 - `idx_invoices_contact` (tenant_id, contact_id)
-- **UNIQUE** `uq_invoices_tenant_number` (tenant_id, invoice_number)
+- `idx_invoices_inspection` (inspection_id)
 - `idx_invoices_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_invoices_tenant_number` (tenant_id, invoice_number)
 
 ---
 
@@ -1658,8 +1658,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_message_templates_tenant_channel` (tenant_id, channel)
-- `idx_message_templates_variant` (tenant_id, name, channel, locale)
 - `idx_message_templates_tenant_id` (tenant_id, id)
+- `idx_message_templates_variant` (tenant_id, name, channel, locale)
 
 ---
 
@@ -1728,8 +1728,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_migration_batches_tenant_created` (tenant_id, created_at)
 - `idx_migration_batches_expires` (expires_at)
+- `idx_migration_batches_tenant_created` (tenant_id, created_at)
 - `idx_migration_batches_tenant_id` (tenant_id, id)
 
 ---
@@ -1799,8 +1799,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `idx_notification_prefs_unique` (tenant_id, subject_kind, subject_id, class_id, channel)
 - `idx_notification_preferences_tenant_id` (tenant_id, id)
+- **UNIQUE** `idx_notification_prefs_unique` (tenant_id, subject_kind, subject_id, class_id, channel)
 
 ---
 
@@ -1827,10 +1827,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_notifications_tenant_user_created` (tenant_id, user_id, created_at)
-- `idx_notifications_tenant_user_unread` (tenant_id, user_id, read_at)
 - `idx_notifications_tenant_contact_created` (tenant_id, contact_id, created_at)
 - `idx_notifications_tenant_id` (tenant_id, id)
+- `idx_notifications_tenant_user_created` (tenant_id, user_id, created_at)
+- `idx_notifications_tenant_user_unread` (tenant_id, user_id, read_at)
 
 ---
 
@@ -1882,8 +1882,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_order_payments_inspection` (tenant_id, inspection_id)
 - `idx_order_payments_invoice` (tenant_id, invoice_id)
-- **UNIQUE** `uq_order_payments_provider_ref` (tenant_id, provider, provider_ref)
 - `idx_order_payments_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_order_payments_provider_ref` (tenant_id, provider, provider_ref)
 
 ---
 
@@ -1947,8 +1947,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_permission_templates_name` (tenant_id, name) — partial, `WHERE archived_at IS NULL`
 - `idx_permission_templates_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_permission_templates_name` (tenant_id, name) — partial, `WHERE archived_at IS NULL`
 
 ---
 
@@ -1999,9 +1999,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_psq_inspection` (tenant_id, inspection_id)
-- **UNIQUE** `idx_psq_share_token` (share_token)
 - `idx_psq_responses_tenant_id` (tenant_id, id)
+- **UNIQUE** `idx_psq_share_token` (share_token)
+- **UNIQUE** `uq_psq_inspection` (tenant_id, inspection_id)
 
 ---
 
@@ -2049,8 +2049,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `idx_qbo_entity_map_qbo` (tenant_id, qbo_type, qbo_id)
 - **UNIQUE** `idx_qbo_entity_map_oi` (tenant_id, oi_type, oi_id)
+- **UNIQUE** `idx_qbo_entity_map_qbo` (tenant_id, qbo_type, qbo_id)
 - `idx_qbo_entity_map_tenant_id` (tenant_id, id)
 
 ---
@@ -2100,8 +2100,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `idx_rating_systems_tenant_slug` (tenant_id, slug)
 - `idx_rating_systems_tenant_id` (tenant_id, id)
+- **UNIQUE** `idx_rating_systems_tenant_slug` (tenant_id, slug)
 
 ---
 
@@ -2211,10 +2211,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_report_pdfs_inspection_type` (inspection_id, type, version_number)
-- `idx_report_pdfs_status` (status)
 - `idx_report_pdfs_content_hash` (inspection_id, type, content_hash)
+- `idx_report_pdfs_status` (status)
 - `idx_report_pdfs_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_report_pdfs_inspection_type` (inspection_id, type, version_number)
 
 ---
 
@@ -2241,8 +2241,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_report_signoff_inspection` (tenant_id, inspection_id)
-- **UNIQUE** `uq_report_signoff_role` (inspection_id, role)
 - `idx_report_signoff_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_report_signoff_role` (inspection_id, role)
 
 ---
 
@@ -2266,8 +2266,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_report_translations_report_locale` (tenant_id, report_id, locale)
 - `idx_report_translations_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_report_translations_report_locale` (tenant_id, report_id, locale)
 
 ---
 
@@ -2296,9 +2296,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_report_versions_report_version` (report_id, version_number)
-- **UNIQUE** `idx_report_versions_verify_token` (verification_token)
 - `idx_report_versions_tenant_id` (tenant_id, id)
+- **UNIQUE** `idx_report_versions_verify_token` (verification_token)
+- **UNIQUE** `uq_report_versions_report_version` (report_id, version_number)
 
 ---
 
@@ -2350,8 +2350,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_reports_inspection` (inspection_id)
-- **UNIQUE** `uq_reports_primary` (inspection_id) — partial, `WHERE kind = 'primary'`
 - `idx_reports_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_reports_primary` (inspection_id) — partial, `WHERE kind = 'primary'`
 
 ---
 
@@ -2393,9 +2393,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_service_pay_rules_user` (tenant_id, service_id, user_id) — partial, `WHERE user_id IS NOT NULL`
-- **UNIQUE** `uq_service_pay_rules_default` (tenant_id, service_id) — partial, `WHERE user_id IS NULL`
 - `idx_service_pay_rules_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_service_pay_rules_default` (tenant_id, service_id) — partial, `WHERE user_id IS NULL`
+- **UNIQUE** `uq_service_pay_rules_user` (tenant_id, service_id, user_id) — partial, `WHERE user_id IS NOT NULL`
 
 ---
 
@@ -2445,9 +2445,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_signing_keys_tenant_fingerprint` (tenant_id, fingerprint)
-- **UNIQUE** `uq_signing_keys_tenant_active` (tenant_id) — partial, `WHERE retired_at IS NULL`
 - `idx_signing_keys_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_signing_keys_tenant_active` (tenant_id) — partial, `WHERE retired_at IS NULL`
+- **UNIQUE** `uq_signing_keys_tenant_fingerprint` (tenant_id, fingerprint)
 
 ---
 
@@ -2489,8 +2489,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_sms_consent_contact` (tenant_id, contact_id, created_at)
-- `idx_sms_consent_subject` (tenant_id, subject_kind, subject_id, created_at)
 - `idx_sms_consent_log_tenant_id` (tenant_id, id)
+- `idx_sms_consent_subject` (tenant_id, subject_kind, subject_id, created_at)
 
 ---
 
@@ -2548,9 +2548,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_statutory_form_entries_subject` (tenant_id, inspection_id, form_id)
 - `idx_statutory_form_entries_inspection` (tenant_id, inspection_id)
 - `idx_statutory_form_entries_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_statutory_form_entries_subject` (tenant_id, inspection_id, form_id)
 
 ---
 
@@ -2573,9 +2573,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
+- `idx_statutory_form_productions_tenant_id` (tenant_id, id)
 - `idx_statutory_productions_form_version` (form_id, version)
 - `idx_statutory_productions_inspection` (tenant_id, inspection_id)
-- `idx_statutory_form_productions_tenant_id` (tenant_id, id)
 
 ---
 
@@ -2597,8 +2597,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_statutory_form_sightings_seen` (form_id, source_url, observed_hash)
 - `idx_statutory_form_sightings_form` (form_id, last_seen_at)
+- **UNIQUE** `uq_statutory_form_sightings_seen` (form_id, source_url, observed_hash)
 
 ---
 
@@ -2624,8 +2624,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_statutory_form_versions_form_version` (form_id, version)
 - `idx_statutory_form_versions_form` (form_id, effective_from)
+- **UNIQUE** `uq_statutory_form_versions_form_version` (form_id, version)
 
 ---
 
@@ -2652,8 +2652,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_statutory_inspection_details_subject` (tenant_id, inspection_id)
 - `idx_statutory_inspection_details_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_statutory_inspection_details_subject` (tenant_id, inspection_id)
 
 ---
 
@@ -2697,8 +2697,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `idx_tags_tenant_name` (tenant_id, name)
 - `idx_tags_tenant_id` (tenant_id, id)
+- **UNIQUE** `idx_tags_tenant_name` (tenant_id, name)
 
 ---
 
@@ -2874,8 +2874,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_tenant_custom_holidays_tenant_date` (tenant_id, date)
 - `idx_tenant_custom_holidays_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_tenant_custom_holidays_tenant_date` (tenant_id, date)
 
 ---
 
@@ -2909,10 +2909,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_tenant_data_jobs_active` (tenant_id) — partial, `WHERE status IN ('queued', 'running')`
-- `idx_tenant_data_jobs_tenant_id` (tenant_id, id)
-- `idx_tenant_data_jobs_tenant_created` (tenant_id, created_at)
 - `idx_tenant_data_jobs_sweep` (status, lease_expires_at)
+- `idx_tenant_data_jobs_tenant_created` (tenant_id, created_at)
+- `idx_tenant_data_jobs_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_tenant_data_jobs_active` (tenant_id) — partial, `WHERE status IN ('queued', 'running')`
 
 ---
 
@@ -2962,8 +2962,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_tenant_invites_pending_email` (tenant_id, email) — partial, `WHERE status = 'pending'`
 - `idx_tenant_invites_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_tenant_invites_pending_email` (tenant_id, email) — partial, `WHERE status = 'pending'`
 
 ---
 
@@ -3010,8 +3010,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_tenant_library_import` (tenant_id, library_id)
 - `idx_tenant_library_imports_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_tenant_library_import` (tenant_id, library_id)
 
 ---
 
@@ -3037,9 +3037,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- `idx_marketplace_history_tenant` (tenant_id, created_at)
-- `idx_marketplace_history_template` (template_id)
 - `idx_marketplace_history_library` (library_id)
+- `idx_marketplace_history_template` (template_id)
+- `idx_marketplace_history_tenant` (tenant_id, created_at)
 - `idx_tenant_marketplace_import_history_tenant_id` (tenant_id, id)
 
 ---
@@ -3149,10 +3149,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_users_deleted_at` (deleted_at)
-- **UNIQUE** `uq_users_tenant_email` (tenant_id, email) — partial, `WHERE deleted_at IS NULL`
-- **UNIQUE** `idx_users_slug_per_tenant` (tenant_id, slug)
 - `idx_users_email` (email)
+- **UNIQUE** `idx_users_slug_per_tenant` (tenant_id, slug)
 - `idx_users_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_users_tenant_email` (tenant_id, email) — partial, `WHERE deleted_at IS NULL`
 
 ---
 
@@ -3218,7 +3218,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `uq_video_uploads_media` (tenant_id, media_id)
 - `idx_video_uploads_sweep` (state, expires_at)
 - `idx_video_uploads_tenant_id` (tenant_id, id)
+- **UNIQUE** `uq_video_uploads_media` (tenant_id, media_id)
 
