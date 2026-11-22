@@ -1,3 +1,19 @@
+-- Generated from the complete migrations/ chain by drizzle-baseline-squash.
+-- Do not hand-edit. Use a forward migration for routine schema changes.
+PRAGMA defer_foreign_keys=TRUE;
+CREATE TABLE `account_acceptances` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`actor_identity_ref` text,
+	`doc` text NOT NULL,
+	`version` text NOT NULL,
+	`content_hash` text NOT NULL,
+	`authority_basis` text NOT NULL,
+	`accepted_at` integer NOT NULL,
+	`created_at` integer NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE `agent_terms_acceptances` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
@@ -9,7 +25,6 @@ CREATE TABLE `agent_terms_acceptances` (
 	`country` text
 );
 --> statement-breakpoint
-CREATE INDEX `idx_agent_terms_acceptances_user` ON `agent_terms_acceptances` (`user_id`,`accepted_at`);--> statement-breakpoint
 CREATE TABLE `agreement_requests` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -40,10 +55,6 @@ CREATE TABLE `agreement_requests` (
 	FOREIGN KEY (`inspector_user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_agreement_requests_verify_token` ON `agreement_requests` (`verification_token`);--> statement-breakpoint
-CREATE INDEX `idx_agreement_requests_tenant` ON `agreement_requests` (`tenant_id`);--> statement-breakpoint
-CREATE INDEX `idx_agreement_requests_inspection` ON `agreement_requests` (`inspection_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_agreement_requests_token_hash` ON `agreement_requests` (`token_hash`);--> statement-breakpoint
 CREATE TABLE `agreement_signers` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -73,9 +84,6 @@ CREATE TABLE `agreement_signers` (
 	`attributed_at` integer
 );
 --> statement-breakpoint
-CREATE INDEX `idx_agreement_signers_tenant_request` ON `agreement_signers` (`tenant_id`,`request_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_agreement_signers_request_email` ON `agreement_signers` (`request_id`,`email`);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_agreement_signers_token_hash` ON `agreement_signers` (`token_hash`);--> statement-breakpoint
 CREATE TABLE `agreements` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -86,7 +94,6 @@ CREATE TABLE `agreements` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_agreements_tenant` ON `agreements` (`tenant_id`);--> statement-breakpoint
 CREATE TABLE `ai_call_provenance` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -99,7 +106,6 @@ CREATE TABLE `ai_call_provenance` (
 	`endpoint` text
 );
 --> statement-breakpoint
-CREATE INDEX `idx_ai_call_provenance_tenant_created` ON `ai_call_provenance` (`tenant_id`,`created_at`);--> statement-breakpoint
 CREATE TABLE `ai_content_reviews` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -110,8 +116,22 @@ CREATE TABLE `ai_content_reviews` (
 	`ai_call_id` text NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_ai_content_reviews_ai_call` ON `ai_content_reviews` (`ai_call_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_ai_content_reviews_person_call` ON `ai_content_reviews` (`tenant_id`,`artifact_type`,`artifact_id`,`ai_call_id`,`reviewed_by`);--> statement-breakpoint
+CREATE TABLE `audit_logs` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`user_id` text,
+	`action` text NOT NULL,
+	`entity_type` text NOT NULL,
+	`entity_id` text,
+	`metadata` text,
+	`ip_address` text,
+	`inspector_slug` text,
+	`created_at` integer NOT NULL,
+	`actor_kind` text DEFAULT 'tenant_user' NOT NULL,
+	`platform_actor_id` text,
+	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
 CREATE TABLE `automation_logs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -134,9 +154,6 @@ CREATE TABLE `automation_logs` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_automation_logs_pending` ON `automation_logs` (`tenant_id`,`status`,`send_at`);--> statement-breakpoint
-CREATE INDEX `idx_automation_logs_insp` ON `automation_logs` (`inspection_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_automation_logs_event` ON `automation_logs` (`automation_id`,`inspection_id`,`event_id`,`channel`,`recipient`) WHERE event_id IS NOT NULL;--> statement-breakpoint
 CREATE TABLE `automations` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -156,7 +173,6 @@ CREATE TABLE `automations` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_automations_tenant` ON `automations` (`tenant_id`);--> statement-breakpoint
 CREATE TABLE `availability` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -169,7 +185,6 @@ CREATE TABLE `availability` (
 	FOREIGN KEY (`inspector_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_availability_window_unique` ON `availability` (`inspector_id`,`day_of_week`,`start_time`);--> statement-breakpoint
 CREATE TABLE `availability_overrides` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -186,8 +201,6 @@ CREATE TABLE `availability_overrides` (
 	FOREIGN KEY (`inspector_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_avail_overrides_block_unique` ON `availability_overrides` (`inspector_id`,`date`) WHERE is_available = 0 AND source IS NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_avail_overrides_external` ON `availability_overrides` (`inspector_id`,`source`,`external_id`);--> statement-breakpoint
 CREATE TABLE `calendar_blocks` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -202,7 +215,6 @@ CREATE TABLE `calendar_blocks` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_calendar_blocks_tenant_user_date` ON `calendar_blocks` (`tenant_id`,`user_id`,`date`);--> statement-breakpoint
 CREATE TABLE `calendar_connection_read_calendars` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -214,8 +226,6 @@ CREATE TABLE `calendar_connection_read_calendars` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_conn_read_cal` ON `calendar_connection_read_calendars` (`connection_id`,`external_calendar_id`);--> statement-breakpoint
-CREATE INDEX `idx_conn_read_cal_tenant` ON `calendar_connection_read_calendars` (`tenant_id`,`connection_id`);--> statement-breakpoint
 CREATE TABLE `calendar_connections` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -232,8 +242,6 @@ CREATE TABLE `calendar_connections` (
 	`last_sync_error` text
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_calendar_connections_user_provider` ON `calendar_connections` (`user_id`,`provider`);--> statement-breakpoint
-CREATE INDEX `idx_calendar_connections_tenant_user` ON `calendar_connections` (`tenant_id`,`user_id`);--> statement-breakpoint
 CREATE TABLE `calendar_external_links` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -247,8 +255,23 @@ CREATE TABLE `calendar_external_links` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_calendar_external_links_entity` ON `calendar_external_links` (`tenant_id`,`provider`,`entity_type`,`entity_id`);--> statement-breakpoint
-CREATE INDEX `idx_calendar_external_links_user` ON `calendar_external_links` (`tenant_id`,`user_id`,`provider`);--> statement-breakpoint
+CREATE TABLE `client_uploads` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`inspection_id` text NOT NULL,
+	`uploaded_by_kind` text NOT NULL,
+	`uploaded_by_ref` text NOT NULL,
+	`uploaded_by_name` text,
+	`category` text NOT NULL,
+	`visibility` text NOT NULL,
+	`r2_key` text NOT NULL,
+	`filename` text NOT NULL,
+	`content_type` text NOT NULL,
+	`size_bytes` integer NOT NULL,
+	`label` text,
+	`created_at` integer NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE `comment_usage` (
 	`tenant_id` text NOT NULL,
 	`user_id` text NOT NULL,
@@ -259,7 +282,6 @@ CREATE TABLE `comment_usage` (
 	FOREIGN KEY (`comment_id`) REFERENCES `comments`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `idx_comment_usage_user_last_used` ON `comment_usage` (`tenant_id`,`user_id`,`last_used_at`);--> statement-breakpoint
 CREATE TABLE `comments` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -281,8 +303,6 @@ CREATE TABLE `comments` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_comments_tenant` ON `comments` (`tenant_id`);--> statement-breakpoint
-CREATE INDEX `idx_comments_library_id` ON `comments` (`library_id`);--> statement-breakpoint
 CREATE TABLE `concierge_confirm_tokens` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -294,8 +314,6 @@ CREATE TABLE `concierge_confirm_tokens` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_concierge_tokens_expiry` ON `concierge_confirm_tokens` (`expires_at`);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_concierge_confirm_token_hash` ON `concierge_confirm_tokens` (`token_hash`);--> statement-breakpoint
 CREATE TABLE `contact_role_profiles` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -312,8 +330,6 @@ CREATE TABLE `contact_role_profiles` (
 	`capability_overrides` text
 );
 --> statement-breakpoint
-CREATE INDEX `idx_crp_tenant` ON `contact_role_profiles` (`tenant_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_crp_tenant_key` ON `contact_role_profiles` (`tenant_id`,`key`) WHERE is_active = 1;--> statement-breakpoint
 CREATE TABLE `contacts` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -333,10 +349,6 @@ CREATE TABLE `contacts` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_contacts_type` ON `contacts` (`tenant_id`,`type`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_contacts_tenant_email` ON `contacts` (`tenant_id`,`email`) WHERE email IS NOT NULL AND archived_at IS NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_contacts_tenant_agent_user` ON `contacts` (`tenant_id`,`agent_user_id`) WHERE agent_user_id IS NOT NULL AND archived_at IS NULL;--> statement-breakpoint
-CREATE INDEX `idx_contacts_agent_user` ON `contacts` (`agent_user_id`);--> statement-breakpoint
 CREATE TABLE `contractor_types` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -346,8 +358,6 @@ CREATE TABLE `contractor_types` (
 	`trade_slug` text
 );
 --> statement-breakpoint
-CREATE INDEX `idx_contractor_types_tenant` ON `contractor_types` (`tenant_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_contractor_types_tenant_trade` ON `contractor_types` (`tenant_id`,`trade_slug`) WHERE trade_slug IS NOT NULL;--> statement-breakpoint
 CREATE TABLE `cost_items` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -376,8 +386,6 @@ CREATE TABLE `cost_items` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_cost_items_tenant_inspection` ON `cost_items` (`tenant_id`,`inspection_id`);--> statement-breakpoint
-CREATE INDEX `idx_cost_items_finding_key` ON `cost_items` (`finding_key`);--> statement-breakpoint
 CREATE TABLE `defect_categories` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -389,7 +397,6 @@ CREATE TABLE `defect_categories` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_defect_categories_tenant` ON `defect_categories` (`tenant_id`);--> statement-breakpoint
 CREATE TABLE `deployment_legal_versions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`doc` text NOT NULL,
@@ -399,8 +406,6 @@ CREATE TABLE `deployment_legal_versions` (
 	`published_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_deployment_legal_versions_doc_hash` ON `deployment_legal_versions` (`doc`,`content_hash`);--> statement-breakpoint
-CREATE INDEX `idx_deployment_legal_versions_latest` ON `deployment_legal_versions` (`doc`,`published_at`);--> statement-breakpoint
 CREATE TABLE `discount_codes` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -415,8 +420,14 @@ CREATE TABLE `discount_codes` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_discount_codes_tenant` ON `discount_codes` (`tenant_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_discount_codes_code_tenant` ON `discount_codes` (upper(code),`tenant_id`);--> statement-breakpoint
+CREATE TABLE `discovery_objections` (
+	`id` text PRIMARY KEY NOT NULL,
+	`email_hash` text NOT NULL,
+	`proved_by` text NOT NULL,
+	`created_at` integer NOT NULL,
+	`withdrawn_at` integer
+);
+--> statement-breakpoint
 CREATE TABLE `document_review_items` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -431,8 +442,6 @@ CREATE TABLE `document_review_items` (
 	`sort_order` integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_doc_review_inspection` ON `document_review_items` (`tenant_id`,`inspection_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_doc_review_item` ON `document_review_items` (`inspection_id`,`document_key`);--> statement-breakpoint
 CREATE TABLE `email_suppressions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -443,7 +452,17 @@ CREATE TABLE `email_suppressions` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_email_suppressions_email` ON `email_suppressions` (`tenant_id`,`email`);--> statement-breakpoint
+CREATE TABLE `email_templates` (
+	`tenant_id` text NOT NULL,
+	`trigger` text NOT NULL,
+	`subject` text,
+	`blocks` text,
+	`is_enabled` integer DEFAULT true NOT NULL,
+	`updated_at` integer NOT NULL,
+	PRIMARY KEY(`tenant_id`, `trigger`),
+	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
 CREATE TABLE `erasure_log` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -459,7 +478,6 @@ CREATE TABLE `erasure_log` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_erasure_log_tenant` ON `erasure_log` (`tenant_id`,`created_at`);--> statement-breakpoint
 CREATE TABLE `esign_audit_logs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -473,8 +491,6 @@ CREATE TABLE `esign_audit_logs` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_esign_audit_logs_request` ON `esign_audit_logs` (`tenant_id`,`request_id`,`created_at`);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_esign_audit_logs_event_dedup` ON `esign_audit_logs` (`tenant_id`,`request_id`,`event`) WHERE event NOT LIKE 'signer.%';--> statement-breakpoint
 CREATE TABLE `event_types` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -490,7 +506,6 @@ CREATE TABLE `event_types` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_event_types_tenant_slug` ON `event_types` (`tenant_id`,`slug`);--> statement-breakpoint
 CREATE TABLE `idempotency_keys` (
 	`tenant_id` text NOT NULL,
 	`key` text NOT NULL,
@@ -503,7 +518,26 @@ CREATE TABLE `idempotency_keys` (
 	PRIMARY KEY(`tenant_id`, `key`)
 );
 --> statement-breakpoint
-CREATE INDEX `idx_idempotency_expires` ON `idempotency_keys` (`expires_at`);--> statement-breakpoint
+CREATE TABLE `import_archives` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`package_id` text NOT NULL,
+	`sha256` text NOT NULL,
+	`counts` text,
+	`source_ids` text,
+	`created_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `import_id_map` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`package_id` text NOT NULL,
+	`table_name` text NOT NULL,
+	`source_id` text NOT NULL,
+	`new_id` text NOT NULL,
+	`created_at` integer NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE `inspection_access_tokens` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -519,9 +553,6 @@ CREATE TABLE `inspection_access_tokens` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_iat_inspection` ON `inspection_access_tokens` (`tenant_id`,`inspection_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_iat_recipient` ON `inspection_access_tokens` (`inspection_id`,`recipient_email`);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_iat_token_hash` ON `inspection_access_tokens` (`token_hash`);--> statement-breakpoint
 CREATE TABLE `inspection_events` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -543,8 +574,6 @@ CREATE TABLE `inspection_events` (
 	FOREIGN KEY (`inspector_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_inspection_events_scheduled` ON `inspection_events` (`tenant_id`,`scheduled_at`);--> statement-breakpoint
-CREATE INDEX `idx_inspection_events_inspection` ON `inspection_events` (`inspection_id`);--> statement-breakpoint
 CREATE TABLE `inspection_inspectors` (
 	`inspection_id` text NOT NULL,
 	`user_id` text NOT NULL,
@@ -554,8 +583,6 @@ CREATE TABLE `inspection_inspectors` (
 	PRIMARY KEY(`inspection_id`, `user_id`)
 );
 --> statement-breakpoint
-CREATE INDEX `idx_insp_inspectors_tenant_user` ON `inspection_inspectors` (`tenant_id`,`user_id`);--> statement-breakpoint
-CREATE INDEX `idx_insp_inspectors_user` ON `inspection_inspectors` (`user_id`);--> statement-breakpoint
 CREATE TABLE `inspection_item_tag_links` (
 	`inspection_id` text NOT NULL,
 	`item_id` text NOT NULL,
@@ -565,9 +592,6 @@ CREATE TABLE `inspection_item_tag_links` (
 	PRIMARY KEY(`inspection_id`, `item_id`, `tag_id`)
 );
 --> statement-breakpoint
-CREATE INDEX `idx_tag_links_tenant` ON `inspection_item_tag_links` (`tenant_id`);--> statement-breakpoint
-CREATE INDEX `idx_tag_links_tag` ON `inspection_item_tag_links` (`tag_id`);--> statement-breakpoint
-CREATE INDEX `idx_tag_links_inspection_item` ON `inspection_item_tag_links` (`inspection_id`,`item_id`);--> statement-breakpoint
 CREATE TABLE `inspection_media_pool` (
 	`id` text PRIMARY KEY NOT NULL,
 	`inspection_id` text NOT NULL,
@@ -586,8 +610,6 @@ CREATE TABLE `inspection_media_pool` (
 	`poster_key` text
 );
 --> statement-breakpoint
-CREATE INDEX `idx_media_pool_tenant` ON `inspection_media_pool` (`tenant_id`);--> statement-breakpoint
-CREATE INDEX `idx_media_pool_inspection` ON `inspection_media_pool` (`inspection_id`);--> statement-breakpoint
 CREATE TABLE `inspection_messages` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -604,9 +626,6 @@ CREATE TABLE `inspection_messages` (
 	FOREIGN KEY (`inspection_id`) REFERENCES `inspections`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `idx_msg_inspection` ON `inspection_messages` (`inspection_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `idx_msg_contact` ON `inspection_messages` (`tenant_id`,`contact_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `idx_msg_unread` ON `inspection_messages` (`tenant_id`,`contact_id`,`from_role`) WHERE "inspection_messages"."read_at" IS NULL;--> statement-breakpoint
 CREATE TABLE `inspection_people` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -616,8 +635,6 @@ CREATE TABLE `inspection_people` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_ip_tenant` ON `inspection_people` (`tenant_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_ip_insp_contact_role` ON `inspection_people` (`inspection_id`,`contact_id`,`role_profile_id`);--> statement-breakpoint
 CREATE TABLE `inspection_requests` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -636,8 +653,6 @@ CREATE TABLE `inspection_requests` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_inspection_requests_tenant` ON `inspection_requests` (`tenant_id`,`status`,`scheduled_at`);--> statement-breakpoint
-CREATE INDEX `idx_inspection_requests_email` ON `inspection_requests` (`tenant_id`,`client_email`);--> statement-breakpoint
 CREATE TABLE `inspection_results` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -652,9 +667,6 @@ CREATE TABLE `inspection_results` (
 	FOREIGN KEY (`inspection_id`) REFERENCES `inspections`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_results_tenant` ON `inspection_results` (`tenant_id`);--> statement-breakpoint
-CREATE INDEX `idx_results_inspection` ON `inspection_results` (`inspection_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_results_report` ON `inspection_results` (`report_id`);--> statement-breakpoint
 CREATE TABLE `inspection_service_pay_splits` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -669,9 +681,6 @@ CREATE TABLE `inspection_service_pay_splits` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_pay_split_line_user` ON `inspection_service_pay_splits` (`tenant_id`,`inspection_service_id`,`user_id`) WHERE corrects_split_id IS NULL;--> statement-breakpoint
-CREATE INDEX `idx_pay_split_user` ON `inspection_service_pay_splits` (`tenant_id`,`user_id`);--> statement-breakpoint
-CREATE INDEX `idx_pay_split_line` ON `inspection_service_pay_splits` (`tenant_id`,`inspection_service_id`);--> statement-breakpoint
 CREATE TABLE `inspection_services` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -686,8 +695,13 @@ CREATE TABLE `inspection_services` (
 	FOREIGN KEY (`service_id`) REFERENCES `services`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_insp_services_tenant` ON `inspection_services` (`tenant_id`);--> statement-breakpoint
-CREATE INDEX `idx_insp_services_insp` ON `inspection_services` (`inspection_id`);--> statement-breakpoint
+CREATE TABLE `inspection_tombstones` (
+	`tenant_id` text NOT NULL,
+	`inspection_id` text NOT NULL,
+	`deleted_at` integer NOT NULL,
+	PRIMARY KEY(`tenant_id`, `inspection_id`)
+);
+--> statement-breakpoint
 CREATE TABLE `inspection_types` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -699,7 +713,6 @@ CREATE TABLE `inspection_types` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_inspection_types_tenant_name` ON `inspection_types` (`tenant_id`,`name`);--> statement-breakpoint
 CREATE TABLE `inspection_units` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -713,8 +726,6 @@ CREATE TABLE `inspection_units` (
 	`attrs` text
 );
 --> statement-breakpoint
-CREATE INDEX `idx_inspection_units_tenant_inspection` ON `inspection_units` (`tenant_id`,`inspection_id`);--> statement-breakpoint
-CREATE INDEX `idx_inspection_units_parent` ON `inspection_units` (`parent_unit_id`);--> statement-breakpoint
 CREATE TABLE `inspections` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -799,12 +810,6 @@ CREATE TABLE `inspections` (
 	FOREIGN KEY (`request_id`) REFERENCES `inspection_requests`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_inspections_request` ON `inspections` (`request_id`);--> statement-breakpoint
-CREATE INDEX `idx_inspections_tenant_status` ON `inspections` (`tenant_id`,`status`);--> statement-breakpoint
-CREATE INDEX `idx_inspections_tenant_date` ON `inspections` (`tenant_id`,`date`);--> statement-breakpoint
-CREATE INDEX `idx_inspections_inspector_date` ON `inspections` (`inspector_id`,`date`);--> statement-breakpoint
-CREATE INDEX `idx_inspections_root` ON `inspections` (`root_inspection_id`);--> statement-breakpoint
-CREATE INDEX `idx_inspections_tenant_created` ON `inspections` (`tenant_id`,`created_at`,`id`);--> statement-breakpoint
 CREATE TABLE `inspector_credentials` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -818,8 +823,6 @@ CREATE TABLE `inspector_credentials` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_inspector_credentials_tenant` ON `inspector_credentials` (`tenant_id`);--> statement-breakpoint
-CREATE INDEX `idx_inspector_credentials_user` ON `inspector_credentials` (`user_id`);--> statement-breakpoint
 CREATE TABLE `inspector_service_areas` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -828,7 +831,18 @@ CREATE TABLE `inspector_service_areas` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_inspector_service_areas` ON `inspector_service_areas` (`tenant_id`,`user_id`,`zip_prefix`);--> statement-breakpoint
+CREATE TABLE `integration_test_results` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`target` text NOT NULL,
+	`provider` text,
+	`is_ok` integer NOT NULL,
+	`detail` text,
+	`tested_by_user_id` text,
+	`tested_at` integer NOT NULL,
+	`step` text
+);
+--> statement-breakpoint
 CREATE TABLE `invoices` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -855,9 +869,18 @@ CREATE TABLE `invoices` (
 	FOREIGN KEY (`contact_id`) REFERENCES `contacts`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_invoices_inspection` ON `invoices` (`inspection_id`);--> statement-breakpoint
-CREATE INDEX `idx_invoices_contact` ON `invoices` (`tenant_id`,`contact_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_invoices_tenant_number` ON `invoices` (`tenant_id`,`invoice_number`);--> statement-breakpoint
+CREATE TABLE `legal_holds` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`matter` text NOT NULL,
+	`reason` text NOT NULL,
+	`placed_by` text NOT NULL,
+	`placed_at` integer NOT NULL,
+	`released_at` integer,
+	`released_by` text,
+	`release_reason` text
+);
+--> statement-breakpoint
 CREATE TABLE `marketplace_libraries` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
@@ -876,7 +899,6 @@ CREATE TABLE `marketplace_libraries` (
 	`delisted_at` integer
 );
 --> statement-breakpoint
-CREATE INDEX `idx_marketplace_libraries_kind_featured` ON `marketplace_libraries` (`kind`,`is_featured`);--> statement-breakpoint
 CREATE TABLE `message_templates` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -891,8 +913,6 @@ CREATE TABLE `message_templates` (
 	`locale` text DEFAULT 'en' NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_message_templates_tenant_channel` ON `message_templates` (`tenant_id`,`channel`);--> statement-breakpoint
-CREATE INDEX `idx_message_templates_variant` ON `message_templates` (`tenant_id`,`name`,`channel`,`locale`);--> statement-breakpoint
 CREATE TABLE `messaging_compliance` (
 	`tenant_id` text PRIMARY KEY NOT NULL,
 	`mode` text DEFAULT 'own' NOT NULL,
@@ -942,8 +962,6 @@ CREATE TABLE `migration_batches` (
 	`staff_access_authorization_version` text
 );
 --> statement-breakpoint
-CREATE INDEX `idx_migration_batches_tenant_created` ON `migration_batches` (`tenant_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `idx_migration_batches_expires` ON `migration_batches` (`expires_at`);--> statement-breakpoint
 CREATE TABLE `migration_rows` (
 	`id` text PRIMARY KEY NOT NULL,
 	`batch_id` text NOT NULL,
@@ -960,8 +978,15 @@ CREATE TABLE `migration_rows` (
 	`applied_at` integer
 );
 --> statement-breakpoint
-CREATE INDEX `idx_migration_rows_batch_status` ON `migration_rows` (`batch_id`,`status`);--> statement-breakpoint
-CREATE INDEX `idx_migration_rows_tenant` ON `migration_rows` (`tenant_id`);--> statement-breakpoint
+CREATE TABLE `native_client_seen` (
+	`tenant_id` text NOT NULL,
+	`platform` text NOT NULL,
+	`client_version` text NOT NULL,
+	`first_seen_at` integer NOT NULL,
+	`last_seen_at` integer NOT NULL,
+	PRIMARY KEY(`tenant_id`, `platform`, `client_version`)
+);
+--> statement-breakpoint
 CREATE TABLE `notification_preferences` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -974,7 +999,35 @@ CREATE TABLE `notification_preferences` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_notification_prefs_unique` ON `notification_preferences` (`tenant_id`,`subject_kind`,`subject_id`,`class_id`,`channel`);--> statement-breakpoint
+CREATE TABLE `notifications` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`user_id` text,
+	`type` text NOT NULL,
+	`title` text NOT NULL,
+	`body` text,
+	`entity_type` text,
+	`entity_id` text,
+	`metadata` text,
+	`read_at` integer,
+	`archived_at` integer,
+	`created_at` integer NOT NULL,
+	`contact_id` text,
+	`inspection_id` text,
+	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE TABLE `offline_import_applied` (
+	`tenant_id` text NOT NULL,
+	`idempotency_key` text NOT NULL,
+	`op` text NOT NULL,
+	`inspection_id` text NOT NULL,
+	`applied_at` integer NOT NULL,
+	`applied_by` text NOT NULL,
+	PRIMARY KEY(`tenant_id`, `idempotency_key`, `inspection_id`)
+);
+--> statement-breakpoint
 CREATE TABLE `order_payments` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -992,9 +1045,6 @@ CREATE TABLE `order_payments` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_order_payments_inspection` ON `order_payments` (`tenant_id`,`inspection_id`);--> statement-breakpoint
-CREATE INDEX `idx_order_payments_invoice` ON `order_payments` (`tenant_id`,`invoice_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_order_payments_provider_ref` ON `order_payments` (`tenant_id`,`provider`,`provider_ref`);--> statement-breakpoint
 CREATE TABLE `orphaned_media` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1003,7 +1053,31 @@ CREATE TABLE `orphaned_media` (
 	`first_seen_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_orphaned_media_key` ON `orphaned_media` (`tenant_id`,`r2_key`);--> statement-breakpoint
+CREATE TABLE `parked_cmd_events` (
+	`id` text PRIMARY KEY NOT NULL,
+	`envelope` text NOT NULL,
+	`reason` text NOT NULL,
+	`received_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `permission_templates` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`name` text NOT NULL,
+	`base_role` text NOT NULL,
+	`overrides` text NOT NULL,
+	`created_by` text,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	`archived_at` integer
+);
+--> statement-breakpoint
+CREATE TABLE `processed_cmd_events` (
+	`event_id` text PRIMARY KEY NOT NULL,
+	`cmd_type` text NOT NULL,
+	`processed_at` integer NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE `processed_webhook_events` (
 	`event_id` text PRIMARY KEY NOT NULL,
 	`received_at` integer NOT NULL
@@ -1021,8 +1095,6 @@ CREATE TABLE `psq_responses` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_psq_inspection` ON `psq_responses` (`tenant_id`,`inspection_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_psq_share_token` ON `psq_responses` (`share_token`);--> statement-breakpoint
 CREATE TABLE `qbo_connections` (
 	`tenant_id` text PRIMARY KEY NOT NULL,
 	`realm_id` text NOT NULL,
@@ -1037,7 +1109,6 @@ CREATE TABLE `qbo_connections` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_qbo_connections_realm` ON `qbo_connections` (`realm_id`);--> statement-breakpoint
 CREATE TABLE `qbo_entity_map` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1047,10 +1118,8 @@ CREATE TABLE `qbo_entity_map` (
 	`qbo_id` text NOT NULL,
 	`qbo_sync_token` text NOT NULL,
 	`synced_at` integer NOT NULL
-);
+, `qbo_display_name` text);
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_qbo_entity_map_qbo` ON `qbo_entity_map` (`tenant_id`,`qbo_type`,`qbo_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_qbo_entity_map_oi` ON `qbo_entity_map` (`tenant_id`,`oi_type`,`oi_id`);--> statement-breakpoint
 CREATE TABLE `qbo_sync_errors` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1079,7 +1148,6 @@ CREATE TABLE `rating_systems` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_rating_systems_tenant_slug` ON `rating_systems` (`tenant_id`,`slug`);--> statement-breakpoint
 CREATE TABLE `repair_request_items` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1098,7 +1166,6 @@ CREATE TABLE `repair_request_items` (
 	`repair_action_tag` text
 );
 --> statement-breakpoint
-CREATE INDEX `idx_repair_request_items_rr` ON `repair_request_items` (`repair_request_id`);--> statement-breakpoint
 CREATE TABLE `repair_requests` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1113,8 +1180,6 @@ CREATE TABLE `repair_requests` (
 	`revoked_at` integer
 );
 --> statement-breakpoint
-CREATE INDEX `idx_repair_requests_inspection` ON `repair_requests` (`tenant_id`,`inspection_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_repair_requests_share_token` ON `repair_requests` (`share_token`);--> statement-breakpoint
 CREATE TABLE `report_exports` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1128,7 +1193,6 @@ CREATE TABLE `report_exports` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_report_exports_inspection` ON `report_exports` (`tenant_id`,`inspection_id`);--> statement-breakpoint
 CREATE TABLE `report_pdfs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1145,10 +1209,6 @@ CREATE TABLE `report_pdfs` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_report_pdfs_inspection_type` ON `report_pdfs` (`inspection_id`,`type`,`version_number`);--> statement-breakpoint
-CREATE INDEX `idx_report_pdfs_tenant` ON `report_pdfs` (`tenant_id`);--> statement-breakpoint
-CREATE INDEX `idx_report_pdfs_status` ON `report_pdfs` (`status`);--> statement-breakpoint
-CREATE INDEX `idx_report_pdfs_content_hash` ON `report_pdfs` (`inspection_id`,`type`,`content_hash`);--> statement-breakpoint
 CREATE TABLE `report_signoff` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1163,8 +1223,6 @@ CREATE TABLE `report_signoff` (
 	`is_dual_role` integer DEFAULT false NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_report_signoff_inspection` ON `report_signoff` (`tenant_id`,`inspection_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_report_signoff_role` ON `report_signoff` (`inspection_id`,`role`);--> statement-breakpoint
 CREATE TABLE `report_translations` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1179,7 +1237,6 @@ CREATE TABLE `report_translations` (
 	`generated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_report_translations_report_locale` ON `report_translations` (`tenant_id`,`report_id`,`locale`);--> statement-breakpoint
 CREATE TABLE `report_versions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1199,8 +1256,6 @@ CREATE TABLE `report_versions` (
 	`report_id` text
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_report_versions_report_version` ON `report_versions` (`report_id`,`version_number`);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_report_versions_verify_token` ON `report_versions` (`verification_token`);--> statement-breakpoint
 CREATE TABLE `report_views` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1211,7 +1266,6 @@ CREATE TABLE `report_views` (
 	`view_count` integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_report_views_scope` ON `report_views` (`tenant_id`,`inspection_id`,`access_token_id`);--> statement-breakpoint
 CREATE TABLE `reports` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1228,9 +1282,6 @@ CREATE TABLE `reports` (
 	`inspector_narrative` text
 );
 --> statement-breakpoint
-CREATE INDEX `idx_reports_inspection` ON `reports` (`inspection_id`);--> statement-breakpoint
-CREATE INDEX `idx_reports_tenant` ON `reports` (`tenant_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_reports_primary` ON `reports` (`inspection_id`) WHERE kind = 'primary';--> statement-breakpoint
 CREATE TABLE `service_inspectors` (
 	`service_id` text NOT NULL,
 	`user_id` text NOT NULL,
@@ -1239,7 +1290,6 @@ CREATE TABLE `service_inspectors` (
 	PRIMARY KEY(`service_id`, `user_id`)
 );
 --> statement-breakpoint
-CREATE INDEX `idx_service_inspectors_tenant` ON `service_inspectors` (`tenant_id`);--> statement-breakpoint
 CREATE TABLE `service_pay_rules` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1251,8 +1301,6 @@ CREATE TABLE `service_pay_rules` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_service_pay_rules_user` ON `service_pay_rules` (`tenant_id`,`service_id`,`user_id`) WHERE user_id IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_service_pay_rules_default` ON `service_pay_rules` (`tenant_id`,`service_id`) WHERE user_id IS NULL;--> statement-breakpoint
 CREATE TABLE `services` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1272,7 +1320,6 @@ CREATE TABLE `services` (
 	FOREIGN KEY (`agreement_id`) REFERENCES `agreements`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_services_tenant` ON `services` (`tenant_id`);--> statement-breakpoint
 CREATE TABLE `signing_keys` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1286,8 +1333,11 @@ CREATE TABLE `signing_keys` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_signing_keys_tenant_fingerprint` ON `signing_keys` (`tenant_id`,`fingerprint`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_signing_keys_tenant_active` ON `signing_keys` (`tenant_id`) WHERE retired_at IS NULL;--> statement-breakpoint
+CREATE TABLE `slug_reservations` (
+	`slug` text PRIMARY KEY NOT NULL,
+	`reason` text NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE `sms_consent_log` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1304,8 +1354,6 @@ CREATE TABLE `sms_consent_log` (
 	`disclosure_content_hash` text
 );
 --> statement-breakpoint
-CREATE INDEX `idx_sms_consent_contact` ON `sms_consent_log` (`tenant_id`,`contact_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `idx_sms_consent_subject` ON `sms_consent_log` (`tenant_id`,`subject_kind`,`subject_id`,`created_at`);--> statement-breakpoint
 CREATE TABLE `sms_delivery_status` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1315,12 +1363,20 @@ CREATE TABLE `sms_delivery_status` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_sms_delivery_status_msg` ON `sms_delivery_status` (`tenant_id`,`provider_message_id`);--> statement-breakpoint
 CREATE TABLE `sms_disclosure_versions` (
 	`version` integer PRIMARY KEY NOT NULL,
 	`text` text NOT NULL,
 	`published_at` integer NOT NULL,
 	`content_hash` text
+);
+--> statement-breakpoint
+CREATE TABLE `statutory_form_entries` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`inspection_id` text NOT NULL,
+	`form_id` text NOT NULL,
+	`values` text NOT NULL,
+	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE `statutory_form_productions` (
@@ -1334,8 +1390,6 @@ CREATE TABLE `statutory_form_productions` (
 	`produced_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_statutory_productions_form_version` ON `statutory_form_productions` (`form_id`,`version`);--> statement-breakpoint
-CREATE INDEX `idx_statutory_productions_inspection` ON `statutory_form_productions` (`tenant_id`,`inspection_id`);--> statement-breakpoint
 CREATE TABLE `statutory_form_sightings` (
 	`id` text PRIMARY KEY NOT NULL,
 	`form_id` text NOT NULL,
@@ -1346,8 +1400,6 @@ CREATE TABLE `statutory_form_sightings` (
 	`last_seen_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_statutory_form_sightings_seen` ON `statutory_form_sightings` (`form_id`,`source_url`,`observed_hash`);--> statement-breakpoint
-CREATE INDEX `idx_statutory_form_sightings_form` ON `statutory_form_sightings` (`form_id`,`last_seen_at`);--> statement-breakpoint
 CREATE TABLE `statutory_form_versions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`form_id` text NOT NULL,
@@ -1362,8 +1414,32 @@ CREATE TABLE `statutory_form_versions` (
 	`published_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_statutory_form_versions_form_version` ON `statutory_form_versions` (`form_id`,`version`);--> statement-breakpoint
-CREATE INDEX `idx_statutory_form_versions_form` ON `statutory_form_versions` (`form_id`,`effective_from`);--> statement-breakpoint
+CREATE TABLE `statutory_inspection_details` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`inspection_id` text NOT NULL,
+	`inspector_signature_date` text,
+	`employee_printed_name` text,
+	`owner_name` text,
+	`owner_email` text,
+	`owner_mailing_address` text,
+	`owner_home_phone` text,
+	`owner_work_phone` text,
+	`owner_cell_phone` text,
+	`updated_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `sync_outbox` (
+	`id` text PRIMARY KEY NOT NULL,
+	`event_type` text NOT NULL,
+	`payload` text NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`attempts` integer DEFAULT 0 NOT NULL,
+	`created_at` integer NOT NULL,
+	`last_tried_at` integer,
+	`last_error` text
+);
+--> statement-breakpoint
 CREATE TABLE `tags` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1373,7 +1449,6 @@ CREATE TABLE `tags` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_tags_tenant_name` ON `tags` (`tenant_id`,`name`);--> statement-breakpoint
 CREATE TABLE `templates` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1391,57 +1466,25 @@ CREATE TABLE `templates` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_templates_tenant` ON `templates` (`tenant_id`);--> statement-breakpoint
-CREATE INDEX `idx_templates_rating_system` ON `templates` (`rating_system_id`);--> statement-breakpoint
-CREATE TABLE `tenant_custom_holidays` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`date` text NOT NULL,
-	`name` text NOT NULL,
-	`created_at` integer NOT NULL,
+CREATE TABLE `tenant_ai_attestations` (
+	`tenant_id` text PRIMARY KEY NOT NULL,
+	`provider` text NOT NULL,
+	`mode` text NOT NULL,
+	`account_owner` text NOT NULL,
+	`terms_version` text NOT NULL,
+	`attested_at` integer NOT NULL,
+	`policy_version` text NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `tenant_ai_configs` (
+	`tenant_id` text PRIMARY KEY NOT NULL,
+	`is_enabled` integer DEFAULT true NOT NULL,
+	`base_url` text,
+	`model` text,
+	`is_courtesy_translation_enabled` integer DEFAULT false NOT NULL,
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_tenant_custom_holidays_tenant_date` ON `tenant_custom_holidays` (`tenant_id`,`date`);--> statement-breakpoint
-CREATE TABLE `tenant_library_imports` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`library_id` text NOT NULL,
-	`imported_semver` text NOT NULL,
-	`imported_at` integer NOT NULL,
-	`row_count` integer DEFAULT 0 NOT NULL,
-	`local_entity_id` text,
-	`uninstalled_at` integer
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `uq_tenant_library_import` ON `tenant_library_imports` (`tenant_id`,`library_id`);--> statement-breakpoint
-CREATE TABLE `tenant_marketplace_import_history` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`library_id` text,
-	`template_id` text,
-	`action` text NOT NULL,
-	`source_version` text,
-	`target_version` text,
-	`rows_affected` integer DEFAULT 0 NOT NULL,
-	`metadata` text,
-	`created_at` integer NOT NULL,
-	`created_by` text NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `idx_marketplace_history_tenant` ON `tenant_marketplace_import_history` (`tenant_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `idx_marketplace_history_template` ON `tenant_marketplace_import_history` (`template_id`);--> statement-breakpoint
-CREATE INDEX `idx_marketplace_history_library` ON `tenant_marketplace_import_history` (`library_id`);--> statement-breakpoint
-CREATE TABLE `usage_counters` (
-	`tenant_id` text NOT NULL,
-	`metric` text NOT NULL,
-	`period_key` text NOT NULL,
-	`value` integer DEFAULT 0 NOT NULL,
-	`updated_at` integer NOT NULL,
-	PRIMARY KEY(`tenant_id`, `metric`, `period_key`)
-);
---> statement-breakpoint
-CREATE INDEX `idx_usage_counters_tenant` ON `usage_counters` (`tenant_id`);--> statement-breakpoint
 CREATE TABLE `tenant_configs` (
 	`tenant_id` text PRIMARY KEY NOT NULL,
 	`company_name` text,
@@ -1524,8 +1567,113 @@ CREATE TABLE `tenant_configs` (
 	`legal_name` text,
 	`invoice_seq` integer DEFAULT 1000 NOT NULL,
 	`report_pdf_retention_years` integer DEFAULT 7 NOT NULL,
-	`is_report_view_counting_enabled` integer DEFAULT false NOT NULL,
+	`is_report_view_counting_enabled` integer DEFAULT false NOT NULL, `offline_max_days` integer DEFAULT 30 NOT NULL, `is_new_inspectors_view_all` integer DEFAULT true NOT NULL,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE TABLE `tenant_custom_holidays` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`date` text NOT NULL,
+	`name` text NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `tenant_data_jobs` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`kind` text NOT NULL,
+	`status` text NOT NULL,
+	`stage` text NOT NULL,
+	`cursor` text,
+	`package_id` text,
+	`bytes` integer DEFAULT 0 NOT NULL,
+	`sha256` text,
+	`counts` text,
+	`error_code` text,
+	`created_by` text NOT NULL,
+	`created_at` integer NOT NULL,
+	`started_at` integer,
+	`updated_at` integer NOT NULL,
+	`finished_at` integer,
+	`lease_holder` text,
+	`lease_expires_at` integer,
+	`client_kind` text,
+	CONSTRAINT "ck_tenant_data_jobs_cursor_len" CHECK("tenant_data_jobs"."cursor" IS NULL OR length("tenant_data_jobs"."cursor") <= 4096),
+	CONSTRAINT "ck_tenant_data_jobs_counts_len" CHECK("tenant_data_jobs"."counts" IS NULL OR length("tenant_data_jobs"."counts") <= 4096)
+);
+--> statement-breakpoint
+CREATE TABLE `tenant_destruction_records` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`tenant_slug` text,
+	`rows_deleted` integer DEFAULT 0 NOT NULL,
+	`r2_objects` integer DEFAULT 0 NOT NULL,
+	`r2_bytes` integer DEFAULT 0 NOT NULL,
+	`kv_keys` integer DEFAULT 0 NOT NULL,
+	`destroyed_at` integer NOT NULL,
+	`status` text DEFAULT 'completed' NOT NULL,
+	`completed_at` integer,
+	`record_version` integer DEFAULT 1 NOT NULL,
+	`stores_measured` text,
+	`store_results` text,
+	`incomplete_notified_at` integer
+);
+--> statement-breakpoint
+CREATE TABLE `tenant_invites` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`email` text NOT NULL,
+	`role` text DEFAULT 'inspector' NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`expires_at` integer NOT NULL,
+	`permission_overrides` text,
+	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE TABLE `tenant_legal_versions` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`doc` text NOT NULL,
+	`version` text NOT NULL,
+	`body_snapshot` text,
+	`content_hash` text NOT NULL,
+	`is_material` integer DEFAULT false NOT NULL,
+	`published_at` integer NOT NULL,
+	`published_by_user_id` text
+);
+--> statement-breakpoint
+CREATE TABLE `tenant_library_imports` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`library_id` text NOT NULL,
+	`imported_semver` text NOT NULL,
+	`imported_at` integer NOT NULL,
+	`row_count` integer DEFAULT 0 NOT NULL,
+	`local_entity_id` text,
+	`uninstalled_at` integer
+);
+--> statement-breakpoint
+CREATE TABLE `tenant_marketplace_import_history` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`library_id` text,
+	`template_id` text,
+	`action` text NOT NULL,
+	`source_version` text,
+	`target_version` text,
+	`rows_affected` integer DEFAULT 0 NOT NULL,
+	`metadata` text,
+	`created_at` integer NOT NULL,
+	`created_by` text NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `tenant_slug_history` (
+	`old_slug` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`changed_at` integer NOT NULL,
+	`retired_until` integer NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE `tenants` (
@@ -1542,67 +1690,15 @@ CREATE TABLE `tenants` (
 	`content_version` text
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `tenants_slug_unique` ON `tenants` (`slug`);--> statement-breakpoint
-CREATE TABLE `discovery_objections` (
-	`id` text PRIMARY KEY NOT NULL,
-	`email_hash` text NOT NULL,
-	`proved_by` text NOT NULL,
-	`created_at` integer NOT NULL,
-	`withdrawn_at` integer
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `uq_discovery_objections_email_hash` ON `discovery_objections` (`email_hash`);--> statement-breakpoint
-CREATE TABLE `tenant_ai_attestations` (
-	`tenant_id` text PRIMARY KEY NOT NULL,
-	`provider` text NOT NULL,
-	`mode` text NOT NULL,
-	`account_owner` text NOT NULL,
-	`terms_version` text NOT NULL,
-	`attested_at` integer NOT NULL,
-	`policy_version` text NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE `tenant_ai_configs` (
-	`tenant_id` text PRIMARY KEY NOT NULL,
-	`is_enabled` integer DEFAULT true NOT NULL,
-	`base_url` text,
-	`model` text,
-	`is_courtesy_translation_enabled` integer DEFAULT false NOT NULL,
-	`updated_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE `email_templates` (
+CREATE TABLE `usage_counters` (
 	`tenant_id` text NOT NULL,
-	`trigger` text NOT NULL,
-	`subject` text,
-	`blocks` text,
-	`is_enabled` integer DEFAULT true NOT NULL,
+	`metric` text NOT NULL,
+	`period_key` text NOT NULL,
+	`value` integer DEFAULT 0 NOT NULL,
 	`updated_at` integer NOT NULL,
-	PRIMARY KEY(`tenant_id`, `trigger`),
-	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
+	PRIMARY KEY(`tenant_id`, `metric`, `period_key`)
 );
 --> statement-breakpoint
-CREATE TABLE `tenant_slug_history` (
-	`old_slug` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`changed_at` integer NOT NULL,
-	`retired_until` integer NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `idx_tenant_slug_history_tenant` ON `tenant_slug_history` (`tenant_id`);--> statement-breakpoint
-CREATE TABLE `tenant_invites` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`email` text NOT NULL,
-	`role` text DEFAULT 'inspector' NOT NULL,
-	`status` text DEFAULT 'pending' NOT NULL,
-	`expires_at` integer NOT NULL,
-	`permission_overrides` text,
-	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
-);
---> statement-breakpoint
-CREATE INDEX `idx_invites_tenant` ON `tenant_invites` (`tenant_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_tenant_invites_pending_email` ON `tenant_invites` (`tenant_id`,`email`) WHERE status = 'pending';--> statement-breakpoint
 CREATE TABLE `users` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text,
@@ -1637,197 +1733,567 @@ CREATE TABLE `users` (
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `idx_users_deleted_at` ON `users` (`deleted_at`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_users_tenant_email` ON `users` (`tenant_id`,`email`) WHERE deleted_at IS NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_users_slug_per_tenant` ON `users` (`tenant_id`,`slug`);--> statement-breakpoint
-CREATE INDEX `idx_users_email` ON `users` (`email`);--> statement-breakpoint
-CREATE TABLE `audit_logs` (
-	`id` text PRIMARY KEY NOT NULL,
+CREATE TABLE `verify_export_attempts` (
+	`key` text PRIMARY KEY NOT NULL,
+	`attempts` integer NOT NULL,
+	`window_ends_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `video_upload_parts` (
 	`tenant_id` text NOT NULL,
-	`user_id` text,
-	`action` text NOT NULL,
-	`entity_type` text NOT NULL,
-	`entity_id` text,
-	`metadata` text,
-	`ip_address` text,
-	`inspector_slug` text,
-	`created_at` integer NOT NULL,
-	`actor_kind` text DEFAULT 'tenant_user' NOT NULL,
-	`platform_actor_id` text,
-	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
-);
---> statement-breakpoint
-CREATE INDEX `idx_audit_tenant_created` ON `audit_logs` (`tenant_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `idx_audit_entity` ON `audit_logs` (`entity_type`,`entity_id`);--> statement-breakpoint
-CREATE TABLE `integration_test_results` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`target` text NOT NULL,
-	`provider` text,
-	`is_ok` integer NOT NULL,
-	`detail` text,
-	`tested_by_user_id` text,
-	`tested_at` integer NOT NULL,
-	`step` text
-);
---> statement-breakpoint
-CREATE INDEX `idx_integration_test_tenant_target` ON `integration_test_results` (`tenant_id`,`target`,`tested_at`);--> statement-breakpoint
-CREATE TABLE `notifications` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`user_id` text,
-	`type` text NOT NULL,
-	`title` text NOT NULL,
-	`body` text,
-	`entity_type` text,
-	`entity_id` text,
-	`metadata` text,
-	`read_at` integer,
-	`archived_at` integer,
-	`created_at` integer NOT NULL,
-	`contact_id` text,
-	`inspection_id` text,
-	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `idx_notifications_tenant_user_created` ON `notifications` (`tenant_id`,`user_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `idx_notifications_tenant_user_unread` ON `notifications` (`tenant_id`,`user_id`,`read_at`);--> statement-breakpoint
-CREATE INDEX `idx_notifications_tenant_contact_created` ON `notifications` (`tenant_id`,`contact_id`,`created_at`);--> statement-breakpoint
-CREATE TABLE `parked_cmd_events` (
-	`id` text PRIMARY KEY NOT NULL,
-	`envelope` text NOT NULL,
-	`reason` text NOT NULL,
-	`received_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `idx_parked_cmd_events_received_at` ON `parked_cmd_events` (`received_at`);--> statement-breakpoint
-CREATE TABLE `processed_cmd_events` (
-	`event_id` text PRIMARY KEY NOT NULL,
-	`cmd_type` text NOT NULL,
-	`processed_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE `slug_reservations` (
-	`slug` text PRIMARY KEY NOT NULL,
-	`reason` text NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE `sync_outbox` (
-	`id` text PRIMARY KEY NOT NULL,
-	`event_type` text NOT NULL,
-	`payload` text NOT NULL,
-	`status` text DEFAULT 'pending' NOT NULL,
-	`attempts` integer DEFAULT 0 NOT NULL,
-	`created_at` integer NOT NULL,
-	`last_tried_at` integer,
-	`last_error` text
-);
---> statement-breakpoint
-CREATE INDEX `idx_sync_outbox_status_created` ON `sync_outbox` (`status`,`created_at`);--> statement-breakpoint
-CREATE TABLE `tenant_destruction_records` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`tenant_slug` text,
-	`rows_deleted` integer DEFAULT 0 NOT NULL,
-	`r2_objects` integer DEFAULT 0 NOT NULL,
-	`r2_bytes` integer DEFAULT 0 NOT NULL,
-	`kv_keys` integer DEFAULT 0 NOT NULL,
-	`destroyed_at` integer NOT NULL,
-	`status` text DEFAULT 'completed' NOT NULL,
-	`completed_at` integer,
-	`record_version` integer DEFAULT 1 NOT NULL,
-	`stores_measured` text,
-	`store_results` text,
-	`incomplete_notified_at` integer
-);
---> statement-breakpoint
-CREATE INDEX `idx_destruction_tenant` ON `tenant_destruction_records` (`tenant_id`);--> statement-breakpoint
-CREATE INDEX `idx_destruction_destroyed_at` ON `tenant_destruction_records` (`destroyed_at`);--> statement-breakpoint
-CREATE TABLE `tenant_legal_versions` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`doc` text NOT NULL,
-	`version` text NOT NULL,
-	`body_snapshot` text,
-	`content_hash` text NOT NULL,
-	`is_material` integer DEFAULT false NOT NULL,
-	`published_at` integer NOT NULL,
-	`published_by_user_id` text
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `idx_tenant_legal_versions_doc_version` ON `tenant_legal_versions` (`tenant_id`,`doc`,`version`);--> statement-breakpoint
-CREATE INDEX `idx_tenant_legal_versions_latest` ON `tenant_legal_versions` (`tenant_id`,`doc`,`published_at`);--> statement-breakpoint
-CREATE TABLE `account_acceptances` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`user_id` text NOT NULL,
-	`actor_identity_ref` text,
-	`doc` text NOT NULL,
-	`version` text NOT NULL,
-	`content_hash` text NOT NULL,
-	`authority_basis` text NOT NULL,
-	`accepted_at` integer NOT NULL,
-	`created_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `uq_account_acceptances_user_doc_version` ON `account_acceptances` (`user_id`,`doc`,`version`);--> statement-breakpoint
-CREATE INDEX `idx_account_acceptances_tenant` ON `account_acceptances` (`tenant_id`,`accepted_at`);--> statement-breakpoint
-CREATE TABLE `legal_holds` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`matter` text NOT NULL,
-	`reason` text NOT NULL,
-	`placed_by` text NOT NULL,
-	`placed_at` integer NOT NULL,
-	`released_at` integer,
-	`released_by` text,
-	`release_reason` text
-);
---> statement-breakpoint
-CREATE INDEX `idx_legal_holds_tenant_active` ON `legal_holds` (`tenant_id`,`released_at`);--> statement-breakpoint
-CREATE TABLE `client_uploads` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`inspection_id` text NOT NULL,
-	`uploaded_by_kind` text NOT NULL,
-	`uploaded_by_ref` text NOT NULL,
-	`uploaded_by_name` text,
-	`category` text NOT NULL,
-	`visibility` text NOT NULL,
-	`r2_key` text NOT NULL,
-	`filename` text NOT NULL,
-	`content_type` text NOT NULL,
+	`media_id` text NOT NULL,
+	`part_number` integer NOT NULL,
+	`etag` text NOT NULL,
 	`size_bytes` integer NOT NULL,
-	`label` text,
-	`created_at` integer NOT NULL
+	`received_at` integer NOT NULL,
+	PRIMARY KEY(`tenant_id`, `media_id`, `part_number`)
 );
 --> statement-breakpoint
-CREATE INDEX `idx_client_uploads_inspection` ON `client_uploads` (`tenant_id`,`inspection_id`);--> statement-breakpoint
-CREATE TABLE `statutory_form_entries` (
+CREATE TABLE `video_uploads` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
 	`inspection_id` text NOT NULL,
-	`form_id` text NOT NULL,
-	`values` text NOT NULL,
-	`updated_at` integer NOT NULL
+	`media_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`upload_id` text,
+	`r2_key` text,
+	`content_type` text,
+	`total_bytes` integer NOT NULL,
+	`part_bytes` integer NOT NULL,
+	`part_count` integer NOT NULL,
+	`state` text NOT NULL,
+	`created_at` integer NOT NULL,
+	`expires_at` integer NOT NULL,
+	`completed_at` integer,
+	`completing_at` integer
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `uq_statutory_form_entries_subject` ON `statutory_form_entries` (`tenant_id`,`inspection_id`,`form_id`);--> statement-breakpoint
-CREATE INDEX `idx_statutory_form_entries_inspection` ON `statutory_form_entries` (`tenant_id`,`inspection_id`);--> statement-breakpoint
-CREATE TABLE `statutory_inspection_details` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`inspection_id` text NOT NULL,
-	`inspector_signature_date` text,
-	`employee_printed_name` text,
-	`owner_name` text,
-	`owner_email` text,
-	`owner_mailing_address` text,
-	`owner_home_phone` text,
-	`owner_work_phone` text,
-	`owner_cell_phone` text,
-	`updated_at` integer NOT NULL
-);
+CREATE INDEX `idx_account_acceptances_tenant` ON `account_acceptances` (`tenant_id`,`accepted_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_account_acceptances_tenant_id` ON `account_acceptances` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_account_acceptances_user_doc_version` ON `account_acceptances` (`user_id`,`doc`,`version`);
+--> statement-breakpoint
+CREATE INDEX `idx_agent_terms_acceptances_user` ON `agent_terms_acceptances` (`user_id`,`accepted_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_agreement_requests_inspection` ON `agreement_requests` (`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_agreement_requests_tenant_id` ON `agreement_requests` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_agreement_requests_token_hash` ON `agreement_requests` (`token_hash`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_agreement_requests_verify_token` ON `agreement_requests` (`verification_token`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_agreement_signers_request_email` ON `agreement_signers` (`request_id`,`email`);
+--> statement-breakpoint
+CREATE INDEX `idx_agreement_signers_tenant_id` ON `agreement_signers` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_agreement_signers_tenant_request` ON `agreement_signers` (`tenant_id`,`request_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_agreement_signers_token_hash` ON `agreement_signers` (`token_hash`);
+--> statement-breakpoint
+CREATE INDEX `idx_agreements_tenant_id` ON `agreements` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_ai_call_provenance_tenant_created` ON `ai_call_provenance` (`tenant_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_ai_call_provenance_tenant_id` ON `ai_call_provenance` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_ai_content_reviews_ai_call` ON `ai_content_reviews` (`ai_call_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_ai_content_reviews_tenant_id` ON `ai_content_reviews` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_ai_content_reviews_person_call` ON `ai_content_reviews` (`tenant_id`,`artifact_type`,`artifact_id`,`ai_call_id`,`reviewed_by`);
+--> statement-breakpoint
+CREATE INDEX `idx_audit_entity` ON `audit_logs` (`entity_type`,`entity_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_audit_logs_tenant_id` ON `audit_logs` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_audit_tenant_created` ON `audit_logs` (`tenant_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_automation_logs_insp` ON `automation_logs` (`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_automation_logs_pending` ON `automation_logs` (`tenant_id`,`status`,`send_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_automation_logs_tenant_id` ON `automation_logs` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_automation_logs_event` ON `automation_logs` (`automation_id`,`inspection_id`,`event_id`,`channel`,`recipient`) WHERE event_id IS NOT NULL;
+--> statement-breakpoint
+CREATE INDEX `idx_automations_tenant_id` ON `automations` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_availability_tenant_id` ON `availability` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_availability_window_unique` ON `availability` (`inspector_id`,`day_of_week`,`start_time`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_avail_overrides_block_unique` ON `availability_overrides` (`inspector_id`,`date`) WHERE is_available = 0 AND source IS NULL;
+--> statement-breakpoint
+CREATE INDEX `idx_availability_overrides_tenant_id` ON `availability_overrides` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_avail_overrides_external` ON `availability_overrides` (`inspector_id`,`source`,`external_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_calendar_blocks_tenant_id` ON `calendar_blocks` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_calendar_blocks_tenant_user_date` ON `calendar_blocks` (`tenant_id`,`user_id`,`date`);
+--> statement-breakpoint
+CREATE INDEX `idx_calendar_connection_read_calendars_tenant_id` ON `calendar_connection_read_calendars` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_conn_read_cal_tenant` ON `calendar_connection_read_calendars` (`tenant_id`,`connection_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_conn_read_cal` ON `calendar_connection_read_calendars` (`connection_id`,`external_calendar_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_calendar_connections_tenant_id` ON `calendar_connections` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_calendar_connections_tenant_user` ON `calendar_connections` (`tenant_id`,`user_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_calendar_connections_user_provider` ON `calendar_connections` (`user_id`,`provider`);
+--> statement-breakpoint
+CREATE INDEX `idx_calendar_external_links_tenant_id` ON `calendar_external_links` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_calendar_external_links_user` ON `calendar_external_links` (`tenant_id`,`user_id`,`provider`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_calendar_external_links_entity` ON `calendar_external_links` (`tenant_id`,`provider`,`entity_type`,`entity_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_client_uploads_inspection` ON `client_uploads` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_client_uploads_tenant_id` ON `client_uploads` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_comment_usage_user_last_used` ON `comment_usage` (`tenant_id`,`user_id`,`last_used_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_comments_library_id` ON `comments` (`library_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_comments_tenant_id` ON `comments` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_concierge_confirm_token_hash` ON `concierge_confirm_tokens` (`token_hash`);
+--> statement-breakpoint
+CREATE INDEX `idx_concierge_confirm_tokens_tenant_id` ON `concierge_confirm_tokens` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_concierge_tokens_expiry` ON `concierge_confirm_tokens` (`expires_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_contact_role_profiles_tenant_id` ON `contact_role_profiles` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_crp_tenant_key` ON `contact_role_profiles` (`tenant_id`,`key`) WHERE is_active = 1;
+--> statement-breakpoint
+CREATE INDEX `idx_contacts_agent_user` ON `contacts` (`agent_user_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_contacts_tenant_id` ON `contacts` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_contacts_type` ON `contacts` (`tenant_id`,`type`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_contacts_tenant_agent_user` ON `contacts` (`tenant_id`,`agent_user_id`) WHERE agent_user_id IS NOT NULL AND archived_at IS NULL;
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_contacts_tenant_email` ON `contacts` (`tenant_id`,`email`) WHERE email IS NOT NULL AND archived_at IS NULL;
+--> statement-breakpoint
+CREATE INDEX `idx_contractor_types_tenant_id` ON `contractor_types` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_contractor_types_tenant_trade` ON `contractor_types` (`tenant_id`,`trade_slug`) WHERE trade_slug IS NOT NULL;
+--> statement-breakpoint
+CREATE INDEX `idx_cost_items_finding_key` ON `cost_items` (`finding_key`);
+--> statement-breakpoint
+CREATE INDEX `idx_cost_items_tenant_id` ON `cost_items` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_cost_items_tenant_inspection` ON `cost_items` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_defect_categories_tenant_id` ON `defect_categories` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_deployment_legal_versions_latest` ON `deployment_legal_versions` (`doc`,`published_at`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_deployment_legal_versions_doc_hash` ON `deployment_legal_versions` (`doc`,`content_hash`);
+--> statement-breakpoint
+CREATE INDEX `idx_discount_codes_tenant_id` ON `discount_codes` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_discount_codes_code_tenant` ON `discount_codes` (upper(code),`tenant_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_discovery_objections_email_hash` ON `discovery_objections` (`email_hash`);
+--> statement-breakpoint
+CREATE INDEX `idx_doc_review_inspection` ON `document_review_items` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_document_review_items_tenant_id` ON `document_review_items` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_doc_review_item` ON `document_review_items` (`inspection_id`,`document_key`);
+--> statement-breakpoint
+CREATE INDEX `idx_email_suppressions_email` ON `email_suppressions` (`tenant_id`,`email`);
+--> statement-breakpoint
+CREATE INDEX `idx_email_suppressions_tenant_id` ON `email_suppressions` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_erasure_log_tenant` ON `erasure_log` (`tenant_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_erasure_log_tenant_id` ON `erasure_log` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_esign_audit_logs_event_dedup` ON `esign_audit_logs` (`tenant_id`,`request_id`,`event`) WHERE event NOT LIKE 'signer.%';
+--> statement-breakpoint
+CREATE INDEX `idx_esign_audit_logs_request` ON `esign_audit_logs` (`tenant_id`,`request_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_esign_audit_logs_tenant_created` ON `esign_audit_logs` (`tenant_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_esign_audit_logs_tenant_id` ON `esign_audit_logs` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_event_types_tenant_id` ON `event_types` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_event_types_tenant_slug` ON `event_types` (`tenant_id`,`slug`);
+--> statement-breakpoint
+CREATE INDEX `idx_idempotency_expires` ON `idempotency_keys` (`expires_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_import_archives_tenant_id` ON `import_archives` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_import_archives_package` ON `import_archives` (`tenant_id`,`package_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_import_id_map_new_id` ON `import_id_map` (`tenant_id`,`table_name`,`new_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_import_id_map_package` ON `import_id_map` (`tenant_id`,`package_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_import_id_map_tenant_id` ON `import_id_map` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_import_id_map_source` ON `import_id_map` (`tenant_id`,`package_id`,`table_name`,`source_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_iat_inspection` ON `inspection_access_tokens` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_iat_recipient` ON `inspection_access_tokens` (`inspection_id`,`recipient_email`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_iat_token_hash` ON `inspection_access_tokens` (`token_hash`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_access_tokens_tenant_id` ON `inspection_access_tokens` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_events_inspection` ON `inspection_events` (`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_events_scheduled` ON `inspection_events` (`tenant_id`,`scheduled_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_events_tenant_id` ON `inspection_events` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_insp_inspectors_tenant_user` ON `inspection_inspectors` (`tenant_id`,`user_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_insp_inspectors_user` ON `inspection_inspectors` (`user_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_inspectors_tenant_inspection_id_user_id` ON `inspection_inspectors` (`tenant_id`,`inspection_id`,`user_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_item_tag_links_tenant_pk` ON `inspection_item_tag_links` (`tenant_id`,`inspection_id`,`item_id`,`tag_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_tag_links_inspection_item` ON `inspection_item_tag_links` (`inspection_id`,`item_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_tag_links_tag` ON `inspection_item_tag_links` (`tag_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_media_pool_tenant_id` ON `inspection_media_pool` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_media_pool_inspection` ON `inspection_media_pool` (`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_messages_tenant_id` ON `inspection_messages` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_msg_contact` ON `inspection_messages` (`tenant_id`,`contact_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_msg_inspection` ON `inspection_messages` (`inspection_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_msg_unread` ON `inspection_messages` (`tenant_id`,`contact_id`,`from_role`) WHERE "inspection_messages"."read_at" IS NULL;
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_people_tenant_id` ON `inspection_people` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_ip_insp_contact_role` ON `inspection_people` (`inspection_id`,`contact_id`,`role_profile_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_requests_email` ON `inspection_requests` (`tenant_id`,`client_email`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_requests_tenant` ON `inspection_requests` (`tenant_id`,`status`,`scheduled_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_requests_tenant_id` ON `inspection_requests` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_results_tenant_id` ON `inspection_results` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_results_inspection` ON `inspection_results` (`inspection_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_results_report` ON `inspection_results` (`report_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_service_pay_splits_tenant_id` ON `inspection_service_pay_splits` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_pay_split_line` ON `inspection_service_pay_splits` (`tenant_id`,`inspection_service_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_pay_split_user` ON `inspection_service_pay_splits` (`tenant_id`,`user_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_pay_split_line_user` ON `inspection_service_pay_splits` (`tenant_id`,`inspection_service_id`,`user_id`) WHERE corrects_split_id IS NULL;
+--> statement-breakpoint
+CREATE INDEX `idx_insp_services_insp` ON `inspection_services` (`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_services_tenant_id` ON `inspection_services` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_types_tenant_id` ON `inspection_types` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_inspection_types_tenant_name` ON `inspection_types` (`tenant_id`,`name`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_units_parent` ON `inspection_units` (`parent_unit_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_units_tenant_id` ON `inspection_units` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspection_units_tenant_inspection` ON `inspection_units` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspections_inspector_date` ON `inspections` (`inspector_id`,`date`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspections_request` ON `inspections` (`request_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspections_root` ON `inspections` (`root_inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspections_tenant_created` ON `inspections` (`tenant_id`,`created_at`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspections_tenant_date` ON `inspections` (`tenant_id`,`date`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspections_tenant_id` ON `inspections` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspections_tenant_status` ON `inspections` (`tenant_id`,`status`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspector_credentials_tenant_id` ON `inspector_credentials` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspector_credentials_user` ON `inspector_credentials` (`user_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_inspector_service_areas_tenant_id` ON `inspector_service_areas` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_inspector_service_areas` ON `inspector_service_areas` (`tenant_id`,`user_id`,`zip_prefix`);
+--> statement-breakpoint
+CREATE INDEX `idx_integration_test_results_tenant_id` ON `integration_test_results` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_integration_test_tenant_target` ON `integration_test_results` (`tenant_id`,`target`,`tested_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_invoices_contact` ON `invoices` (`tenant_id`,`contact_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_invoices_inspection` ON `invoices` (`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_invoices_tenant_id` ON `invoices` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_invoices_tenant_number` ON `invoices` (`tenant_id`,`invoice_number`);
+--> statement-breakpoint
+CREATE INDEX `idx_legal_holds_tenant_active` ON `legal_holds` (`tenant_id`,`released_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_legal_holds_tenant_id` ON `legal_holds` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_marketplace_libraries_kind_featured` ON `marketplace_libraries` (`kind`,`is_featured`);
+--> statement-breakpoint
+CREATE INDEX `idx_message_templates_tenant_channel` ON `message_templates` (`tenant_id`,`channel`);
+--> statement-breakpoint
+CREATE INDEX `idx_message_templates_tenant_id` ON `message_templates` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_message_templates_variant` ON `message_templates` (`tenant_id`,`name`,`channel`,`locale`);
+--> statement-breakpoint
+CREATE INDEX `idx_migration_batches_expires` ON `migration_batches` (`expires_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_migration_batches_tenant_created` ON `migration_batches` (`tenant_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_migration_batches_tenant_id` ON `migration_batches` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_migration_rows_batch_status` ON `migration_rows` (`batch_id`,`status`);
+--> statement-breakpoint
+CREATE INDEX `idx_migration_rows_tenant_id` ON `migration_rows` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_notification_preferences_tenant_id` ON `notification_preferences` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_notification_prefs_unique` ON `notification_preferences` (`tenant_id`,`subject_kind`,`subject_id`,`class_id`,`channel`);
+--> statement-breakpoint
+CREATE INDEX `idx_notifications_tenant_contact_created` ON `notifications` (`tenant_id`,`contact_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_notifications_tenant_id` ON `notifications` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_notifications_tenant_user_created` ON `notifications` (`tenant_id`,`user_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_notifications_tenant_user_unread` ON `notifications` (`tenant_id`,`user_id`,`read_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_offline_import_applied_age` ON `offline_import_applied` (`tenant_id`,`applied_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_order_payments_inspection` ON `order_payments` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_order_payments_invoice` ON `order_payments` (`tenant_id`,`invoice_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_order_payments_tenant_id` ON `order_payments` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_order_payments_provider_ref` ON `order_payments` (`tenant_id`,`provider`,`provider_ref`);
+--> statement-breakpoint
+CREATE INDEX `idx_orphaned_media_key` ON `orphaned_media` (`tenant_id`,`r2_key`);
+--> statement-breakpoint
+CREATE INDEX `idx_orphaned_media_tenant_id` ON `orphaned_media` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_parked_cmd_events_received_at` ON `parked_cmd_events` (`received_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_permission_templates_tenant_id` ON `permission_templates` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_permission_templates_name` ON `permission_templates` (`tenant_id`,`name`) WHERE archived_at IS NULL;
+--> statement-breakpoint
+CREATE INDEX `idx_psq_responses_tenant_id` ON `psq_responses` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_psq_share_token` ON `psq_responses` (`share_token`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_psq_inspection` ON `psq_responses` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_qbo_connections_realm` ON `qbo_connections` (`realm_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_qbo_entity_map_oi` ON `qbo_entity_map` (`tenant_id`,`oi_type`,`oi_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_qbo_entity_map_qbo` ON `qbo_entity_map` (`tenant_id`,`qbo_type`,`qbo_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_qbo_entity_map_tenant_id` ON `qbo_entity_map` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_qbo_sync_errors_tenant_id` ON `qbo_sync_errors` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_rating_systems_tenant_id` ON `rating_systems` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_rating_systems_tenant_slug` ON `rating_systems` (`tenant_id`,`slug`);
+--> statement-breakpoint
+CREATE INDEX `idx_repair_request_items_rr` ON `repair_request_items` (`repair_request_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_repair_request_items_tenant_id` ON `repair_request_items` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_repair_requests_inspection` ON `repair_requests` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_repair_requests_share_token` ON `repair_requests` (`share_token`);
+--> statement-breakpoint
+CREATE INDEX `idx_repair_requests_tenant_id` ON `repair_requests` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_report_exports_inspection` ON `report_exports` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_report_exports_tenant_id` ON `report_exports` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_report_pdfs_content_hash` ON `report_pdfs` (`inspection_id`,`type`,`content_hash`);
+--> statement-breakpoint
+CREATE INDEX `idx_report_pdfs_status` ON `report_pdfs` (`status`);
+--> statement-breakpoint
+CREATE INDEX `idx_report_pdfs_tenant_id` ON `report_pdfs` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_report_pdfs_inspection_type` ON `report_pdfs` (`inspection_id`,`type`,`version_number`);
+--> statement-breakpoint
+CREATE INDEX `idx_report_signoff_inspection` ON `report_signoff` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_report_signoff_tenant_id` ON `report_signoff` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_report_signoff_role` ON `report_signoff` (`inspection_id`,`role`);
+--> statement-breakpoint
+CREATE INDEX `idx_report_translations_tenant_id` ON `report_translations` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_report_translations_report_locale` ON `report_translations` (`tenant_id`,`report_id`,`locale`);
+--> statement-breakpoint
+CREATE INDEX `idx_report_versions_tenant_id` ON `report_versions` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_report_versions_verify_token` ON `report_versions` (`verification_token`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_report_versions_report_version` ON `report_versions` (`report_id`,`version_number`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_report_views_scope` ON `report_views` (`tenant_id`,`inspection_id`,`access_token_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_report_views_tenant_id` ON `report_views` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_reports_inspection` ON `reports` (`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_reports_tenant_id` ON `reports` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_reports_primary` ON `reports` (`inspection_id`) WHERE kind = 'primary';
+--> statement-breakpoint
+CREATE INDEX `idx_service_inspectors_tenant_service_id_user_id` ON `service_inspectors` (`tenant_id`,`service_id`,`user_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_service_pay_rules_tenant_id` ON `service_pay_rules` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_service_pay_rules_default` ON `service_pay_rules` (`tenant_id`,`service_id`) WHERE user_id IS NULL;
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_service_pay_rules_user` ON `service_pay_rules` (`tenant_id`,`service_id`,`user_id`) WHERE user_id IS NOT NULL;
+--> statement-breakpoint
+CREATE INDEX `idx_services_tenant_id` ON `services` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_signing_keys_tenant_id` ON `signing_keys` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_signing_keys_tenant_active` ON `signing_keys` (`tenant_id`) WHERE retired_at IS NULL;
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_signing_keys_tenant_fingerprint` ON `signing_keys` (`tenant_id`,`fingerprint`);
+--> statement-breakpoint
+CREATE INDEX `idx_sms_consent_contact` ON `sms_consent_log` (`tenant_id`,`contact_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_sms_consent_log_tenant_id` ON `sms_consent_log` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_sms_consent_subject` ON `sms_consent_log` (`tenant_id`,`subject_kind`,`subject_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_sms_delivery_status_msg` ON `sms_delivery_status` (`tenant_id`,`provider_message_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_sms_delivery_status_tenant_id` ON `sms_delivery_status` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_statutory_form_entries_inspection` ON `statutory_form_entries` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_statutory_form_entries_tenant_id` ON `statutory_form_entries` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_statutory_form_entries_subject` ON `statutory_form_entries` (`tenant_id`,`inspection_id`,`form_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_statutory_form_productions_tenant_id` ON `statutory_form_productions` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_statutory_productions_form_version` ON `statutory_form_productions` (`form_id`,`version`);
+--> statement-breakpoint
+CREATE INDEX `idx_statutory_productions_inspection` ON `statutory_form_productions` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_statutory_form_sightings_form` ON `statutory_form_sightings` (`form_id`,`last_seen_at`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_statutory_form_sightings_seen` ON `statutory_form_sightings` (`form_id`,`source_url`,`observed_hash`);
+--> statement-breakpoint
+CREATE INDEX `idx_statutory_form_versions_form` ON `statutory_form_versions` (`form_id`,`effective_from`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_statutory_form_versions_form_version` ON `statutory_form_versions` (`form_id`,`version`);
+--> statement-breakpoint
+CREATE INDEX `idx_statutory_inspection_details_tenant_id` ON `statutory_inspection_details` (`tenant_id`,`id`);
 --> statement-breakpoint
 CREATE UNIQUE INDEX `uq_statutory_inspection_details_subject` ON `statutory_inspection_details` (`tenant_id`,`inspection_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_sync_outbox_status_created` ON `sync_outbox` (`status`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_tags_tenant_id` ON `tags` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_tags_tenant_name` ON `tags` (`tenant_id`,`name`);
+--> statement-breakpoint
+CREATE INDEX `idx_templates_rating_system` ON `templates` (`rating_system_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_templates_tenant_id` ON `templates` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_tenant_custom_holidays_tenant_id` ON `tenant_custom_holidays` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_tenant_custom_holidays_tenant_date` ON `tenant_custom_holidays` (`tenant_id`,`date`);
+--> statement-breakpoint
+CREATE INDEX `idx_tenant_data_jobs_sweep` ON `tenant_data_jobs` (`status`,`lease_expires_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_tenant_data_jobs_tenant_created` ON `tenant_data_jobs` (`tenant_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_tenant_data_jobs_tenant_id` ON `tenant_data_jobs` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_tenant_data_jobs_active` ON `tenant_data_jobs` (`tenant_id`) WHERE status IN ('queued', 'running');
+--> statement-breakpoint
+CREATE INDEX `idx_destruction_destroyed_at` ON `tenant_destruction_records` (`destroyed_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_tenant_destruction_records_tenant_id` ON `tenant_destruction_records` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_tenant_invites_tenant_id` ON `tenant_invites` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_tenant_invites_pending_email` ON `tenant_invites` (`tenant_id`,`email`) WHERE status = 'pending';
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_tenant_legal_versions_doc_version` ON `tenant_legal_versions` (`tenant_id`,`doc`,`version`);
+--> statement-breakpoint
+CREATE INDEX `idx_tenant_legal_versions_latest` ON `tenant_legal_versions` (`tenant_id`,`doc`,`published_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_tenant_legal_versions_tenant_id` ON `tenant_legal_versions` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_tenant_library_imports_tenant_id` ON `tenant_library_imports` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_tenant_library_import` ON `tenant_library_imports` (`tenant_id`,`library_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_marketplace_history_library` ON `tenant_marketplace_import_history` (`library_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_marketplace_history_template` ON `tenant_marketplace_import_history` (`template_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_marketplace_history_tenant` ON `tenant_marketplace_import_history` (`tenant_id`,`created_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_tenant_marketplace_import_history_tenant_id` ON `tenant_marketplace_import_history` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE INDEX `idx_tenant_slug_history_tenant_old_slug` ON `tenant_slug_history` (`tenant_id`,`old_slug`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `tenants_slug_unique` ON `tenants` (`slug`);
+--> statement-breakpoint
+CREATE INDEX `idx_usage_counters_tenant` ON `usage_counters` (`tenant_id`);
+--> statement-breakpoint
+CREATE INDEX `idx_users_deleted_at` ON `users` (`deleted_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_users_email` ON `users` (`email`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_users_slug_per_tenant` ON `users` (`tenant_id`,`slug`);
+--> statement-breakpoint
+CREATE INDEX `idx_users_tenant_id` ON `users` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_users_tenant_email` ON `users` (`tenant_id`,`email`) WHERE deleted_at IS NULL;
+--> statement-breakpoint
+CREATE INDEX `idx_verify_export_attempts_ends` ON `verify_export_attempts` (`window_ends_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_video_uploads_sweep` ON `video_uploads` (`state`,`expires_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_video_uploads_tenant_id` ON `video_uploads` (`tenant_id`,`id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_video_uploads_media` ON `video_uploads` (`tenant_id`,`media_id`);

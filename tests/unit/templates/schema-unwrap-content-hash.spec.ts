@@ -25,9 +25,14 @@ const DOC = {
 };
 const WRAPPED = JSON.stringify(JSON.stringify(DOC));
 
-// Matched by suffix, not sequence number: migration files renumber on consolidation.
-const migrationSql = import.meta.glob('../../../migrations/*.sql', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-const UNWRAP = Object.entries(migrationSql).find(([key]) => key.endsWith('_templates_schema_unwrap.sql'))![1];
+// This one-time data repair was folded into the baseline history after all
+// existing databases had applied it. Keep its SQL here so the regression test
+// continues to exercise the transformation without depending on a deleted file.
+const UNWRAP = `UPDATE templates
+SET schema = json_extract(schema, '$')
+WHERE CASE WHEN json_valid(schema) THEN json_type(schema) END = 'text'
+  AND CASE WHEN json_valid(json_extract(schema, '$'))
+           THEN json_type(json_extract(schema, '$')) END = 'object';`;
 
 describe('the unwrap migration leaves the report content hash alone', () => {
     let sqlite: SqliteDatabase;

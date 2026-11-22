@@ -65,10 +65,17 @@ for (const raw of sql.split('--> statement-breakpoint')) {
     const stmt = raw.trim();
     if (!stmt) continue;
 
-    const ct = stmt.match(/CREATE TABLE `(\w+)` \(([\s\S]*?)\n\);/);
+    // Keep the closing delimiter flexible: drizzle-kit may place a final
+    // column and `);` on the same line in the generated baseline.
+    const ct = stmt.match(/CREATE TABLE `(\w+)` \(([\s\S]*?)\s*\);/);
     if (ct) {
         const cols = []; let pk = []; const fks = [];
-        for (let line of ct[2].split('\n')) {
+        // Drizzle's baseline renderer can put several column declarations on
+        // one physical line. Split those declarations before parsing them so
+        // the DEFAULT expression for one column cannot absorb the following
+        // column definitions (the tenant_configs tail hit this after squash).
+        const columnSeparated = ct[2].replace(/,\s*(?=`\w+`\s+(?:text|integer|real|blob)\b)/g, '\n');
+        for (let line of columnSeparated.split('\n')) {
             line = line.trim().replace(/,$/, '');
             const c = line.match(/^`(\w+)` (text|integer|real|blob)(.*)$/);
             if (c) {

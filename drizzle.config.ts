@@ -4,8 +4,9 @@ import { defineConfig } from 'drizzle-kit';
 // migrations are forward-only. D1 has no rollback, so every change follows
 // expand-migrate-contract: add the new column or table first, backfill in the same
 // file, switch the code over, and only then retire the old structure. Do not
-// regenerate migrations/0000_baseline.sql and do not wipe a database to apply a
-// schema change; run `npm run db:generate` and commit the new incremental file.
+// regenerate migrations/0000_baseline.sql for routine schema changes or wipe a
+// database to apply them; run `npm run db:generate` and commit the new incremental
+// file. An intentional full-chain baseline squash is the documented exception.
 // An ADD COLUMN goes in its own migration, and the column goes at the END of the
 // table's definition in the schema.
 //

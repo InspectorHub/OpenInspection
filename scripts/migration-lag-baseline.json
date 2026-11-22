@@ -17,22 +17,40 @@
     "remote)` for a standalone self-host running `npm run db:lag`. Keys not listed here read as",
     "an empty allowlist, which is the safe default: every unexpected name fails.",
     "",
-    "WHY MOST LISTS BELOW ARE EMPTY. This deployment reconciled the baseline rebuilds by rewriting",
-    "the ledger rather than by allowlisting: the rows naming the superseded migrations were",
-    "deleted, leaving only `0000_baseline.sql`, which wrangler already considers applied. Nothing",
-    "is left for the gate to forgive. An empty list is a declaration, not an oversight — and a",
-    "declared name that the database no longer carries fails the gate as a stale allowlist, so",
-    "these lists must be emptied again whenever a ledger is rewritten.",
-    "",
-    "The `saas` list is the exception: after the 2026-10-13 rebuild its ledger still names the two forward files that rebuild folded in, and they are left in place on purpose.",
+    "WHY MOST LISTS BELOW ARE EMPTY. The standalone ledgers were reconciled after the baseline",
+    "rebuilds, so the rows naming superseded migrations were deleted and only the baseline remains.",
+    "The SaaS ledger is intentionally different: it retains two names folded into the 2026-10-13",
+    "baseline and fifteen names folded into the 2026-11-22 baseline. Its acceptedExtra list below",
+    "records those seventeen names. Empty lists are declarations, not omissions — and a declared",
+    "name that the database no longer carries fails the gate as a stale allowlist, so empty a list",
+    "again whenever that database's ledger is reconciled.",
     "",
     "ADD A NAME HERE ONLY IF you deliberately chose to leave the pre-rebuild rows in place, and",
     "only after confirming that the database's SCHEMA is current. This file silences a report; it",
     "reconciles nothing. Self-hosters upgrading across the baseline rebuild should follow",
-    "docs/operate/upgrade.md instead — the ledger rewrite it describes leaves this file empty."
+    "docs/operate/upgrade.md instead; the reconcile there clears the old rows rather than adding",
+    "them to this allowlist."
   ],
   "saas": {
-    "acceptedExtra": ["0001_integration_test_step.sql", "0002_automation_log_human_verified.sql"]
+    "acceptedExtra": [
+      "0001_integration_test_step.sql",
+      "0002_automation_log_human_verified.sql",
+      "0001_offline_max_days.sql",
+      "0002_offline_import_applied.sql",
+      "0003_qbo_display_name.sql",
+      "0004_permission_templates.sql",
+      "0005_new_inspectors_view_all.sql",
+      "0006_inspection_tombstones.sql",
+      "0007_video_upload_ledger.sql",
+      "0008_verify_export_attempts.sql",
+      "0009_templates_schema_unwrap.sql",
+      "0010_export_tenant_indexes.sql",
+      "0011_drop_redundant_tenant_indexes.sql",
+      "0012_tenant_data_jobs.sql",
+      "0013_curious_grey_gargoyle.sql",
+      "0014_rapid_makkari.sql",
+      "0015_glorious_wildside.sql"
+    ]
   },
   "local-d1": {
     "acceptedExtra": []
