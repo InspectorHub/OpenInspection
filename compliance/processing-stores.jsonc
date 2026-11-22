@@ -262,7 +262,7 @@
     {
       "store_type": "queue",
       "binding": "CRON_QUEUE",
-      "queues": ["openinspection-cron", "openinspection-cron-saas"],
+      "queues": ["openinspection-cron", "openinspection-cron-us"],
       "modes": ["standalone", "saas"],
       "role": {
         "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — scheduled maintenance the tenant's own configuration asks for", "determined_at": "2026-08-22", "source": "engineering" },
@@ -284,7 +284,7 @@
     {
       "store_type": "queue",
       "binding": "WORD_EXPORT_QUEUE",
-      "queues": ["openinspection-word-export", "openinspection-word-export-saas"],
+      "queues": ["openinspection-word-export", "openinspection-word-export-us"],
       "modes": ["standalone", "saas"],
       "role": {
         "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — an export job the tenant's staff started", "determined_at": "2026-08-15", "source": "contract + round 14" },
@@ -306,7 +306,7 @@
     {
       "store_type": "queue",
       "binding": "SYNC_QUEUE",
-      "queues": ["inspectorhub-sync-dlq-saas"],
+      "queues": ["inspectorhub-sync-dlq-us"],
       "modes": ["saas"],
       "role": {
         "EU":    { "legal_role": "controller",   "basis": "The account record synchronised here is our own customer relationship, not the tenant's end-client data — framework §3 'roles by product area', account/billing row", "determined_at": "2026-08-17", "source": "framework §3 + round 25 §12" },
@@ -328,7 +328,7 @@
     {
       "store_type": "queue",
       "binding": null,
-      "queues": ["inspectorhub-cmd-saas"],
+      "queues": ["inspectorhub-cmd-us"],
       "modes": ["saas"],
       "role": {
         "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — commands apply changes to the tenant's own workspace on portal's instruction", "determined_at": "2026-08-17", "source": "contract + round 14" },
