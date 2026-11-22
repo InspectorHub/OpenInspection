@@ -142,13 +142,31 @@ test('raising an invoice, and marking it paid', async ({ page }) => {
     await expect(page.getByRole('dialog')).toBeVisible();
     await INVOICE(page, 'invoice-create');
 
-    await page.keyboard.press('Escape');
+    // Actually SEND the request. The first version pressed Escape here, which
+    // created no invoice — so /invoices showed "No invoices yet" and the
+    // mark-paid picture was an empty state that contradicted its own caption
+    // ("Marking an invoice paid and choosing the payment method"). The seed
+    // tenant is past the new-company verification window, so `ensureHuman()`
+    // resolves true and the form posts without a Turnstile challenge.
+    const send = page.getByRole('button', { name: /Send request/i }).first();
+    await expect(send).toBeVisible();
+    await send.click();
+    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 30_000 });
+
     await page.goto('/invoices');
+    // Assert the invoice really exists rather than guarding with `count()`:
+    // a silently-missing invoice must fail the capture, not publish another
+    // empty state under a caption that promises a paid invoice.
     const paid = page.getByRole('button', { name: /Mark paid|Record payment/i }).first();
-    if (await paid.count()) {
-        await paid.click();
-        await expect(page.getByRole('dialog')).toBeVisible();
-    }
+    await expect(paid).toBeVisible({ timeout: 30_000 });
+    await paid.click();
+    // "Mark paid" does NOT open a dialog — InvoiceRowActions swaps the row's
+    // Action cell for an INLINE payment-method picker ("Check / Cash / Bank /
+    // Other offline / Other / Cancel"). The guide's caption is "Marking an
+    // invoice paid and choosing the payment method", so this picker is exactly
+    // the right thing to photograph; wait for it, not for a dialog that never
+    // appears (the first attempt timed out on a nonexistent getByRole('dialog')).
+    await expect(page.getByRole('button', { name: 'Cash' }).first()).toBeVisible({ timeout: 10_000 });
     await INVOICE(page, 'invoice-mark-paid');
 });
 
@@ -172,9 +190,22 @@ test('sending the report, and the delivery record', async ({ page }) => {
     await expect(page.getByRole('dialog')).toBeVisible();
     await DELIVER(page, 'send-report');
 
-    await page.keyboard.press('Escape');
+    // Actually SEND the report. The first version pressed Escape here, so no
+    // delivery was recorded and the delivery-record panel was empty ("0
+    // delivered") under a caption promising a per-recipient delivery list.
+    // The report is already published by the earlier "publish check" test, so
+    // the send succeeds; the seed tenant is past the verification window so no
+    // Turnstile challenge appears. Wait for the dialog to close, then reload so
+    // the hub's Communication panel reflects the new delivery row.
+    const submit = page.getByRole('dialog').getByRole('button', { name: /^Send$/i }).first();
+    await expect(submit).toBeVisible();
+    await submit.click();
+    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 30_000 });
+    await page.reload();
+
     // The delivery record lives in the Communication panel, so photograph the
     // panel — same reasoning as the hub regions above, same unchanged id.
+    await expect(page.getByRole('heading', { name: /^Communication$/i })).toBeVisible();
     await DELIVER.sections(page, [
         {
             id: 'delivery-record',

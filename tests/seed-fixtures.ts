@@ -695,6 +695,20 @@ export function seedFixtures(appDir: string): void {
          VALUES ('crp_${TENANT_A_ID}_client', '${TENANT_A_ID}', 'client', 'Client', 'client',
                  1, 10, 1, ${nowMs}, ${nowMs})`, cwd);
 
+    // The `buyer_agent` role profile, needed for the agent-portal docs capture:
+    // listReferrals (server/services/agent/referral.ts) associates an agent with
+    // an inspection ONLY through a buyer_agent inspection_people contact, and
+    // joins on this profile's key. The seeded run never performs workspace setup,
+    // so seedRoleProfiles never runs and only the `client` profile above exists.
+    // Id is the same deterministic PK seedRoleProfiles would use, so this is a
+    // no-op for any flow that does seed the full set. kind='agent' gives the
+    // agent capability baseline (showsInAgentPortal, selfRetrieveReport, ...)
+    // via capabilitiesForKind without needing a capabilityOverrides row.
+    d1(`INSERT OR REPLACE INTO contact_role_profiles
+         (id, tenant_id, key, label, kind, is_system, sort_order, is_active, created_at, updated_at)
+         VALUES ('crp_${TENANT_A_ID}_buyer_agent', '${TENANT_A_ID}', 'buyer_agent', 'Buyer''s Agent', 'agent',
+                 1, 30, 1, ${nowMs}, ${nowMs})`, cwd);
+
     // The live client access token. expires_at NULL = open (the order is active);
     // revoked_at NULL = live. Both are read numerically by the guard, and NULL is
     // the only value that means "not set" — a 0 would read as 1970 and revoke it.
