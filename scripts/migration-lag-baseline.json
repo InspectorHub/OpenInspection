@@ -17,19 +17,19 @@
     "remote)` for a standalone self-host running `npm run db:lag`. Keys not listed here read as",
     "an empty allowlist, which is the safe default: every unexpected name fails.",
     "",
-    "WHY MOST LISTS BELOW ARE EMPTY. This deployment reconciled the baseline rebuilds by rewriting",
-    "the ledger rather than by allowlisting: the rows naming the superseded migrations were",
-    "deleted, leaving only `0000_baseline.sql`, which wrangler already considers applied. Nothing",
-    "is left for the gate to forgive. An empty list is a declaration, not an oversight — and a",
-    "declared name that the database no longer carries fails the gate as a stale allowlist, so",
-    "these lists must be emptied again whenever a ledger is rewritten.",
-    "",
-    "The `saas` list is the exception: the ledger retains two names folded in by the 2026-10-13 rebuild and fifteen names folded in by the 2026-11-22 rebuild. They are left in place on purpose.",
+    "WHY MOST LISTS BELOW ARE EMPTY. The standalone ledgers were reconciled after the baseline",
+    "rebuilds, so the rows naming superseded migrations were deleted and only the baseline remains.",
+    "The SaaS ledger is intentionally different: it retains two names folded into the 2026-10-13",
+    "baseline and fifteen names folded into the 2026-11-22 baseline. Its acceptedExtra list below",
+    "records those seventeen names. Empty lists are declarations, not omissions — and a declared",
+    "name that the database no longer carries fails the gate as a stale allowlist, so empty a list",
+    "again whenever that database's ledger is reconciled.",
     "",
     "ADD A NAME HERE ONLY IF you deliberately chose to leave the pre-rebuild rows in place, and",
     "only after confirming that the database's SCHEMA is current. This file silences a report; it",
     "reconciles nothing. Self-hosters upgrading across the baseline rebuild should follow",
-    "docs/operate/upgrade.md instead — the ledger rewrite it describes leaves this file empty."
+    "docs/operate/upgrade.md instead; the reconcile there clears the old rows rather than adding",
+    "them to this allowlist."
   ],
   "saas": {
     "acceptedExtra": [
