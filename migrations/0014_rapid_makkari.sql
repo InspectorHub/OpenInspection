@@ -1,1 +1,0 @@
-CREATE INDEX `idx_import_id_map_tenant_id` ON `import_id_map` (`tenant_id`,`id`);

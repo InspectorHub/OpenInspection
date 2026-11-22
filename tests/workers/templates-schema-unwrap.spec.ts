@@ -16,7 +16,14 @@ import { applyMigrations, flattenStatement } from './migration-replay';
 
 const b = env as unknown as { DB: D1Database };
 const migrationSql = import.meta.glob('../../migrations/*.sql', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-const UNWRAP = Object.entries(migrationSql).find(([key]) => key.endsWith('_templates_schema_unwrap.sql'))![1];
+// Existing databases already applied this one-time data repair before the
+// migration was folded out of the chain. Keep the SQL in the regression test
+// so the behaviour remains covered without loading a deleted migration file.
+const UNWRAP = `UPDATE templates
+SET schema = json_extract(schema, '$')
+WHERE CASE WHEN json_valid(schema) THEN json_type(schema) END = 'text'
+  AND CASE WHEN json_valid(json_extract(schema, '$'))
+           THEN json_type(json_extract(schema, '$')) END = 'object';`;
 
 const TENANT = 'tenant-unwrap';
 const DOC = { schemaVersion: 2, title: 'Residential', sections: [{ id: 's1', title: 'Roof', items: [] }] };
