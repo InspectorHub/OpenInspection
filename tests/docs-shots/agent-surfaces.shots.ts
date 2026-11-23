@@ -101,8 +101,10 @@ test('the dashboard, grouped by property', async ({ page, browser, baseURL, view
 
     // Seed the referral FIRST, on a throwaway admin session. This must happen
     // before the agent cookie is handed to `page` below, because the API calls
-    // need admin rights. It is idempotent by address (ensureDocsTemplate and
-    // the people link tolerate repeats), so a re-run cannot duplicate the row.
+    // need admin rights. docs-shots globalSetup resets D1 before the suite; this
+    // helper creates a fresh contact and inspection, so it relies on that reset
+    // and must not be rerun against a warm database. ensureDocsTemplate and the
+    // people link tolerate repeats, but the contact and inspection do not.
     await loginAsSeedUser(page, SEED_EMAILS.admin);
     await seedAgentReferral(page);
 
