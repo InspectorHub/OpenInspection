@@ -42,7 +42,7 @@ beforeEach(async () => {
 // Resolve an automations row's recipient role by joining
 // recipientRoleProfileId -> contact_role_profiles.key, per the brief's
 // preference for asserting the actual recipient rather than just rule name.
-async function reportPublishedRuleForRole(roleKey: string) {
+async function reportPublishedRuleForRole(roleKey: string, ruleName: string) {
     const rows = await db.select({
         active: schema.automations.active,
         roleKey: schema.contactRoleProfiles.key,
@@ -52,6 +52,7 @@ async function reportPublishedRuleForRole(roleKey: string) {
         .where(and(
             eq(schema.automations.tenantId, TENANT),
             eq(schema.automations.trigger, 'report.published'),
+            eq(schema.automations.name, ruleName),
             eq(schema.contactRoleProfiles.key, roleKey),
         ));
     return rows[0];
@@ -60,21 +61,21 @@ async function reportPublishedRuleForRole(roleKey: string) {
 describe('default report.published seeds — role-aware recipients (Spec 2 Task 5)', () => {
     it('seeds an ACTIVE report.published rule for the client (safety guard: publish must always reach the client)', async () => {
         await svc.ensureSeeds(TENANT);
-        const rule = await reportPublishedRuleForRole('client');
+        const rule = await reportPublishedRuleForRole('client', 'Report Ready');
         expect(rule).toBeDefined();
         expect(rule?.active).toBe(true);
     });
 
     it("seeds an ACTIVE report.published rule for the buyer's agent", async () => {
         await svc.ensureSeeds(TENANT);
-        const rule = await reportPublishedRuleForRole('buyer_agent');
+        const rule = await reportPublishedRuleForRole('buyer_agent', "Report Ready (Buyer's Agent)");
         expect(rule).toBeDefined();
         expect(rule?.active).toBe(true);
     });
 
     it('seeds an INACTIVE report.published rule for the listing agent (opt-in)', async () => {
         await svc.ensureSeeds(TENANT);
-        const rule = await reportPublishedRuleForRole('listing_agent');
+        const rule = await reportPublishedRuleForRole('listing_agent', 'Report Ready (Listing Agent)');
         expect(rule).toBeDefined();
         expect(rule?.active).toBe(false);
     });
