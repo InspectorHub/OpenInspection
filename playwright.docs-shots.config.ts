@@ -30,6 +30,7 @@ process.env.SEED_E2E = '1';
 
 export default defineConfig({
     ...base,
+    reporter: [['list'], ['./tests/docs-shots/meta-reporter.ts']],
     // Clears `.docs-shots/` once per run, then delegates to the shared seed.
     // The per-guide `beforeAll` reset it replaces ran a second time whenever a
     // failure restarted the worker, deleting the screenshots already taken.
