@@ -75,5 +75,24 @@ export async function captureSettings(page: Page, entry: SettingsShot): Promise<
     // around the page is not a readiness check.
     const content = page.getByRole('main');
     await expect(content.getByText(entry.ready).first()).toBeVisible({ timeout: 20_000 });
+    // A fullPage screenshot paints position:sticky bars at whatever scroll
+    // offset the viewport was left at. The Settings pages carry a sticky
+    // bottom Save bar (SettingsSaveBar) and a sticky top section nav; in a
+    // full-page capture they get frozen halfway down the image, overlapping a
+    // field label (on Company settings it covered "Company timezone"). A
+    // reader-facing picture should show the form, not a scroll artifact.
+    // Neutralise sticky positioning for the capture only — the elements stay
+    // in the document flow at their natural place, so nothing is removed or
+    // invented, it simply stops floating over content.
+    // Scope the rule through a class on <html> so it can be switched off
+    // precisely after the shot without leaking into the next entry's capture.
+    await page.addStyleTag({
+        content: '.ih-docs-no-sticky .sticky { position: static !important; }',
+    });
+    await page.evaluate(() => {
+        document.documentElement.classList.add('ih-docs-no-sticky');
+        window.scrollTo(0, 0);
+    });
     await shot(page, entry.id, { fullPage: true });
+    await page.evaluate(() => document.documentElement.classList.remove('ih-docs-no-sticky'));
 }
