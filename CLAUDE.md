@@ -1,5 +1,10 @@
 # CLAUDE.md — OpenInspection (Open Source Edition)
 
+This is the canonical app-facing agent document. [`AGENTS.md`](AGENTS.md) is a
+concise entry point for tools that look for that filename; this document keeps
+the complete project rules. Directory-specific additions live in
+`server/AGENTS.md` and `app/AGENTS.md`.
+
 The open-source inspection engine. A single Cloudflare Worker (the
 cloudflare/react-router-hono-fullstack-template shape): a Hono entry that mounts the full
 API in-process and delegates page routes to React Router v8 SSR.

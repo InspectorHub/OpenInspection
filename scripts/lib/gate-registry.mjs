@@ -335,6 +335,10 @@ export const SCRIPT_GATES = [
     { key: 'nativecontract', label: 'lint:native-contract', script: 'check-native-contract.mjs', fix: 'npm run lint:native-contract', rung: PUSH },
     { key: 'noportalroutes', label: 'lint:no-portal-routes', script: 'check-no-portal-routes.mjs', fix: 'npm run lint:no-portal-routes', rung: PUSH },
     { key: 'schemadoc', label: 'lint:schema-doc', script: 'gen-schema-doc.mjs', fix: 'npm run lint:schema-doc', rung: PUSH, args: ['--check'] },
+    { key: 'docclaims', label: 'lint:docs-claims', script: 'check-doc-claims.mjs', fix: 'npm run lint:docs-claims', rung: PUSH, args: ['--baseline'] },
+    { key: 'docsimpact', label: 'lint:docs-impact', script: 'check-docs-impact.mjs', fix: 'npm run lint:docs-impact', rung: PUSH, args: ['--ci'] },
+    { key: 'envdoc', label: 'lint:env-doc', script: 'gen-env-doc.mjs', fix: 'npm run lint:env-doc', rung: PUSH, args: ['--check'] },
+    { key: 'modesdoc', label: 'lint:modes-doc', script: 'check-deployment-modes-doc.mjs', fix: 'npm run lint:modes-doc', rung: PUSH },
     // The two copy-policy gates, as one row (scripts/check-copy-policy.mjs), run UNMODIFIED and
     // in sequence: verification-copy (no surface converts an integrity result into a conclusion)
     // and endorsement-copy (no copy attributes an approval of our output to an authority --

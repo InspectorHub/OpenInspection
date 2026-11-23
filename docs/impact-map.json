@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "code": ["server/lib/db/schema/**"],
+      "docs": ["docs/reference/database-schema.md", "docs/reference/database.md"],
+      "note": "Database schema source changes can alter the documented database shape. Migration-only maintenance is covered by migration-chain validation and does not change the public schema reference."
+    },
+    {
+      "code": ["server/lib/deployment-profile.ts"],
+      "docs": ["docs/reference/deployment-modes.md"],
+      "note": "Deployment capability changes must be reflected in the generated mode reference."
+    },
+    {
+      "code": ["workers/app.ts", "workers/inprocess-request.ts", "app/lib/api-client.server.ts"],
+      "docs": ["docs/develop/architecture.md"],
+      "note": "Worker dispatch and API transport changes affect the documented request flow."
+    },
+    {
+      "code": ["server/api/inspections/**"],
+      "docs": ["docs/reference/api.md"],
+      "note": "Inspection API route changes affect the endpoint reference."
+    },
+    {
+      "code": ["server/lib/validations/**"],
+      "docs": ["docs/reference/api.md", "docs/reference/roles.md"],
+      "note": "Request-shape validation changes can alter API contracts and role behavior."
+    },
+    {
+      "code": ["app/styles/tailwind.css", "packages/field-ui/src/theme.css"],
+      "docs": ["docs/develop/design-system.md"],
+      "note": "Design-token source changes must keep the design-system guide accurate."
+    },
+    {
+      "code": ["scripts/check-doc-claims.mjs", "scripts/lib/doc-claims.mjs"],
+      "docs": ["docs/develop/gates.md"],
+      "note": "Documentation-reference checker changes must keep their user-facing instructions current."
+    },
+    {
+      "code": ["scripts/check-docs-impact.mjs", "scripts/lib/docs-impact.mjs", "scripts/check-deployment-modes-doc.mjs", "scripts/lib/gate-registry.mjs", ".githooks/commit-msg"],
+      "docs": ["docs/develop/gates.md"],
+      "note": "Gate implementation and registration changes must keep the gate guide current."
+    },
+    {
+      "code": ["scripts/gen-env-doc.mjs", "server/types/hono.ts", "server/lib/secrets-catalog.ts", "server/lib/middleware/integration-secrets.ts"],
+      "docs": ["docs/develop/gates.md", "docs/reference/environment-variables.md"],
+      "note": "Environment-reference generator changes must update its generated output and instructions."
+    },
+    {
+      "code": ["scripts/gen-deployment-modes-doc.ts"],
+      "docs": ["docs/develop/gates.md", "docs/reference/deployment-modes.md"],
+      "note": "Deployment-mode generator changes must update its generated output and instructions."
+    },
+    {
+      "code": ["scripts/gen-schema-doc.mjs"],
+      "docs": ["docs/develop/gates.md"],
+      "note": "Schema-reference check changes must keep the generated-document gate instructions current."
+    }
+  ]
+}

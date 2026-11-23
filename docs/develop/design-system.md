@@ -151,6 +151,12 @@ and borders for higher contrast.
    the token is WORTH — `npm run lint:contrast` is the gate that does the
    arithmetic.
 
+The app stylesheet imports the shared field-ui theme before adding app-only
+tokens. Tailwind v4 combines the theme declarations; if the same `@theme`
+variable is declared again later, the later CSS declaration wins. Extend the
+shared namespace with a new alias where possible, and treat a same-name
+redefinition as an intentional override that needs a visual check.
+
 ---
 
 ## 2. Typography & utility classes
