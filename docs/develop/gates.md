@@ -141,3 +141,27 @@ copy of this repository, commit in one at a time.
 | `scripts/check-gate-registry.mjs` | fails when a `lint:*` script is registered nowhere |
 | `scripts/lib/gate-stamp.mjs` | input-hash caching |
 | `.githooks/pre-commit` | the pre-commit rung |
+
+## Documentation gates
+
+`npm run lint:docs-claims` checks inline-code repository paths and `npm run`
+commands in tracked Markdown against tracked files and the scripts declared in
+`package.json`. A `--prefix` command is resolved only when its package remains
+inside this repository. Its numeric baseline may only fall relative to the
+target branch. This checks whether a
+reference resolves; it does not prove the referenced code still behaves as the
+prose claims. Review product claims against implementation or a behavior test.
+
+`npm run lint:docs-impact` checks commits in the current CI range against
+`docs/impact-map.json`. If a mapped code area changes, include a relevant
+documentation path in the same commit and use a `Docs: docs/...` trailer, or
+record a specific reason with `Docs: n/a — ...`. The map is deliberately scoped
+to user-visible behavior, configuration, API contracts and design tokens; a
+zero-match scan or a glob covering more than 30% of tracked source files fails.
+
+Generated references have read-only drift checks: `npm run docs:schema:check`,
+`npm run docs:modes:check` and `npm run docs:env:check`. Edit the schema,
+deployment profiles, Wrangler variables, Worker environment types, the integration-secret
+catalog or tenant-owned secret precedence policy, then run
+the matching generator. Each check reports how many generated documents it
+examined; zero is a failure.

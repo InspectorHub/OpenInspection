@@ -376,9 +376,10 @@ if (check) {
         console.error(`            regenerated: ${out.length} chars over ${names.length} tables / ${nCols} columns`);
         console.error(`            committed:   ${current.length} chars`);
         console.error('            Fix: npm run docs:schema');
+        console.log('[schema-doc] generated documents checked=1');
         process.exit(1);
     }
-    console.log(`[schema-doc] OK — ${names.length} tables / ${nCols} columns, doc matches the schema.`);
+    console.log(`[schema-doc] generated documents checked=1; ${names.length} tables / ${nCols} columns match the schema.`);
 } else {
     writeFileSync(OUT, out);
     console.log(`[schema-doc] wrote ${OUT} — ${names.length} tables / ${nCols} columns / ${nIdx} indexes.`);

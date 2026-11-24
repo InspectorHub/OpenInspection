@@ -118,9 +118,13 @@ export interface AppEnv extends NativeVersionEnv, NativeImportEnv, NativeVisible
      * none of them. Every reader must fail closed (503) rather than assume a
      * value; see POST /api/integrations/email/validate.
      */
+    /** @tenant-configured Encrypted in tenant_configs.secrets_enc; injected per request. */
     SENDGRID_API_KEY?: string;
+    /** @tenant-configured Encrypted in tenant_configs.secrets_enc; injected per request. */
     POSTMARK_SERVER_TOKEN?: string;
+    /** @tenant-configured Encrypted in tenant_configs.secrets_enc; injected per request. */
     MAILGUN_API_KEY?: string;
+    /** @tenant-configured Stored with tenant email settings; injected per request. */
     MAILGUN_DOMAIN?: string;
 
     // System Defaults
@@ -178,6 +182,7 @@ export interface AppEnv extends NativeVersionEnv, NativeImportEnv, NativeVisible
     TELNYX_API_KEY?: string;
     /** Base64 Ed25519 PUBLIC key for verifying Telnyx compliance-status webhooks
      *  (POST /webhooks/compliance-status/telnyx/:tenant). Missing → webhook 403. */
+    /** @tenant-deployment-split BYO inbound/status reads tenant storage; managed compliance webhook reads deployment binding. */
     TELNYX_PUBLIC_KEY?: string;
     /** Platform-wide monthly SMS allowance for managed (dedicated/shared) tenants.
      *  Parsed as an integer; defaults to DEFAULT_MANAGED_SMS_ALLOWANCE (1000) when

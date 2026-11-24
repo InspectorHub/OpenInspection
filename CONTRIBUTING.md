@@ -24,7 +24,7 @@ Detailed setup including Cloudflare bindings and environment variables: [`docs/o
 
 ## Code conventions
 
-These are summarized from `CLAUDE.md` — read that file for the canonical, exhaustive rules.
+Start with [`AGENTS.md`](AGENTS.md) for repository instructions and `CLAUDE.md` for the detailed project rules.
 
 - **Language**: TypeScript with strict mode. All source code, comments, docs, commit messages, and user-facing strings in **English only**.
 - **Validation**: Every API endpoint uses Zod. Schemas live in `server/lib/validations/*.schema.ts`. No manual `if (!field)` checks.
@@ -64,11 +64,18 @@ OpenInspection follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.
 
 ## Pull requests
 
-1. Fork → branch off `master` → make your changes
+1. Fork → branch off `main` → make your changes
 2. Run `npm run type-check && npm run lint && npm run test:unit` (all green)
 3. Check any UI change by hand (see "What reviewers look for" below)
 4. Open PR using the template — describe **what + why** (not how)
 5. Maintainers aim to review within 7 days
+
+If a code change matches a rule in [`docs/impact-map.json`](docs/impact-map.json),
+update one of the listed documents in the same commit. Add a commit-message
+trailer such as `Docs: docs/reference/api.md`. If no listed document needs an
+update, use `Docs: n/a — <specific reason>` so reviewers can distinguish a
+considered documentation decision from an omission. CI verifies the trailer
+against the changed files.
 
 ### What reviewers look for
 

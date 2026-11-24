@@ -11,6 +11,13 @@ The layout is enforced — `npm run lint:tests` (`scripts/check-test-layout.mjs`
 fails the build on a misplaced spec, and it runs in `npm run lint` (CI's
 `lint-gates` job, and by hand; it is not in the pre-commit rung).
 
+When testing an update schema, check that omitted fields stay omitted. Zod's
+`.partial()` makes object keys optional but does not remove defaults attached to
+their inner schemas. A retained default can therefore overwrite stored values
+on a partial update. `tests/unit/validations/update-schemas-carry-no-defaults.spec.ts`
+walks the generated OpenAPI request bodies and includes a positive control so a
+broken detector cannot silently pass.
+
 Collection is enforced in **both** directions, by two gates rather than one:
 
 - `npm run lint:tests` proves every literal `testMatch` in `playwright.config.ts`
@@ -62,6 +69,12 @@ More than one Playwright config reads that directory, and a spec belongs to
 exactly one of them. `npm run lint:e2e-coverage` prints the full list on every
 run — which config collects a spec, which one OWNS it, and which npm script (if
 any) runs it — so read its output rather than a list copied into this page.
+
+For form tests that exercise `requestSubmit()`, do not call it synchronously
+from inside the current `submit` event handler. Browsers ignore a nested
+submission while that dispatch is active. The Turnstile retry path in
+`app/components/OutboundVerification.tsx` yields to the next task before
+re-submitting; keep a browser-level regression test when changing that flow.
 
 ### The rules the gate enforces
 
