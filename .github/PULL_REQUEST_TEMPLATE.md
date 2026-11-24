@@ -38,6 +38,7 @@ Thanks for sending a PR! Before you submit:
 - [ ] I have read and agreed to the [Code of Conduct](https://github.com/InspectorHub/OpenInspection/blob/main/CODE_OF_CONDUCT.md)
 - [ ] I have added tests that prove my fix is effective or that my feature works (or explained why tests are not feasible)
 - [ ] I have updated the documentation in `docs/` where relevant
+- [ ] My commit message includes `Docs: docs/<path>.md` for mapped documentation changes, or `Docs: n/a — <specific reason>`
 - [ ] I have added entries to `CHANGELOG.md` if this PR is user-visible
 - [ ] My commits include `Co-Authored-By:` lines for any AI assistants used
 

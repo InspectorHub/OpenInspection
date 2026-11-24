@@ -2,6 +2,10 @@
 
 Start here. Pick the section that matches what you are trying to do.
 
+The guide follows the Diátaxis document types: [`quickstart.md`](quickstart.md)
+is a tutorial; `operate/` and `integrations/` are how-to guides; `reference/`
+contains lookup material; and `concepts/` explains how the system works.
+
 | I want to… | Go to |
 |---|---|
 | Get something running for the first time, today | [`quickstart.md`](quickstart.md) |

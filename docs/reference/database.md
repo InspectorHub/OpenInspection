@@ -97,6 +97,11 @@ change; do not edit it by hand.
 The sources it derives from remain the authority if the two ever disagree:
 `migrations/` for structure, `server/lib/db/schema/` for meaning.
 
+Cloudflare D1 also limits a query result to **100 columns**. A join that selects
+whole rows can exceed that limit even when each table is valid on its own; use
+an explicit Drizzle projection for joined reads. The automation flush keeps a
+budget under that cap in `tests/unit/automations/flush-column-budget.spec.ts`.
+
 ## What a 2026-08 audit of every table concluded
 
 Recorded here because the answers cost real measurement and would otherwise be

@@ -44,4 +44,9 @@ fi
 # failure does not hide the other.
 node "$REPO_ROOT/scripts/check-reviewed-trailer.mjs" "$MSG_FILE" || STATUS=1
 
+# Gate three: mapped source changes need an updated docs path or a reasoned
+# `Docs: n/a` trailer. It consumes the staged diff because the commit does not
+# exist yet. CI repeats the check over the pushed commit range.
+node "$REPO_ROOT/scripts/check-docs-impact.mjs" --staged "$MSG_FILE" || STATUS=1
+
 exit $STATUS

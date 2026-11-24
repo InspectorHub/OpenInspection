@@ -51,7 +51,19 @@ OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app tha
 - **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based React components (Button, Pill, Card, etc.). `packages/shared-ui/src/index.ts` is the authoritative list; [`design-system.md`](design-system.md) describes each one.
 - **API Types** (`packages/api-types/`) — Re-exports the Hono app type so the web layer's `hono/client` gets full end-to-end type safety.
 
-The web layer uses a **Token Relay BFF** pattern: the React Router v8 server holds the JWT cookie and forwards it to the in-process API on every request, so the browser never sees the token directly.
+Route handlers should keep the shared Hono type, `Context<HonoConfig>`, rather
+than importing bare `Context`: the generic carries the Worker bindings and
+request variables that middleware installs. The API app's `notFound` handler is
+the final fallback after mounted routers; an unmatched `/api/*` request receives
+JSON, while another unmatched path receives plain text. Register new API routes
+on the API app so they pass through its middleware and this fallback.
+
+The web layer uses a **Token Relay BFF** pattern: React Router server loaders and
+actions read the HttpOnly session cookie and forward the JWT to the in-process
+API. Browser JavaScript cannot read the JWT. A browser-originated `fetch` is a
+separate HTTP request through the outer Worker router; it does not use the
+server-only `API_WORKER` binding. Keep that distinction in mind when a test
+calls the API app directly: it does not exercise the browser request path.
 
 ### Why React Router v8
 

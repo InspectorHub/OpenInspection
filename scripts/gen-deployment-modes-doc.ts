@@ -139,19 +139,31 @@ export function renderModesTable(): string {
 const isMain = process.argv[1] != null && fileURLToPath(import.meta.url) === process.argv[1];
 
 if (isMain) {
+    const check = process.argv.includes('--check');
     const doc = readFileSync(DOC_PATH, 'utf8');
+    const eol = doc.includes('\r\n') ? '\r\n' : '\n';
     const start = doc.indexOf(START);
     const end = doc.indexOf(END);
     if (start === -1 || end === -1 || end < start) {
         console.error(`[docs:modes] markers not found in ${DOC_PATH} — expected ${START} … ${END}`);
         process.exit(1);
     }
+    const normalized = doc.replace(/\r\n/g, '\n');
+    const normalizedStart = normalized.indexOf(START);
+    const normalizedEnd = normalized.indexOf(END);
     const next =
-        doc.slice(0, start + START.length) + '\n\n' + renderModesTable() + '\n\n' + doc.slice(end);
-    if (next === doc) {
+        normalized.slice(0, normalizedStart + START.length) + '\n\n' + renderModesTable() + '\n\n' + normalized.slice(normalizedEnd);
+    if (check) {
+        if (next !== normalized) {
+            console.error('[docs:modes] docs/reference/deployment-modes.md is out of date. Run `npm run docs:modes`.');
+            console.log('[docs:modes] generated documents checked=1');
+            process.exit(1);
+        }
+        console.log('[docs:modes] generated documents checked=1; capability table matches the profiles.');
+    } else if (next === normalized) {
         console.log('[docs:modes] table already current — no write');
     } else {
-        writeFileSync(DOC_PATH, next, 'utf8');
+        writeFileSync(DOC_PATH, next.replace(/\n/g, eol), 'utf8');
         console.log(`[docs:modes] rewrote the capability table (${Object.keys(DESCRIPTIONS).length} capabilities)`);
     }
 }
