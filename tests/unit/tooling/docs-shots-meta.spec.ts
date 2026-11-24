@@ -39,4 +39,14 @@ describe('docs shots metadata', () => {
 
         expect(listCapturedSlugs(tempDir)).toEqual([]);
     });
+
+    it('generates local E2E keys before a fresh checkout starts the docs capture', () => {
+        const packageJson = JSON.parse(readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8')) as {
+            scripts: Record<string, string>;
+        };
+
+        expect(packageJson.scripts['docs:shots']).toMatch(
+            /^node scripts\/gen-e2e-dev-vars\.mjs && playwright test -c playwright\.docs-shots\.config\.ts$/,
+        );
+    });
 });
