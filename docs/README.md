@@ -82,7 +82,7 @@ conventions common to all of them: [`integrations/README.md`](integrations/READM
 |---|---|
 | [`develop/setup.md`](develop/setup.md) | Run it locally, the command table, how to add a page or an endpoint |
 | [`develop/architecture.md`](develop/architecture.md) | Single-worker architecture, request flow, module map, the shared mode-aware editor surfaces, cost model |
-| [`develop/testing.md`](develop/testing.md) | Five suites, where a spec lives, how to run each one |
+| [`develop/testing.md`](develop/testing.md) | Six suites, where a spec lives, how to run each one |
 | [`develop/data-package-move-handoff.md`](develop/data-package-move-handoff.md) | Dual-instance move E2E, large-tenant fixture generator, restore/undo timing harness, and the owner-verified Chrome checklist |
 | [`develop/gates.md`](develop/gates.md) | The conformance gates — the registry, the two rungs, and the conventions a new gate has to meet |
 | [`develop/public-response-projection.md`](develop/public-response-projection.md) | How a route reachable without signing in builds its response from a field list, the helper, the gate and the escape comment |
