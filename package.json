@@ -213,7 +213,7 @@
     "lint:doclinks": "node scripts/check-doc-links.mjs",
     "lint:no-portal-routes": "node scripts/check-no-portal-routes.mjs",
     "lint:field-ui-boundary": "node scripts/check-field-ui-boundary.mjs",
-    "docs:shots": "playwright test -c playwright.docs-shots.config.ts",
+    "docs:shots": "node scripts/gen-e2e-dev-vars.mjs && playwright test -c playwright.docs-shots.config.ts",
     "lint:unwired": "node scripts/check-unwired.mjs",
     "lint:unread-fields": "node scripts/check-unread-fields.mjs",
     "lint:no-placeholder-descriptions": "node scripts/check-no-placeholder-descriptions.mjs",
