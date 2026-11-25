@@ -4,10 +4,11 @@
  * packages/field-ui/.publish/, which is the directory that gets packed and published.
  *
  * Why a staging directory: the published package carries the plain GNU AGPL v3 notice,
- * while the repository copy (packages/field-ui/LICENSE) keeps the project's additional
- * permission for its own deployments. npm always packs the LICENSE file that sits next to
- * package.json, so the only way to ship a different one without touching the repository
- * copy is to pack a directory that is built for the purpose. This script builds it.
+ * while the repository copy (packages/field-ui/LICENSE) is the full AGPL-3.0 text. npm
+ * always packs the LICENSE file that sits next to package.json, so the only way to ship
+ * a different one without touching the repository copy is to pack a directory that is
+ * built for the purpose. This script builds it. The project's additional permission for
+ * single-tenant self-hosted deployments lives in the root ADDITIONAL-PERMISSION.md.
  *
  * Deterministic: the directory is deleted and recreated on every run, and nothing is read
  * except dist/, package.json, README.md and the notice file. It refuses when dist/ is

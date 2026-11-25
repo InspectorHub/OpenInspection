@@ -9,9 +9,14 @@ what differs. The scripts take `--package <slug>` and default to `field-ui`.
 ## Why the published LICENSE differs from the repository copy
 
 The published package carries the plain GNU Affero General Public License v3
-notice. The repository copy, `packages/field-ui/LICENSE`, keeps the project's
-additional permission for its own deployments and is identical to the root
-`LICENSE`. It is never modified.
+notice (`packages/field-ui/publish-license/LICENSE-AGPL-3.0-only`). The
+repository copy, `packages/field-ui/LICENSE`, is the full AGPL-3.0 text and
+is identical to the root `LICENSE`. It is never modified.
+
+The project's additional permission for single-tenant self-hosted
+deployments lives in the root `ADDITIONAL-PERMISSION.md`, not in any
+`LICENSE` file, so that GitHub detects the repository license as AGPL-3.0.
+The published notice carries no additional permission.
 
 npm always packs the `LICENSE` that sits next to `package.json`, so the package
 is built in a gitignored staging directory, `packages/field-ui/.publish/`, by

@@ -43,6 +43,17 @@ describe('field-ui licence design', () => {
     expect(read(join(PKG, 'LICENSE'))).toBe(read(join(ROOT, 'LICENSE')));
   });
 
+  it('the root LICENSE is the full AGPL-3.0 text, with the additional permission in its own file', () => {
+    const text = read(join(ROOT, 'LICENSE'));
+    expect(text).toContain('GNU AFFERO GENERAL PUBLIC LICENSE');
+    expect(text).toContain('END OF TERMS AND CONDITIONS');
+    expect(text).toContain('How to Apply These Terms to Your New Programs');
+    expect(text).not.toMatch(/single-tenant/i);
+    const permission = read(join(ROOT, 'ADDITIONAL-PERMISSION.md'));
+    expect(permission).toContain('ADDITIONAL PERMISSION FOR SINGLE-TENANT SELF-HOSTED DEPLOYMENTS');
+    expect(permission).toContain('(pursuant to GNU AGPL v3, Section 7)');
+  });
+
   it('the published notice is the plain AGPL notice, with no additional permission', () => {
     const text = notice();
     expect(text).toContain('GNU AFFERO GENERAL PUBLIC LICENSE');

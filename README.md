@@ -128,4 +128,6 @@ Prefer not to run it yourself? InspectorHub runs OpenInspection for you at [insp
 
 ## License
 
-[GNU Affero General Public License v3.0](LICENSE).
+[GNU Affero General Public License v3.0](LICENSE). An additional permission
+for single-tenant self-hosted deployments applies — see
+[ADDITIONAL-PERMISSION.md](ADDITIONAL-PERMISSION.md).
