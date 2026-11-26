@@ -44,7 +44,10 @@ describe("the result", () => {
         const failed = [{ idempotencyKey: "k-update-insp-1-0", op: "inspection.update", inspectionId: "insp-1", status: 403, reason: "forbidden" }];
         await runToResult(three, (_n, b) => ok(b, { failed }));
         const attention = screen.getByTestId("offline-package-attention");
-        expect(attention.textContent).toContain("inspection.update on inspection insp-1");
+        // #485 — the action in plain words, not its op code; the server answer
+        // stays as the diagnostic line underneath, not the headline.
+        expect(attention.textContent).toContain("Update inspection · insp-1");
+        expect(attention.textContent).not.toContain("inspection.update on inspection");
         expect(attention.textContent).toContain("Server answer: 403");
         expect(attention.textContent).toContain("Reason: forbidden");
         const result = screen.getByTestId("offline-package-result");
@@ -211,3 +214,21 @@ describe("other reasons an inspection is left behind", () => {
     });
 });
 
+
+describe("refused queued changes in plain words (#485)", () => {
+    it("states a not-attempted completion as the plain reason, not its code", async () => {
+        const failed = [{ idempotencyKey: "k-complete-insp-1-0", op: "inspection.complete", inspectionId: "insp-1", status: 424, reason: "blocked_by_failed_update" }];
+        await runToResult(three, (_n, b) => ok(b, { failed }));
+        const attention = screen.getByTestId("offline-package-attention");
+        expect(attention.textContent).toContain("Mark inspection complete · insp-1");
+        expect(attention.textContent).toContain("Not attempted: an earlier update to this inspection was refused");
+        expect(attention.textContent).not.toContain("blocked_by_failed_update");
+    });
+
+    it("shows an op this version does not know as it came, not paraphrased into a guess", async () => {
+        const failed = [{ idempotencyKey: "k-rename-insp-1-0", op: "inspection.rename", inspectionId: "insp-1", status: 403, reason: "forbidden" }];
+        await runToResult(three, (_n, b) => ok(b, { failed }));
+        const attention = screen.getByTestId("offline-package-attention");
+        expect(attention.textContent).toContain("inspection.rename · insp-1");
+    });
+});

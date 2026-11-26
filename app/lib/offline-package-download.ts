@@ -13,16 +13,28 @@ function heldBackFileName(ids: readonly string[]): string {
     return ids.length === 1 ? `offline-package-left-behind-${ids[0]}.zip` : `offline-package-left-behind-${ids.length}-inspections.zip`;
 }
 
-/** Throws when the package cannot be re-read; the caller says so. */
-export function downloadHeldBackPackage(original: Uint8Array, ids: readonly string[]): void {
-    const part = extractHeldBackPackage(original, ids);
-    const url = URL.createObjectURL(new Blob([part as BlobPart], { type: "application/zip" }));
+/** Saves bytes as a .zip download. Throws only when the browser refuses the blob URL. */
+function downloadZip(bytes: Uint8Array, fileName: string): void {
+    const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/zip" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = heldBackFileName(ids);
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     link.remove();
     // A tick later: some browsers read the URL after click() returns.
     setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/** Throws when the package cannot be re-read; the caller says so. */
+export function downloadHeldBackPackage(original: Uint8Array, ids: readonly string[]): void {
+    downloadZip(extractHeldBackPackage(original, ids), heldBackFileName(ids));
+}
+
+/**
+ * Downloads a held-back package already extracted (#485): the leftovers saved
+ * for a later visit, so there is no original file to re-read.
+ */
+export function downloadLeftoverPackage(bytes: Uint8Array, ids: readonly string[]): void {
+    downloadZip(bytes, heldBackFileName(ids));
 }
