@@ -33,7 +33,7 @@
   "scripts/check-agent-terms-classification.mjs": 572,
   "scripts/check-erasure-manifest.mjs": 572,
   "server/api/bookings/agreement.ts": 572,
-  "app/components/NewInspectionWizard.tsx": 557,
+  "app/components/NewInspectionWizard.tsx": 571,
   "app/routes/settings-profile.tsx": 551,
   "server/api/inspections/publish.ts": 547,
   "server/services/inspection/inspection-photo.service.ts": 545,

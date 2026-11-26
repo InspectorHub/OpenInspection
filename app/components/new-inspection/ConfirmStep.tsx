@@ -28,6 +28,7 @@ type HolidayFetcher = ReturnType<
  * the fact, and its rows are now the way back to the step that owns them.
  */
 export function ConfirmStep({
+    createError,
     date,
     setDate,
     time,
@@ -42,6 +43,9 @@ export function ConfirmStep({
     setInspectorId,
     teamMembers,
 }: {
+    /** #482 — a failed create keeps the wizard open and reports here instead
+     *  of closing and discarding the form. Null when no create has failed. */
+    createError?: string | null;
     date: string;
     setDate: (v: string) => void;
     time: string;
@@ -59,6 +63,11 @@ export function ConfirmStep({
 }) {
     return (
         <div className="space-y-5">
+            {createError && (
+                <p role="alert" className="rounded-md bg-ih-bad-bg px-3 py-2.5 text-ih-bad-fg">
+                    {createError}
+                </p>
+            )}
             <section className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-[12px] font-bold text-ih-fg-3 uppercase tracking-wide">
