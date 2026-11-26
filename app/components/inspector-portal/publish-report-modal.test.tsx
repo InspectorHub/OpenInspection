@@ -19,13 +19,19 @@
  * and not the defects themselves — those come from a separate endpoint the
  * editor calls. Listing them here would be a server change, not a copy change.
  */
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { createRoutesStub, useFetcher } from "react-router";
+import type { FormHTMLAttributes } from "react";
 
 import { PublishReportModal } from "~/components/inspector-portal/PublishReportModal";
 
-function renderModal(blockingCount: number) {
+afterEach(cleanup);
+
+function renderModal(
+    blockingCount: number,
+    opts: { isAmendment?: boolean; noticeChoice?: boolean } = {},
+) {
     const Stub = createRoutesStub([
         {
             path: "/",
@@ -36,7 +42,8 @@ function renderModal(blockingCount: number) {
                         open
                         agreementRequired={false}
                         paymentRequired={false}
-                        isAmendment={false}
+                        isAmendment={opts.isAmendment ?? false}
+                        noticeChoice={opts.noticeChoice}
                         courtesyTranslationEnabled={false}
                         courtesyTranslationLocale="es-419"
                         clientPrefersTranslation={false}
@@ -119,5 +126,127 @@ describe("PublishReportModal — no notify switches (F79)", () => {
         renderModal(0);
         expect(await screen.findByRole("checkbox", { name: /signature/i })).toBeTruthy();
         expect(await screen.findByRole("checkbox", { name: /payment/i })).toBeTruthy();
+    });
+});
+
+/**
+ * #484 — republishing a correction from the hub never notified the client:
+ * the hub modal had no notify option and the hub action never sent
+ * `notifyClient`, so an amendment always rode the server default (false) and
+ * no `report.amended` rule fired.
+ *
+ * The choice is back for revisions only, mirroring the editor's PublishModal:
+ * the server honours `notifyClient` on an amendment and ignores it on a first
+ * publish or a republish after a retract, so the box renders only when
+ * `noticeChoice` is true — the report was reopened with "Edit and republish".
+ * Unchecked by default; the modal unmounts on close (Modal returns null),
+ * so the box resets on every open.
+ *
+ * The submit assertions pin the form contract the hub action reads: a ticked
+ * box posts `notifyClient=on`, an unticked one posts nothing. The human gate
+ * passes through here (its context default is `async () => true`) and re-fires
+ * the submit via `requestSubmit`, so the capture waits for the second event.
+ */
+describe("PublishReportModal — republish notice choice (#484)", () => {
+    type Fetcher = Parameters<typeof PublishReportModal>[0]["fetcher"];
+
+    function makeCapturingFetcher(onSubmitted: (data: FormData) => void): Fetcher {
+        function Form({ onSubmit, ...rest }: FormHTMLAttributes<HTMLFormElement>) {
+            return (
+                <form
+                    {...rest}
+                    onSubmit={(e) => {
+                        onSubmit?.(e);
+                        if (!e.defaultPrevented) onSubmitted(new FormData(e.currentTarget));
+                        e.preventDefault();
+                    }}
+                />
+            );
+        }
+        return { state: "idle", data: undefined, Form } as unknown as Fetcher;
+    }
+
+    function renderModalWithFetcher(
+        opts: { isAmendment?: boolean; noticeChoice?: boolean },
+        onSubmitted: (data: FormData) => void,
+    ) {
+        const Stub = createRoutesStub([
+            {
+                path: "/",
+                Component() {
+                    return (
+                        <PublishReportModal
+                            open
+                            agreementRequired={false}
+                            paymentRequired={false}
+                            isAmendment={opts.isAmendment ?? false}
+                            noticeChoice={opts.noticeChoice}
+                            courtesyTranslationEnabled={false}
+                            courtesyTranslationLocale="es-419"
+                            clientPrefersTranslation={false}
+                            blockingCount={0}
+                            fetcher={makeCapturingFetcher(onSubmitted)}
+                            submitting={false}
+                            error={undefined}
+                            onClose={() => {}}
+                        />
+                    );
+                },
+            },
+        ]);
+        render(<Stub initialEntries={["/"]} />);
+    }
+
+    async function submitForm() {
+        const form = document.getElementById("ih-publish-report-form") as HTMLFormElement;
+        fireEvent.submit(form);
+    }
+
+    it("offers the notify box on a revision the server will honour", async () => {
+        renderModalWithFetcher({ isAmendment: true, noticeChoice: true }, () => {});
+        const box = await screen.findByRole("checkbox", { name: /report-updated notices/i });
+        expect((box as HTMLInputElement).checked).toBe(false);
+        expect(document.querySelector('input[name="notifyClient"]')).toBeTruthy();
+        // The amendment sentence replaces the first-publish automation line:
+        // the rules no longer decide alone, the box below does.
+        expect(screen.getByText(/tick the box below/i)).toBeTruthy();
+        expect(screen.queryByTestId("publish-notify-automation")).toBeNull();
+    });
+
+    it("posts notifyClient=on when the box is ticked", async () => {
+        const onSubmitted = vi.fn();
+        renderModalWithFetcher({ isAmendment: true, noticeChoice: true }, (data) => {
+            onSubmitted(Object.fromEntries(data.entries()));
+        });
+        const box = await screen.findByRole("checkbox", { name: /report-updated notices/i });
+        fireEvent.click(box);
+        await submitForm();
+        await waitFor(() => expect(onSubmitted).toHaveBeenCalled());
+        expect(onSubmitted).toHaveBeenCalledWith(expect.objectContaining({ notifyClient: "on" }));
+    });
+
+    it("posts no notifyClient when the box is left unticked", async () => {
+        const onSubmitted = vi.fn();
+        renderModalWithFetcher({ isAmendment: true, noticeChoice: true }, (data) => {
+            onSubmitted(Object.fromEntries(data.entries()));
+        });
+        await screen.findByRole("checkbox", { name: /report-updated notices/i });
+        await submitForm();
+        await waitFor(() => expect(onSubmitted).toHaveBeenCalled());
+        const posted = onSubmitted.mock.calls[0][0] as Record<string, string>;
+        expect(posted).not.toHaveProperty("notifyClient");
+    });
+
+    // POSITIVE CONTROL for the F79 case: an amendment the server will NOT
+    // honour (republish after a retract — versions exist, but the report was
+    // not reopened for editing) offers no box and keeps the automation line.
+    // Without this, a modal that rendered the box on `isAmendment` alone —
+    // the F79 lie in a new shape — would pass.
+    it("offers no box when the revision is not a reopened-for-editing one", async () => {
+        renderModalWithFetcher({ isAmendment: true, noticeChoice: false }, () => {});
+        await screen.findByRole("button", { name: /publish/i });
+        expect(document.querySelector('input[name="notifyClient"]')).toBeNull();
+        expect(screen.queryByRole("checkbox", { name: /notify/i })).toBeNull();
+        expect(screen.getByTestId("publish-notify-automation")).toBeTruthy();
     });
 });

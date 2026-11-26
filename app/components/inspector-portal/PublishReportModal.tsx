@@ -15,6 +15,7 @@ export function PublishReportModal({
   agreementRequired,
   paymentRequired,
   isAmendment,
+  noticeChoice = false,
   courtesyTranslationEnabled,
   courtesyTranslationLocale,
   clientPrefersTranslation,
@@ -29,6 +30,15 @@ export function PublishReportModal({
   paymentRequired: boolean;
   /** IA-40 — this publish creates versionNumber > 1; ask what changed. */
   isAmendment: boolean;
+  /**
+   * #484 — whether the server will honour the notice choice for this publish:
+   * the report was reopened with "Edit and republish" (in progress, published
+   * once). Separate from `isAmendment`, which only decides whether the dialog
+   * asks what changed: a republish after a retract has earlier versions but is
+   * a fresh delivery the automation rules decide, so it offers no choice. Same
+   * name and meaning as the editor's PublishModal prop.
+   */
+  noticeChoice?: boolean;
   /**
    * #23 — whether this workspace may PRODUCE a courtesy translation.
    *
@@ -120,16 +130,35 @@ export function PublishReportModal({
             Dropping the switches silently would leave the question they asked
             unanswered, so the answer — and the address that decides it — is said
             plainly instead. Sentence, not a disabled control: there is nothing
-            here to operate. */}
-        <p
-          data-testid="publish-notify-automation"
-          className="rounded-md border border-ih-border bg-ih-bg-muted px-3 py-2 text-[12px] text-ih-fg-2"
-        >
-          {m.hub_publish_notify_automation()}{" "}
-          <Link to="/settings/automations" className="font-bold text-ih-primary hover:underline">
-            {m.hub_publish_notify_automation_link()}
-          </Link>
-        </p>
+            here to operate.
+            #484 — one choice is back, for revisions only: the server now
+            honours `notifyClient` on an amendment (it decides whether the
+            `report.amended` rules fire at all), so a revision offers the same
+            unchecked-by-default box the editor's PublishModal does. A first
+            publish, and a republish after a retract, keep the sentence above:
+            the rules decide, and there is no box to tick. */}
+        {noticeChoice ? (
+          <>
+            <p className="rounded-md border border-ih-border bg-ih-bg-muted px-3 py-2 text-[12px] text-ih-fg-2">
+              {m.report_publish_body_delivery_amendment()}
+            </p>
+            <ToggleRow
+              name="notifyClient"
+              label={m.editor_publish_notify_client()}
+              defaultChecked={false}
+            />
+          </>
+        ) : (
+          <p
+            data-testid="publish-notify-automation"
+            className="rounded-md border border-ih-border bg-ih-bg-muted px-3 py-2 text-[12px] text-ih-fg-2"
+          >
+            {m.hub_publish_notify_automation()}{" "}
+            <Link to="/settings/automations" className="font-bold text-ih-primary hover:underline">
+              {m.hub_publish_notify_automation_link()}
+            </Link>
+          </p>
+        )}
 
         <ToggleRow
           name="requireSignature"

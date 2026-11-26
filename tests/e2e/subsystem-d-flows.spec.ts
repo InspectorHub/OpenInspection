@@ -74,8 +74,11 @@ test.describe('Subsystem D — units, republish, version diff', () => {
      * (`versions.length > 0`, IA-40). The original's `button:has-text("Send All")`
      * never existed in this repo; today's submit is "Publish report".
      *
-     * The hub offers Publish only while the report is NOT published, so the flow
-     * retracts first — that is the real republish path, not a workaround.
+     * The hub offers Publish while the report is NOT published, and also
+     * while a published report is being edited again (#484) — that second
+     * case opens the same modal with the notify-client choice. The flow
+     * below retracts first because it tests the republish-after-retract
+     * path, which is a fresh delivery, not an amendment.
      */
     test('P7+P9 — republish prompts for a summary and records it on the new version', async ({ page }) => {
         await loginAsSeedUser(page, SEED_EMAILS.lead);

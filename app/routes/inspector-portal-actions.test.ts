@@ -18,6 +18,14 @@ describe('reportActions', () => {
     expect(reportActions(publishCaps, 'published')).toEqual(['unpublish']);
   });
 
+  it('published + editing again + publish cap → publish, unpublish', () => {
+    expect(reportActions(publishCaps, 'published', true)).toEqual(['publish', 'unpublish']);
+  });
+
+  it('published + editing again + no cap → []', () => {
+    expect(reportActions(noCaps, 'published', true)).toEqual([]);
+  });
+
   it('published + no cap → []', () => {
     expect(reportActions(noCaps, 'published')).toEqual([]);
   });

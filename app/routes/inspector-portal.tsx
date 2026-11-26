@@ -465,16 +465,23 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         requireSignature: formData.get("requireSignature") === "on",
         requirePayment: formData.get("requirePayment") === "on",
         ...(summary ? { summary } : {}),
+        // #484 — the republish notice choice, mirroring the editor's
+        // PublishModal: only the modal's amendment checkbox posts this, and
+        // only when ticked. The server honours it on amendments only (a
+        // first publish, and a republish after a retract, ignore it), so
+        // omitting it when unticked rides the default false.
+        ...(formData.get("notifyClient") === "on" ? { notifyClient: true } : {}),
         // #23 — a LOCALE or nothing. Absent is the default and means no; a
         // failure to produce one never fails the publish.
         ...(translateTo ? { translateTo } : {}),
       },
     });
     // F79 — nothing about WHO was emailed travels back, because this form does
-    // not know. The publish modal's notify switches posted two flags the service
-    // never read; delivery is the workspace's `report.published` automation rules'
-    // decision. `PublishNotice` confirms the publish and names that authority,
-    // which is all either side can honestly say.
+    // not know. Delivery is the workspace's automation rules' decision; the one
+    // choice the publisher has is `notifyClient` on an amendment, which only
+    // decides whether the `report.amended` rules fire at all. `PublishNotice`
+    // confirms the publish and names that authority, which is all either side
+    // can honestly say.
     return await toActionResult(res, "publish", m.inspections_hub_error_publish());
   }
 
@@ -596,12 +603,21 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  * The order lifecycle is deliberately not an input: it tracks the job, not the
  * report, and gating on it here left the card empty for every inspection that
  * was never marked completed. Returns an ordered array of action identifiers.
+ *
+ * `editingAgain` — a published report reopened with "Edit and republish" — is
+ * an amendment in progress, not a finished one: the inspector is mid-correction
+ * and the hub offers the same Publish the editor does, opening the same modal
+ * with the same notify-client choice (#484). Without it, the amendment could
+ * only leave through the editor, and the hub's checkbox was unreachable.
  */
 export function reportActions(
   caps: { publish: boolean; edit: boolean },
   reportStatus: string,
+  editingAgain = false,
 ): Array<'submit' | 'publish' | 'return' | 'unpublish'> {
-  if (reportStatus === REPORT_STATUS.PUBLISHED) return caps.publish ? ['unpublish'] : [];
+  if (reportStatus === REPORT_STATUS.PUBLISHED) {
+    return caps.publish ? (editingAgain ? ['publish', 'unpublish'] : ['unpublish']) : [];
+  }
   if (reportStatus === REPORT_STATUS.SUBMITTED) return caps.publish ? ['publish', 'return'] : [];
   // in_progress (or unknown). Submitting for review writes to the report, so it needs the same access the report editor does.
   if (caps.publish) return ['publish'];
@@ -806,7 +822,7 @@ export default function InspectionHubPage() {
 
   // `publish` is the user's permission; the report's own eligibility lives in
   // canPublish, which reportShipped above reads.
-  const reportActionList = reportActions({ publish: canPublishCap && access.canAct, edit: canEditReports }, inspection.reportStatus);
+  const reportActionList = reportActions({ publish: canPublishCap && access.canAct, edit: canEditReports }, inspection.reportStatus, primaryEditingAgain);
 
   // IA-40 — when a version already exists, the next publish increments to
   // versionNumber > 1 (an amendment), so the publish modal asks what changed.
@@ -1091,6 +1107,18 @@ export default function InspectionHubPage() {
                 >
                   {m.inspections_hub_report_repair_log()}
                 </Link>
+                {/* #484 — a published report being edited again offers the same
+                    Publish the not-yet-shipped states do: same button, same
+                    modal, same notify-client choice as the editor. */}
+                {reportActionList.includes('publish') && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => publishModal.setOpen(true)}
+                  >
+                    {m.inspections_hub_report_publish()}
+                  </Button>
+                )}
                 {reportActionList.includes('unpublish') && <RetractReportControl />}
               </div>
             </>
@@ -1351,6 +1379,7 @@ export default function InspectionHubPage() {
         agreementRequired={inspection.agreementRequired}
         paymentRequired={inspection.paymentRequired}
         isAmendment={nextPublishIsAmendment}
+        noticeChoice={primaryEditingAgain}
         courtesyTranslationEnabled={inspection.courtesyTranslationEnabled ?? false}
         courtesyTranslationLocale={COURTESY_TRANSLATION_LOCALE}
         clientPrefersTranslation={inspection.clientLocale === COURTESY_TRANSLATION_LOCALE}
