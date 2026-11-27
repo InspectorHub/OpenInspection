@@ -393,7 +393,7 @@
   "inspections_hub_retract_cancel": "Mantener publicado",
   "inspections_hub_retract_confirm": "Retirar y vencer enlaces",
   "inspections_hub_reports_unpublished_edits": "Cambios sin publicar",
-  "inspections_hub_history_title": "Historial de la inspección",
+  "inspections_hub_history_title": "Historial de inspecciones",
   "hub_publish_gate_heading": "Puertas de entrega",
   "hub_publish_gate_held_payment": "El informe queda retenido hasta el pago.",
   "hub_publish_gate_change_payment": "Cambiarlo en la tarjeta de factura",
