@@ -15,7 +15,6 @@ import {
   createFakeDataSource,
   createFakeMediaPool,
   createFakeRepairItems,
-  createFakeSettingsSheet,
   createFakeTemplateSearch,
   createFakeVersionHistory,
   createFakeVideo,
@@ -80,7 +79,7 @@ export const DATA: EditorData = createEmptyEditorData({
   ratingLevels: [{ id: "ok", label: "Satisfactory", color: "#0a0" }],
 });
 
-type ResourceKey = "aiAssist" | "commentsLibrary" | "costItems" | "mediaPool" | "repairItems" | "settingsSheet" | "templateSearch" | "versionHistory" | "video";
+type ResourceKey = "aiAssist" | "commentsLibrary" | "costItems" | "mediaPool" | "repairItems" | "templateSearch" | "versionHistory" | "video";
 type SlotKey = "renderThemeControl" | "pdf";
 /** The device itself: no camera API, as on a plain-http origin or a desktop without one. */
 type EnvironmentKey = "cameraCapture";
@@ -112,12 +111,6 @@ export function fullResources(): FieldResources {
     costItems: createFakeCostItems(),
     mediaPool: createFakeMediaPool(),
     repairItems: createFakeRepairItems(),
-    settingsSheet: createFakeSettingsSheet({
-      inspection: { templateId: "t1", requireDefectFieldsOverride: "", profileOverride: "", coverPhotoId: null },
-      templates: [{ id: "t1", name: "Full" }],
-      photos: [],
-      profiles: [],
-    }),
     templateSearch: createFakeTemplateSearch(),
     versionHistory: createFakeVersionHistory(),
     video: createFakeVideo(),
@@ -136,7 +129,7 @@ export function fullSlots(): FieldHostSlots {
 }
 
 export const ALL_OMITS: readonly Absent[] = [
-  "aiAssist", "commentsLibrary", "costItems", "mediaPool", "repairItems", "settingsSheet", "templateSearch", "versionHistory", "video",
+  "aiAssist", "commentsLibrary", "costItems", "mediaPool", "repairItems", "templateSearch", "versionHistory", "video",
   "renderThemeControl", "pdf", "cameraCapture",
 ];
 

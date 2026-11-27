@@ -3,8 +3,6 @@ import { Button, MenuItem, Popover } from "@core/shared-ui";
 import { m } from "../../i18n";
 
 export interface TemplateMenuProps {
-  /** Open the template picker (the inspection's applied template can be swapped). Null when the host has no settings sheet: the row is left out. */
-  onChangeTemplate: (() => void) | null;
   /** Save the current structure as a brand-new template. */
   onSaveAsNewTemplate: () => void;
   /** Write the current structure back to the inspection's source template. */
@@ -16,11 +14,11 @@ export interface TemplateMenuProps {
 /**
  * Global (document-level) template actions, consolidated into one header menu so
  * they live with the other config actions instead of being scattered across the
- * section rail. Switch the applied template, save the current structure as a new
- * template, or write it back to the source template.
+ * section rail. Save the current structure as a new template, or write it back
+ * to the source template. The template itself is chosen on the inspection's hub
+ * page now (#529), so there is no swap-template row.
  */
 export function TemplateMenu({
-  onChangeTemplate,
   onSaveAsNewTemplate,
   onUpdateSourceTemplate,
   canUpdateSource,
@@ -57,19 +55,6 @@ export function TemplateMenu({
 
       <Popover open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} align="right">
         <ul role="menu" aria-label={m.template_menu_actions_aria()} className="py-1 min-w-[220px]">
-          {onChangeTemplate && (
-            <>
-              <li role="none">
-                <MenuItem
-                  data-testid="change-template-btn"
-                  onClick={() => run(onChangeTemplate)}
-                >
-                  {m.template_menu_change()}
-                </MenuItem>
-              </li>
-              <li aria-hidden className="mx-3 my-1 border-t border-ih-border" />
-            </>
-          )}
           <li role="none">
             <MenuItem
               data-testid="save-template-new-btn"

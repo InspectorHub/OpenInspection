@@ -57,8 +57,6 @@ export interface EditorHeaderProps {
   * header renders byte-identically to before.
   */
  perUnitControls?: ReactNode;
- /** Template menu (config cluster) — open the template picker to swap templates. */
- onChangeTemplate: () => void;
  /** Template menu — save the current structure as a new template. */
  onSaveAsNewTemplate: () => void;
  /** Template menu — write the current structure back to the source template. */
@@ -79,7 +77,6 @@ export function EditorHeader({
  collabEditing,
  onOpenVersionHistory,
  perUnitControls,
- onChangeTemplate,
  onSaveAsNewTemplate,
  onUpdateSourceTemplate,
  canUpdateSourceTemplate,
@@ -221,49 +218,11 @@ export function EditorHeader({
      widths reach it through the mobile Theme drawer. */}
  {renderThemeControl?.({ className: HEADER_OVERFLOW.theme.inline })}
 
- {/* Report settings — a labelled button, not a bare gear.
-     IA-87 ③ / IA-88 ⑤: this was the only unlabelled icon in a row of text
-     buttons, and it was the sole entry point to per-inspection report
-     settings, so the most important control in the header was also the
-     least discoverable. The label collapses on narrow widths (where its
-     text-button neighbours hide entirely) but the button itself never
-     does — nothing else opens this sheet. */}
- {caps.settingsSheet && !readOnly && <Button
-  variant="secondary"
-  size="md"
-  aria-label={m.editor_header_settings()}
-  onClick={() => state.setSettingsOpen(true)}
-  title={m.editor_header_settings()}
-  icon={
-  <svg
-  className="w-3.5 h-3.5"
-  fill="none"
-  stroke="currentColor"
-  viewBox="0 0 24 24"
-  >
-  <path
-   strokeLinecap="round"
-   strokeLinejoin="round"
-   strokeWidth={2}
-   d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-  />
-  <path
-   strokeLinecap="round"
-   strokeLinejoin="round"
-   strokeWidth={2}
-   d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-  />
-  </svg>
-  }
- >
-  <span className="hidden min-[1920px]:inline">{m.editor_header_settings()}</span>
- </Button>}
-
  {/* Template menu [config] — global template actions consolidated here
-     (swap template · save as new · update source), replacing the buttons
-     that used to sit at the section-rail bottom. */}
+     (save as new · update source), replacing the buttons that used to sit
+     at the section-rail bottom. The template itself is chosen on the
+     inspection's hub page now (#529), so there is no swap-template row. */}
  {!readOnly && <TemplateMenu
-  onChangeTemplate={caps.settingsSheet ? onChangeTemplate : null}
   onSaveAsNewTemplate={onSaveAsNewTemplate}
   onUpdateSourceTemplate={onUpdateSourceTemplate}
   canUpdateSource={canUpdateSourceTemplate}

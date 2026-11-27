@@ -1,16 +1,16 @@
 // @vitest-environment happy-dom
 /**
- * The editor page on a fake data source: it mounts and lists the template's items, and the two actions that used
- * to reach for browser globals (a template change, the report preview) go through the data source, with a notice
- * when the host does not offer the member.
+ * The editor page on a fake data source: it mounts and lists the template's items, and the action that used
+ * to reach for browser globals (the report preview) goes through the data source, with a notice when the
+ * host does not offer the member. The template itself is chosen on the inspection's hub page now (#529),
+ * so there is no template-change path left in the editor.
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, cleanup, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 import { FieldDataSourceProvider } from "../context";
 import type { EditorData } from "../data-source";
-import type { SettingsSheetData } from "../data-source-types";
 import { m } from "../i18n";
-import { createEmptyEditorData, createFakeDataSource, createFakeSettingsSheet } from "../testing/fake-data-source";
+import { createEmptyEditorData, createFakeDataSource } from "../testing/fake-data-source";
 import type { FakeDataSource, FakeSeed } from "../testing/fake-data-source";
 import { FieldEditor } from "./FieldEditor";
 
@@ -39,19 +39,11 @@ const DATA: EditorData = createEmptyEditorData({
   ratingLevels: [{ id: "ok", label: "Satisfactory", color: "#0a0" }],
 });
 
-const SHEET: SettingsSheetData = {
-  inspection: { templateId: "t1", requireDefectFieldsOverride: "", profileOverride: "", coverPhotoId: null },
-  templates: [{ id: "t1", name: "Full" }, { id: "t2", name: "Condo" }],
-  photos: [],
-  profiles: [],
-};
-
 function mount(seed: Partial<FakeSeed> = {}): FakeDataSource {
   const fake = createFakeDataSource({
     data: DATA,
     session: { tenantSlug: "acme" },
     urls: { reportPreview: (slug, id) => `/report-preview/${slug}/${id}` },
-    resources: { settingsSheet: createFakeSettingsSheet(SHEET) },
     ...seed,
   });
   render(
@@ -64,14 +56,6 @@ function mount(seed: Partial<FakeSeed> = {}): FakeDataSource {
 
 async function openMoreActions() {
   fireEvent.click(await screen.findByRole("button", { name: m.editor_mobile_more() }));
-}
-
-async function applyTemplateChange() {
-  fireEvent.click(await screen.findByText(m.editor_header_settings()));
-  await waitFor(() => expect(document.getElementById("inspection-settings-form")).not.toBeNull());
-  fireEvent.click(screen.getByRole("button", { name: "Full" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Condo" }));
-  fireEvent.submit(document.getElementById("inspection-settings-form") as HTMLFormElement);
 }
 
 describe("FieldEditor", () => {
@@ -98,22 +82,6 @@ describe("FieldEditor", () => {
       // The drawer is open (Publish is in it), and the preview entry is not.
       await screen.findByRole("button", { name: m.editor_header_publish() });
       expect(screen.queryByText(m.editor_header_preview_report())).toBeNull();
-    });
-
-    it("restarts the session after a template change, not just a data reload", async () => {
-      const fake = mount();
-      await openMoreActions();
-      await applyTemplateChange();
-      await waitFor(() => expect(fake.restartCount).toBe(1));
-      expect(fake.reloadCount).toBe(0);
-    });
-
-    it("asks the person to reopen the inspection when the host cannot restart", async () => {
-      const fake = mount({ without: ["restartSession"] });
-      await openMoreActions();
-      await applyTemplateChange();
-      await waitFor(() => expect(fake.notifications.map((n) => n.message)).toContain(m.editor_template_applied_reopen()));
-      expect(fake.restartCount).toBe(0);
     });
   });
 });

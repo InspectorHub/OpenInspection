@@ -23,7 +23,6 @@ const state = {
   saveStatus: 'idle',
   searchQuery: '',
   setSearchQuery: vi.fn(),
-  setSettingsOpen: vi.fn(),
 };
 
 function mountHeader() {
@@ -39,7 +38,6 @@ function mountHeader() {
         finishingFieldwork={false}
         collabEditing
         onOpenVersionHistory={vi.fn()}
-        onChangeTemplate={vi.fn()}
         onSaveAsNewTemplate={vi.fn()}
         onUpdateSourceTemplate={vi.fn()}
         canUpdateSourceTemplate={false}
@@ -73,14 +71,14 @@ describe('the header bar', () => {
     expect(progress).not.toContain('2xl:flex');
   });
 
-  it('labels Report settings, Template and Preview only from 1920px, and below that they are icon-only with a name', () => {
+  it('labels Template and Preview only from 1920px, and below that they are icon-only with a name', () => {
     mountHeader();
-    for (const label of [m.editor_header_settings(), m.template_menu_template(), m.editor_header_preview()]) {
+    for (const label of [m.template_menu_template(), m.editor_header_preview()]) {
       const span = screen.getAllByText(label, { selector: 'span' }).find((s) => s.className.includes('hidden'));
       expect(span?.className, label).toContain('min-[1920px]:inline');
     }
     // happy-dom ignores the hidden class, so a role-name query would pass without a label: ask for the attribute itself.
-    for (const label of [m.editor_header_settings(), m.template_menu_template(), m.editor_header_preview()]) {
+    for (const label of [m.template_menu_template(), m.editor_header_preview()]) {
       expect(document.querySelector(`[aria-label="${label}"]`), label).not.toBeNull();
     }
     expect(screen.getByRole('textbox').getAttribute('aria-label')).toBe(m.editor_header_search_placeholder());

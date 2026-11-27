@@ -50,7 +50,6 @@ describe("phone tree: touch entry points", () => {
       m.editor_header_version_history(),
       m.editor_route_units(),
       m.editor_route_cost_items(),
-      m.editor_header_settings(),
     ].map(at);
     expect(order.every((i) => i >= 0), `every entry is in the drawer: ${order.join(",")}`).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);

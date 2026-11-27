@@ -35,6 +35,8 @@ const notesField = () =>
   screen.queryByPlaceholderText(m.editor_item_notes_placeholder()) ?? screen.queryByPlaceholderText(m.editor_item_notes_placeholder_no_library());
 
 const has = (name: string | RegExp) => screen.queryAllByRole("button", { name }).length > 0;
+/** Plain text on screen (the empty-template explanation is paragraphs, not buttons). */
+const hasText = (text: string) => screen.queryAllByText(text).length > 0;
 /** The phone nav buttons carry an icon glyph in front of their label ("≣ Items"), so the label ends the name. */
 const endsWith = (label: string) => new RegExp(`${label}$`);
 
@@ -84,26 +86,6 @@ const ENTRIES: Entry[] = [
     },
   },
   { name: "costItems: header button", cap: "costItems", trees: ["desktop"], present: async () => has(m.editor_route_cost_items()) },
-  { name: "settingsSheet: header button", cap: "settingsSheet", trees: ["desktop"], present: async () => has(m.editor_header_settings()) },
-  {
-    name: "settingsSheet: Template menu, change template",
-    cap: "settingsSheet",
-    trees: ["desktop"],
-    present: async () => {
-      fireEvent.click(screen.getByRole("button", { name: m.template_menu_template() }));
-      return screen.queryByTestId("change-template-btn") !== null;
-    },
-  },
-  {
-    name: "settingsSheet: phone More drawer",
-    cap: "settingsSheet",
-    trees: ["phone"],
-    present: async () => {
-      fireEvent.click(screen.getByRole("button", { name: m.editor_mobile_more() }));
-      await screen.findByRole("button", { name: m.editor_header_publish() });
-      return has(m.editor_header_settings());
-    },
-  },
   // The phone More drawer: every row is gated exactly like its desktop counterpart. The controls are the rows that
   // belong to no capability, so hiding one row must not take another with it.
   {
@@ -265,20 +247,16 @@ const ENTRIES: Entry[] = [
     },
   },
   {
-    name: "settingsSheet: Template menu divider goes with Change template",
-    cap: "settingsSheet",
-    trees: ["desktop"],
-    present: async () => {
-      fireEvent.click(screen.getByRole("button", { name: m.template_menu_template() }));
-      return screen.getByRole("menu", { name: m.template_menu_actions_aria() }).querySelector("li[aria-hidden]") !== null;
-    },
-  },
-  {
-    name: "settingsSheet: Choose a template call to action",
-    cap: "settingsSheet",
+    // #529 — the template is chosen on the inspection's hub page now: an
+    // inspection with no template shows the explanation and no action that
+    // would open the (removed) settings sheet.
+    name: "empty template: explanation, no template action",
+    cap: null,
     trees: ["desktop", "phone"],
     data: EMPTY_TEMPLATE_DATA,
-    present: async () => has(m.editor_route_choose_template()),
+    present: async () => hasText(m.editor_route_empty_template_title()) && hasText(m.editor_route_empty_template_desc()) && !has("Choose a template"),
+    // The last clause is a literal because #529 removed the settings sheet
+    // and its message key with it: no entry in the editor is named that now.
   },
   {
     name: "video: poster-frame action in the media viewer",

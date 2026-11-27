@@ -40,7 +40,7 @@ type OrderField = (typeof ORDER_FIELDS)[number];
  * The route relays this straight to `PATCH /api/inspections/:id`, whose Zod
  * schema also accepts `status`, `templateId`, `coverPhotoId` and the property
  * facts. Those have their own surfaces with their own rules — the publish
- * lifecycle owns `status`, the editor owns the template — so an allow-list
+ * lifecycle owns `status`, the hub's Settings card owns the template — so an allow-list
  * here keeps one modal's payload from quietly becoming a general-purpose
  * inspection PATCH. Exported for the test that pins the list.
  */

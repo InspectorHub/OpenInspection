@@ -55,11 +55,14 @@ function pivotPx(bp: string): number {
  * The class that hides the More trigger where it would be empty, or null when no row is present at all. A row can be
  * absent (no theme slot, fieldwork already finished, no collaboration, read-only), and the trigger is needed only
  * until the widest pivot among the rows that ARE present, because from there every one of them is inline again.
+ * `"always"` is a row with no inline copy (the device-local upload-quality toggle): the menu is never empty while
+ * it is present, so the trigger never hides — `""` renders it with no hide class.
  */
-export function overflowTriggerHide(present: ReadonlyArray<keyof typeof HEADER_OVERFLOW>): string | null {
+export function overflowTriggerHide(present: ReadonlyArray<keyof typeof HEADER_OVERFLOW | "always">): string | null {
+  if (present.includes("always")) return "";
   let widest: { px: number; cls: string } | null = null;
   for (const key of present) {
-    const pair = HEADER_OVERFLOW[key];
+    const pair = HEADER_OVERFLOW[key as keyof typeof HEADER_OVERFLOW];
     const px = pivotPx(pivotBreakpoint(pair) ?? '');
     if (widest === null || px > widest.px) widest = { px, cls: pair.row };
   }

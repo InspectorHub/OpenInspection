@@ -1,7 +1,8 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Icon, MenuItem, Popover } from "@core/shared-ui";
 import { HEADER_OVERFLOW, overflowTriggerHide } from "./header-visibility";
 import { useReadOnly } from "../../read-only";
+import { readOriginalQuality, writeOriginalQuality } from "../../shared/original-quality";
 import { m } from "../../i18n";
 
 export interface HeaderOverflowMenuProps {
@@ -41,19 +42,39 @@ export function HeaderOverflowMenu({
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const readOnly = useReadOnly();
+  // Device-local upload preference, not a per-inspection setting: it used to
+  // live in the settings sheet (#529 moved the sheet to the hub), and this
+  // menu is its home now — a toggle row, like the theme row, with no inline
+  // copy. It is shown even in read-only: it writes to this device's storage,
+  // not to the inspection, and it governs the inspector's next upload.
+  const [originalQuality, setOriginalQuality] = useState(readOriginalQuality);
+  // Re-read on every open: the phone drawer's toggle writes the same key, and
+  // this row must show the current value, not the one from when the menu mounted.
+  useEffect(() => {
+    if (open) setOriginalQuality(readOriginalQuality());
+  }, [open ]);
+  const toggleOriginalQuality = () => {
+    setOriginalQuality((v) => {
+      writeOriginalQuality(!v);
+      return !v;
+    });
+  };
 
   const run = (fn: () => void) => {
     setOpen(false);
     fn();
   };
 
-  // Sign, finish and version history all write, so a read-only editor holds only the theme row. The trigger is there only
-  // while a row it holds is hidden inline, and not at all when it holds none.
+  // Sign, finish and version history all write, so a read-only editor holds only the theme row and the
+  // upload-quality toggle. The trigger is there only while a row it holds is hidden inline — except the
+  // toggle has no inline copy, so `"always"` keeps the trigger rendered at every width; without it the
+  // toggle would be unreachable wherever the widest pivoted row has gone inline.
   const triggerHide = overflowTriggerHide([
     ...(readOnly ? [] : (['sign'] as const)),
     ...(onFinishFieldwork ? (['finishFieldwork'] as const) : []),
     ...(onOpenVersionHistory ? (['versionHistory'] as const) : []),
     ...(themeControl ? (['theme'] as const) : []),
+    'always',
   ]);
   if (triggerHide === null) return null;
   return (
@@ -123,6 +144,22 @@ export function HeaderOverflowMenu({
               {themeControl}
             </li>
           )}
+          {/* Device-local upload preference: skip on-device resizing and metadata stripping. A row, not an
+              action: it stays open after the toggle, like the theme row above it. */}
+          <li role="none" className="mt-1 border-t border-ih-border px-3 pt-2 pb-1">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={originalQuality}
+                onChange={toggleOriginalQuality}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-ih-primary"
+              />
+              <span>
+                <span className="block text-[13px] font-medium text-ih-fg-1">{m.editor_settings_original_quality()}</span>
+                <span className="block text-[12px] text-ih-fg-3">{m.editor_settings_original_quality_help()}</span>
+              </span>
+            </label>
+          </li>
         </ul>
       </Popover>
     </>

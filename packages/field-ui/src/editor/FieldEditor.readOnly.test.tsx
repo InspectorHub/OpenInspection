@@ -89,7 +89,6 @@ describe("readOnly editor: no write control is offered", () => {
       tabletPublish: screen.queryByTestId("tablet-publish-btn"),
       speed: screen.queryByTestId("speed-entry"),
       sign: screen.queryByRole("button", { name: m.editor_header_sign() }),
-      settings: screen.queryByRole("button", { name: m.editor_header_settings() }),
       addSection: screen.queryByRole("button", { name: m.editor_shared_add_section() }),
       batch: screen.queryByRole("button", { name: m.editor_route_batch_select_items() }),
     };

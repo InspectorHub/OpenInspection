@@ -11,7 +11,6 @@ import {
   createFakeMediaPool,
   createFakePrefs,
   createFakeRepairItems,
-  createFakeSettingsSheet,
   createFakeTemplateSearch,
   createFakeVersionHistory,
   createFakeVideo,
@@ -478,7 +477,7 @@ describe('the aiAssist and costItems fakes', () => {
     expect(await video.finalize('i', { provider: 'stream', streamUid: 'u' })).toEqual({ ok: false, error: 'late' });
   });
 
-  it('createFakeRepairItems, createFakeMediaPool and createFakeSettingsSheet answer what they were given and count reads', async () => {
+  it('createFakeRepairItems and createFakeMediaPool answer what they were given and count reads', async () => {
     const repair = createFakeRepairItems([{ id: 'r', name: 'n', category: null, defaultRepairSummary: 's', contractorTypeName: null }]);
     expect(await repair.list()).toHaveLength(1);
     expect(repair.lists).toBe(1);
@@ -487,10 +486,5 @@ describe('the aiAssist and costItems fakes', () => {
     pool.setListing({ photos: [], answered: false });
     expect((await pool.list('j')).answered).toBe(false);
     expect(pool.lists).toEqual(['i', 'j']);
-    const sheet = createFakeSettingsSheet();
-    expect((await sheet.load('i'))?.templates).toEqual([]);
-    sheet.setData(null);
-    expect(await sheet.load('j')).toBeNull();
-    expect(sheet.loads).toEqual(['i', 'j']);
   });
 });

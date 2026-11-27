@@ -20,7 +20,6 @@ const state = {
   saveStatus: 'idle',
   searchQuery: '',
   setSearchQuery: vi.fn(),
-  setSettingsOpen: vi.fn(),
 };
 
 function mount(slots?: FieldHostSlots, extra: { held?: boolean; tenantSlug?: string | null; urls?: Partial<FieldUrls>; without?: readonly ('restartSession' | 'openUrl')[] } = {}) {
@@ -38,7 +37,6 @@ function mount(slots?: FieldHostSlots, extra: { held?: boolean; tenantSlug?: str
         handlePublishClick={vi.fn()}
         handleFinishFieldwork={vi.fn()}
         finishingFieldwork={false}
-        onChangeTemplate={vi.fn()}
         onSaveAsNewTemplate={vi.fn()}
         onUpdateSourceTemplate={vi.fn()}
         canUpdateSourceTemplate={false}

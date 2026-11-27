@@ -86,7 +86,6 @@ describe("createWebFieldDataSource", () => {
             expect(typeof ds.resources.templateSearch?.search).toBe("function");
             expect(typeof ds.resources.repairItems?.list).toBe("function");
             expect(typeof ds.resources.mediaPool?.list).toBe("function");
-            expect(typeof ds.resources.settingsSheet?.load).toBe("function");
             expect(typeof ds.resources.versionHistory?.capture).toBe("function");
             expect(typeof ds.resources.costItems?.save).toBe("function");
             for (const member of ["createUpload", "uploadFile", "uploadPoster", "setPoster", "finalize", "remove"] as const) {
@@ -105,7 +104,6 @@ describe("createWebFieldDataSource", () => {
             "mediaPool",
             "publishReadiness",
             "repairItems",
-            "settingsSheet",
             "templateSearch",
             "versionHistory",
             "video",

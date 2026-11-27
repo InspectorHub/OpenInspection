@@ -15,7 +15,6 @@ const props = (over: Partial<MobileFinishDrawerProps> = {}): MobileFinishDrawerP
   onClose: () => {},
   onPublish: () => {},
   onSign: () => {},
-  onOpenSettings: null,
   onFinishFieldwork: null,
   finishingFieldwork: false,
   onPreviewReport: null,

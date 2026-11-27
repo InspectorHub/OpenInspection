@@ -40,7 +40,7 @@ describe.each([[false], [true]])("readOnly=%s", (readOnly) => {
   });
 
   it("MobileFinishDrawer: Publish and Sign are offered only when it can write; Preview stays", () => {
-    mount(readOnly, <MobileFinishDrawer open onClose={() => undefined} onPublish={() => undefined} onSign={() => undefined} onOpenSettings={null} onFinishFieldwork={null} finishingFieldwork={false} onPreviewReport={() => undefined} />);
+    mount(readOnly, <MobileFinishDrawer open onClose={() => undefined} onPublish={() => undefined} onSign={() => undefined} onFinishFieldwork={null} finishingFieldwork={false} onPreviewReport={() => undefined} />);
     const sheet = screen.getByRole("dialog");
     expect(!!within(sheet).queryByRole("button", { name: m.editor_header_publish() })).toBe(has(true));
     expect(!!within(sheet).queryByRole("button", { name: m.editor_header_sign() })).toBe(has(true));

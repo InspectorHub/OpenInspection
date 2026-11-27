@@ -62,11 +62,13 @@ describe("inspection page loader", () => {
 
     it("still reads what the cards show first, and the blocking count is pinned", async () => {
         await run();
-        for (const needed of ["inspections.:id.hub", "auth.me", "inspections.:id.people", "documents", "services.index", "inspections.:id.versions", "inspections.:id.statutory-form"]) {
+        for (const needed of ["inspections.:id.hub", "auth.me", "inspections.:id.people", "documents", "services.index", "inspections.:id.versions", "inspections.:id.statutory-form", "inspections.:id", "inspections.templates", "inspections.:id.media"]) {
             expect(seam.calls, needed).toContain(needed);
         }
-        // Eight first-wave reads plus the two visit reads: ten, from thirteen.
-        expect(seam.calls.length).toBeLessThanOrEqual(11);
+        // Eleven first-wave reads (the eight above plus the Settings card's
+        // three: inspection, templates, media) plus the two visit reads:
+        // thirteen in this run.
+        expect(seam.calls.length).toBeLessThanOrEqual(14);
     });
 
     it("keeps the data that decides the status code blocking: a missing inspection is still a 404", async () => {

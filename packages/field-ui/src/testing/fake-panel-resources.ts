@@ -2,7 +2,6 @@ import type { FieldResources } from '../data-source';
 import type {
   MediaPoolListing,
   RepairItemOption,
-  SettingsSheetData,
   VersionSnapshotContent,
   VersionSnapshotEntry,
   VideoFinalizeInput,
@@ -252,30 +251,6 @@ export function createFakeMediaPool(initial?: MediaPoolListing): FakeMediaPool {
     list: async (inspectionId) => {
       lists.push(inspectionId);
       return listing;
-    },
-  };
-}
-
-/** The `settingsSheet` resource: answers `data` (an empty sheet by default, `null` once `setData(null)`) and records each read. */
-export interface FakeSettingsSheet extends NonNullable<FieldResources['settingsSheet']> {
-  readonly loads: readonly string[];
-  setData(data: SettingsSheetData | null): void;
-}
-
-export function createFakeSettingsSheet(initial?: SettingsSheetData | null): FakeSettingsSheet {
-  let data: SettingsSheetData | null =
-    initial === undefined ? { inspection: null, templates: [], photos: [], profiles: [] } : initial;
-  const loads: string[] = [];
-  return {
-    get loads() {
-      return loads;
-    },
-    setData(next) {
-      data = next;
-    },
-    load: async (inspectionId) => {
-      loads.push(inspectionId);
-      return data;
     },
   };
 }
