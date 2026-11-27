@@ -26,6 +26,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Unused API routes that no client called: `PUT /api/event-types/:id`, `DELETE /api/event-types/:id`, `POST /api/event-types/seed`, `GET /api/events/upcoming`, `GET /api/calendar/connections/:id/calendars`, `GET /api/inspections/{id}/full`, `GET /api/inspections/{id}/sign-status`, the `statusFlags` object on dashboard rows, `POST /api/auth/setup/skip` and `POST /api/auth/onboarding/flag`. Missing default event types are filled in by `POST /api/admin/data/install-bundled-content`; the signed state of an inspection is still returned as `signedByClient` by the inspection read.
 * The unreachable `feature-disabled` page and its translation strings.
 
+## [2.8.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.7.0...openinspection-v2.8.0) (2026-11-27)
+
+
+### Features
+
+* **editor:** remove the settings sheet; settings live on the hub now ([c7e7052](https://github.com/InspectorHub/OpenInspection/commit/c7e705270482bbaba2877f2f1f9469a1be505fe5))
+* **hub:** add Settings card with template, required-fields, profile and cover controls ([fe26ab3](https://github.com/InspectorHub/OpenInspection/commit/fe26ab3e0327691d4738f7b6389f007ba153b3d7))
+* **hub:** move per-inspection settings from the editor to the hub ([cc296b3](https://github.com/InspectorHub/OpenInspection/commit/cc296b3a8c97cc8768d52d2f4e0de72f78004ac3))
+* **publish:** editor modal gains the courtesy-translation opt-in ([9223253](https://github.com/InspectorHub/OpenInspection/commit/92232536bcd81359c9f85f755d0615ea9b9ad99c))
+* **publish:** hub modal gains mark-complete and auto-sign, loses the dead gate checkboxes ([c1c2769](https://github.com/InspectorHub/OpenInspection/commit/c1c276913e5e7bac150079509663e29a652aa392))
+* **publish:** restate the notify choice in the hub publish banner ([433fd95](https://github.com/InspectorHub/OpenInspection/commit/433fd952cedf618bb0e902fade5ee6a806cde6f8))
+* **publish:** show blocking defects on the hub via PublishGateModal ([d81cdff](https://github.com/InspectorHub/OpenInspection/commit/d81cdffca3635da3701002c0e92b0373222e9131))
+
+
+### Bug Fixes
+
+* **compliance:** align queue registry names ([515c5d0](https://github.com/InspectorHub/OpenInspection/commit/515c5d08fc0009dae208e92fe81e705ed0842056))
+* **copy:** call the hub report list "Published versions" ([f685cd6](https://github.com/InspectorHub/OpenInspection/commit/f685cd6d654cdc1508c23d403c1e43e2fcbf5dc1))
+* **docs:** keep generated schema reference complete ([0769355](https://github.com/InspectorHub/OpenInspection/commit/0769355d9ed0db41c68fdf7634b2f1dd42ac5ae9))
+* **hub:** load the settings in the hub loader; split the cover picker out of the Settings card ([aee43d3](https://github.com/InspectorHub/OpenInspection/commit/aee43d3a0a446e12d8218ab9fc8e94f691d32a58))
+* **hub:** make the settings loader tolerate narrow api mocks; pin its reads ([eea5e21](https://github.com/InspectorHub/OpenInspection/commit/eea5e21c882a590c3feb084d2038f9df89e160bf))
+* provision E2E vars for docs captures ([50da7be](https://github.com/InspectorHub/OpenInspection/commit/50da7bef42df2d0df7b58be5d2cf57fcb59741de))
+* provision test keys for docs captures ([552f158](https://github.com/InspectorHub/OpenInspection/commit/552f158933decaf78a3de0f6a3ba88b6272c068e))
+* **publish:** offer the notify-client choice on hub republish ([2db3172](https://github.com/InspectorHub/OpenInspection/commit/2db3172b4ddcce6ac108738cde3ed92cea4fcd3b))
+* **publish:** offer the notify-client choice on hub republish ([216b51a](https://github.com/InspectorHub/OpenInspection/commit/216b51af472aac293f5adc8a1d4ad86ad8474680))
+* **ui:** held-back import rows in plain words, leftovers survive reload ([d3f599b](https://github.com/InspectorHub/OpenInspection/commit/d3f599bcaeca82a8fec7672f61b9b30b165d5c5c))
+* **ui:** held-back import rows in plain words, leftovers survive reload ([439b49e](https://github.com/InspectorHub/OpenInspection/commit/439b49e0797262cb665295e2e2a36f225863a07b))
+* **ui:** keep the New Inspection wizard open when create fails ([9853c12](https://github.com/InspectorHub/OpenInspection/commit/9853c123eee75d7f54a66c75646fda484d03cb6f))
+
 ## [2.7.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.6.0...openinspection-v2.7.0) (2026-11-20)
 
 
