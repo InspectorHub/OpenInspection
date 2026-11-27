@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.11.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.10.1...field-ui-v0.11.0) (2026-11-27)
+
+
+### Features
+
+* **editor:** let an inspection be downloaded for offline use ([5679416](https://github.com/InspectorHub/OpenInspection/commit/5679416beee24c9d3c7967a1869bd60231dc10f7)), closes [#476](https://github.com/InspectorHub/OpenInspection/issues/476)
+* **editor:** remove the settings sheet; settings live on the hub now ([c7e7052](https://github.com/InspectorHub/OpenInspection/commit/c7e705270482bbaba2877f2f1f9469a1be505fe5))
+* **hub,editor:** show inspection history and publish gates, queue offline defect photos, split saved states, add download for offline ([8d4d184](https://github.com/InspectorHub/OpenInspection/commit/8d4d184e6f9c5aa551e7a31ca1360d380c888b0f))
+* **hub:** move per-inspection settings from the editor to the hub ([cc296b3](https://github.com/InspectorHub/OpenInspection/commit/cc296b3a8c97cc8768d52d2f4e0de72f78004ac3))
+* **publish:** editor modal gains the courtesy-translation opt-in ([9223253](https://github.com/InspectorHub/OpenInspection/commit/92232536bcd81359c9f85f755d0615ea9b9ad99c))
+
+
+### Bug Fixes
+
+* **editor:** never report a write as saved before the server confirms it ([6c3592c](https://github.com/InspectorHub/OpenInspection/commit/6c3592c70cbffa8dab2fb26ec1d374e5e7275c22)), closes [#477](https://github.com/InspectorHub/OpenInspection/issues/477)
+* **editor:** queue offline defect and burst photos instead of losing them ([5dfc3ca](https://github.com/InspectorHub/OpenInspection/commit/5dfc3cacd4f6a38f810717a46dc216ace761dfff)), closes [#475](https://github.com/InspectorHub/OpenInspection/issues/475)
+* **hub:** load the settings in the hub loader; split the cover picker out of the Settings card ([aee43d3](https://github.com/InspectorHub/OpenInspection/commit/aee43d3a0a446e12d8218ab9fc8e94f691d32a58))
+* **publish:** offer the notify-client choice on hub republish ([2db3172](https://github.com/InspectorHub/OpenInspection/commit/2db3172b4ddcce6ac108738cde3ed92cea4fcd3b))
+
 ## [0.10.1](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.10.0...field-ui-v0.10.1) (2026-11-11)
 
 
