@@ -24,6 +24,7 @@ export function PublishReportModal({
   submitting,
   error,
   onClose,
+  onPublishSubmit,
 }: {
   open: boolean;
   agreementRequired: boolean;
@@ -79,6 +80,15 @@ export function PublishReportModal({
   submitting: boolean;
   error: string | undefined;
   onClose: () => void;
+  /**
+   * Item 3 — what this submit is, reported while the form still knows. The
+   * banner cannot recover it after the publish: the loader revalidates and
+   * the report is no longer "editing again", so `noticeChoice` is false by
+   * the time the confirmation renders. The human gate re-fires the submit
+   * via requestSubmit, so this runs twice with the same values; the second
+   * run is the real one.
+   */
+  onPublishSubmit?: (choice: { offered: boolean; notified: boolean }) => void;
 }) {
   const gatedSubmit = useHumanGatedSubmit();
   return (
@@ -101,7 +111,15 @@ export function PublishReportModal({
         id={FORM_ID}
         method="post"
         className="space-y-3"
-        onSubmit={gatedSubmit}
+        onSubmit={(e) => {
+          onPublishSubmit?.({
+            offered: noticeChoice,
+            notified: new FormData(e.currentTarget).get("notifyClient") === "on",
+          });
+          // `gatedSubmit` returns a promise (the human gate is async); the
+          // form's own submit already happened — nothing awaits it here.
+          void gatedSubmit(e);
+        }}
       >
         <input type="hidden" name="intent" value="publish" />
         {blockingCount > 0 && (

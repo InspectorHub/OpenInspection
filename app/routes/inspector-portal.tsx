@@ -40,7 +40,7 @@ import { RequestPaymentModal } from "~/components/inspector-portal/RequestPaymen
 import { PublishReportModal } from "~/components/inspector-portal/PublishReportModal";
 import { createWebPublishReadiness } from "~/lib/field/web-publish-readiness";
 import { CreateReinspectionModal } from "~/components/inspector-portal/CreateReinspectionModal";
-import { PublishNotice } from "~/components/inspector-portal/PublishNotice";
+import { PublishNotice, type PublishNoticeChoice } from "~/components/inspector-portal/PublishNotice";
 import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEditor";
 import { RouteErrorNotice } from "~/components/RouteErrorNotice";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
@@ -851,6 +851,12 @@ export default function InspectionHubPage() {
   // dismissal.
   const publishNotice = publishModal.succeeded;
 
+  // Item 3 — what the last publish submit chose, snapshotted by the modal at
+  // submit time (see PublishReportModal.onPublishSubmit). The banner reads
+  // this, not the live report state: after the publish the report is
+  // published again and `primaryEditingAgain` is false.
+  const [lastPublishNotice, setLastPublishNotice] = useState<PublishNoticeChoice | null>(null);
+
   // `publish` is the user's permission; the report's own eligibility lives in
   // canPublish, which reportShipped above reads.
   const reportActionList = reportActions({ publish: canPublishCap && access.canAct, edit: canEditReports }, inspection.reportStatus, primaryEditingAgain);
@@ -946,7 +952,7 @@ export default function InspectionHubPage() {
         }
       />
 
-      <PublishNotice show={publishNotice} />
+      <PublishNotice show={publishNotice} notice={lastPublishNotice} />
 
       {/* Six blocks — responsive 2-col grid (1-col on mobile).
           `items-start`: grid rows stretch their items to equal height by
@@ -1419,6 +1425,7 @@ export default function InspectionHubPage() {
         submitting={publishModal.busy}
         error={publishModal.error}
         onClose={() => publishModal.setOpen(false)}
+        onPublishSubmit={setLastPublishNotice}
       />
 
       {/* Publish pre-flight gate — the defect list the hub used to show only

@@ -169,7 +169,7 @@ describe("PublishReportModal — republish notice choice (#484)", () => {
     }
 
     function renderModalWithFetcher(
-        opts: { isAmendment?: boolean; noticeChoice?: boolean },
+        opts: { isAmendment?: boolean; noticeChoice?: boolean; onPublishSubmit?: (choice: { offered: boolean; notified: boolean }) => void },
         onSubmitted: (data: FormData) => void,
     ) {
         const Stub = createRoutesStub([
@@ -191,6 +191,7 @@ describe("PublishReportModal — republish notice choice (#484)", () => {
                             submitting={false}
                             error={undefined}
                             onClose={() => {}}
+                            onPublishSubmit={opts.onPublishSubmit}
                         />
                     );
                 },
@@ -250,6 +251,37 @@ describe("PublishReportModal — republish notice choice (#484)", () => {
         expect(document.querySelector('input[name="notifyClient"]')).toBeNull();
         expect(screen.queryByRole("checkbox", { name: /notify/i })).toBeNull();
         expect(screen.getByTestId("publish-notify-automation")).toBeTruthy();
+    });
+
+    // Item 3 — the banner cannot recover the choice after the publish (the
+    // loader revalidates and the report is no longer "editing again"), so the
+    // modal snapshots it at submit time via onPublishSubmit.
+    it("reports the ticked choice at submit time", async () => {
+        const onPublishSubmit = vi.fn();
+        renderModalWithFetcher({ isAmendment: true, noticeChoice: true, onPublishSubmit }, () => {});
+        const box = await screen.findByRole("checkbox", { name: /report-updated notices/i });
+        fireEvent.click(box);
+        await submitForm();
+        await waitFor(() => expect(onPublishSubmit).toHaveBeenCalled());
+        expect(onPublishSubmit).toHaveBeenCalledWith({ offered: true, notified: true });
+    });
+
+    it("reports the unticked choice at submit time", async () => {
+        const onPublishSubmit = vi.fn();
+        renderModalWithFetcher({ isAmendment: true, noticeChoice: true, onPublishSubmit }, () => {});
+        await screen.findByRole("checkbox", { name: /report-updated notices/i });
+        await submitForm();
+        await waitFor(() => expect(onPublishSubmit).toHaveBeenCalled());
+        expect(onPublishSubmit).toHaveBeenCalledWith({ offered: true, notified: false });
+    });
+
+    it("reports no choice when none was offered", async () => {
+        const onPublishSubmit = vi.fn();
+        renderModalWithFetcher({ isAmendment: true, noticeChoice: false, onPublishSubmit }, () => {});
+        await screen.findByRole("button", { name: /publish/i });
+        await submitForm();
+        await waitFor(() => expect(onPublishSubmit).toHaveBeenCalled());
+        expect(onPublishSubmit).toHaveBeenCalledWith({ offered: false, notified: false });
     });
 });
 
