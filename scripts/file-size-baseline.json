@@ -1,5 +1,5 @@
 {
-  "packages/field-ui/src/editor/FieldEditor.tsx": 2152,
+  "packages/field-ui/src/editor/FieldEditor.tsx": 2162,
   "app/routes/inspector-portal.tsx": 1587,
   "scripts/verify-statutory-render.mjs": 1283,
   "server/durable-objects/inspection-doc.ts": 1027,
@@ -29,7 +29,7 @@
   "server/api/public-report.ts": 587,
   "packages/field-ui/src/components/inspection-edit/CompliancePanel.tsx": 586,
   "server/services/agent/referral.ts": 582,
-  "packages/field-ui/src/collab/results-binding.ts": 573,
+  "packages/field-ui/src/collab/results-binding.ts": 595,
   "scripts/check-agent-terms-classification.mjs": 572,
   "scripts/check-erasure-manifest.mjs": 572,
   "server/api/bookings/agreement.ts": 572,

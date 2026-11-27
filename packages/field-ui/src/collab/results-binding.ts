@@ -483,7 +483,29 @@ export function toggleCustomDefect(
 }
 
 /**
- * Append a photo to a canned defect's photos array (dedup by key).
+ * Is `photo` already in `existing`?
+ *
+ * Dedup is by `key`, which is right for an uploaded photo and WRONG for a
+ * pending offline one: every pending entry carries `key: ''` until the drain
+ * swaps in its R2 key, so a plain key match declares the second photo of a
+ * defect a duplicate of the first and silently drops it. Pending entries are
+ * therefore deduped by `pendingId`, which is a fresh UUID per capture.
+ * (Credit: NCHILLC's fork, commit 85669e05, which found this latent bug
+ * while fixing offline defect photos; reimplemented here for upstream.)
+ */
+function isDuplicatePhoto(
+    existing: ReadonlyArray<{ key: string } & Record<string, unknown>>,
+    photo: { key: string } & Record<string, unknown>,
+): boolean {
+    if (photo.key === '' && photo.pendingId !== undefined) {
+        return existing.some((p) => p.pendingId === photo.pendingId);
+    }
+    return existing.some((p) => p.key === photo.key);
+}
+
+/**
+ * Append a photo to a canned defect's photos array (dedup — see
+ * `isDuplicatePhoto`).
  * Reads the current defect state from the live doc, then replaces the photos
  * array wholesale via upsertCanned — element-level LWW is the documented
  * behavior for a defect's photos sub-array (Task 7p).
@@ -509,7 +531,7 @@ export function addPhotoToCannedDefect(
     if (!defect) return;
 
     const existing: Array<{ key: string } & Record<string, unknown>> = defect.photos ?? [];
-    if (existing.some((p) => p.key === photo.key)) return;
+    if (isDuplicatePhoto(existing, photo)) return;
 
     const nextPhotos = [...existing, photo];
     upsertCanned(doc, fk, 'defects', { cannedId, photos: nextPhotos });
@@ -541,7 +563,7 @@ export function addPhotoToCustomDefect(
     if (!defect) return;
 
     const existing: Array<{ key: string } & Record<string, unknown>> = defect.photos ?? [];
-    if (existing.some((p) => p.key === photo.key)) return;
+    if (isDuplicatePhoto(existing, photo)) return;
 
     const nextPhotos = [...existing, photo];
     upsertCustomComment(doc, fk, 'defects', { id: customId, photos: nextPhotos });

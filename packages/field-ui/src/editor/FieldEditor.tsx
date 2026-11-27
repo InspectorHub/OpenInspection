@@ -1040,19 +1040,21 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  // #181 PR-G — offline: persist each baked photo locally + append a
  // PENDING doc entry (empty key + pendingUpload) per file. The strip
  // renders them from the local blob; the drain (on reconnect / online)
- // uploads each to R2 and swaps in the real key. Defect-targeted offline
- // adds fall back to the online fetcher (the pending-doc model covers
- // item photos; defect pending is out of scope) — they simply re-fire
- // when back online.
+ // uploads each to R2 and swaps in the real key.
+ // #475 — defect-targeted offline adds take the SAME queue: the pending
+ // entry lands on the defect row (via `defectTarget`) and the drain swaps
+ // it into that row's photos array, so a defect photo taken with no signal
+ // is queued with the same "Queued" tile and retry as an item photo —
+ // it no longer falls through to the online uploader and vanishes.
  const doc = writeDoc;
  const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
- if (!dataSource.isOnline() && doc && sid && !target) {
+ if (!dataSource.isOnline() && doc && sid) {
   // Phase U (Batch C2a) — key the offline pending-photo doc entry to the active
   // unit. At activeUnitId == null this === the legacy `_default:{sid}:{itemId}`.
   const fk = findingKey(activeUnitId, sid, itemId);
   // The host's store may reject a file; the rest of the batch still goes through and the user hears once, with the
   // count. It is a photo that was not added, not a save failure, so the save state is left alone.
-  const batch = await addOfflinePhotos(dataSource.media.store, doc, { inspectionId: String(state.inspection.id), findingKey: fk, itemId, source }, bakedFiles);
+  const batch = await addOfflinePhotos(dataSource.media.store, doc, { inspectionId: String(state.inspection.id), findingKey: fk, itemId, source, ...(target ? { defectTarget: target, sectionId: sid } : {}) }, bakedFiles);
   for (const message of offlinePhotoRejectionMessages(batch, bakedFiles.length)) notify(message, "error", { durationMs: 8000 });
  } else {
   // A file input's change event fires once per file-chooser selection (the chooser is modal) and the input
@@ -1093,10 +1095,18 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  }
  // The burst's "Done" guards its own repeat (BurstCamera), so each commit reaches here once.
  const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
+ // #475 — a burst set taken offline queues like any other photo batch
+ // instead of taking the online uploader and vanishing with no tile.
+ if (!dataSource.isOnline() && writeDoc && sid) {
+  const fk = findingKey(activeUnitId, sid, itemId);
+  const batch = await addOfflinePhotos(dataSource.media.store, writeDoc, { inspectionId: String(state.inspection.id), findingKey: fk, itemId, source: "burst" }, files);
+  for (const message of offlinePhotoRejectionMessages(batch, files.length)) notify(message, "error", { durationMs: 8000 });
+  return;
+ }
  photoUpload.submit({ itemId, findingKey: findingKey(activeUnitId, sid ?? "", itemId), files, target: null, source: "burst" });
  })();
  },
- [state.burstCameraItemId, state.sectionIdForItem, state.currentSection, activeUnitId, photoUpload.submit, notify, readOnly],
+ [state.burstCameraItemId, state.sectionIdForItem, state.currentSection, activeUnitId, photoUpload.submit, notify, readOnly, dataSource, writeDoc],
  );
 
  // Attach uploaded photo keys once a batch has finished — to the item, or
