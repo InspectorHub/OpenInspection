@@ -40,10 +40,18 @@ const EMPTY: SettingsSheetData = {
 export async function loadInspectionSettings(api: Api, inspectionId: string): Promise<SettingsSheetData> {
     if (!inspectionId) return EMPTY;
 
+    // Optional-chained like the hub loader's own reads: a narrower mocked
+    // api-client in unit tests degrades cleanly instead of throwing on a
+    // missing property (the hub's SMS-consent tests mock only the endpoints
+    // they exercise).
+    const inspGet = api.inspections?.[":id"]?.$get as unknown as ((args: { param: { id: string } }) => Promise<Response>) | undefined;
+    const tplGet = api.inspections?.templates?.$get as unknown as ((args: { query: { page: string; pageSize: string } }) => Promise<Response>) | undefined;
+    const mediaGet = api.inspections?.[":id"]?.media?.$get as unknown as ((args: { param: { id: string } }) => Promise<Response>) | undefined;
+
     const [inspRes, tplRes, mediaRes] = await Promise.all([
-        api.inspections[":id"].$get({ param: { id: inspectionId } }).catch(() => null),
-        api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }).catch(() => null),
-        api.inspections[":id"].media.$get({ param: { id: inspectionId } }).catch(() => null),
+        inspGet ? inspGet({ param: { id: inspectionId } }).catch(() => null) : null,
+        tplGet ? tplGet({ query: { page: "1", pageSize: "100" } }).catch(() => null) : null,
+        mediaGet ? mediaGet({ param: { id: inspectionId } }).catch(() => null) : null,
     ]);
 
     let inspection: Record<string, unknown> | null = null;
