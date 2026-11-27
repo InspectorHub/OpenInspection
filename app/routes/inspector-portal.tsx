@@ -85,6 +85,7 @@ import { InvoiceCard } from "~/components/inspector-portal/InvoiceCard";
 import { GateToggle } from "~/components/inspector-portal/GateToggle";
 import { ReportGateUnlock } from "~/components/inspector-portal/ReportGateUnlock";
 import { CommunicationSection } from "~/components/inspector-portal/CommunicationSection";
+import { EntityAuditTrail } from "~/components/audit/EntityAuditTrail";
 import { useHubPickers } from "~/hooks/useHubPickers";
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspector-portal-helpers";
 import type { RestorableStatus } from "../../server/lib/inspection/cancel-restore";
@@ -1333,6 +1334,20 @@ export default function InspectionHubPage() {
             </div>
           )}
 
+          {/* #528 — Inspection history: the events around the order
+              (publish, amend, retract, send, order changes, completion),
+              distinct from "Published versions" above (per-publish snapshots
+              with diffs). Collapsed disclosure; retention is indefinite —
+              the audit chain is a signed evidence chain that is never swept.
+              The writes fire for hub paths too: the hub calls the same
+              publish/send endpoints as the editor. */}
+          <div className="mt-4 pt-4 border-t border-ih-border">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-ih-fg-3 mb-1">
+              {m.inspections_hub_history_title()}
+            </p>
+            <EntityAuditTrail entityId={inspection.id} timeZone={displayTz} />
+          </div>
+
           {/* The order-wide gate's release. It belongs on the REPORT card by the
               same rule GateToggle follows — the card for the artifact it gates —
               and the artifact here is the reports, plural. Admin-only: this
@@ -1485,6 +1500,8 @@ export default function InspectionHubPage() {
         autoSign={inspection.autoSignOnPublish ?? false}
         orderCompleted={inspection.status === INSPECTION_STATUS.COMPLETED}
         blockingCount={hub.publishReadiness.blockingCount}
+        paymentRequired={inspection.paymentRequired}
+        agreementRequired={inspection.agreementRequired}
         fetcher={publishModal.fetcher}
         submitting={publishModal.busy}
         error={publishModal.error}

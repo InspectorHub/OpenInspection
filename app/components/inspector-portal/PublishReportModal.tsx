@@ -21,6 +21,8 @@ export function PublishReportModal({
   autoSign,
   orderCompleted,
   blockingCount,
+  paymentRequired = false,
+  agreementRequired = false,
   fetcher,
   submitting,
   error,
@@ -88,6 +90,19 @@ export function PublishReportModal({
    * editor's PublishGateModal with the defects before this modal ever opens.
    */
   blockingCount: number;
+  /**
+   * #497 — the ACTUAL delivery-gate state from the inspection row, shown
+   * here so the publisher sees what will really hold the report. The
+   * signature/payment checkboxes that used to sit here posted
+   * requireSignature/requirePayment, which the publish endpoint accepts
+   * but never uses — ticking them changed nothing. The gates are set by
+   * GateToggle on the hub cards (payment on the Invoice card, agreement
+   * with the agreements); this box only STATES them, with a link to the
+   * control that actually writes each one. Clicking a link closes the
+   * modal and jumps to that gate.
+   */
+  paymentRequired?: boolean;
+  agreementRequired?: boolean;
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
   submitting: boolean;
   error: string | undefined;
@@ -168,6 +183,32 @@ export function PublishReportModal({
             {m.hub_publish_unresolved({ count: blockingCount })}
           </p>
         )}
+        {/* #497 — the actual gate state, stated not toggled. */}
+        <div
+          data-testid="publish-gate-state"
+          className="rounded-md border border-ih-border bg-ih-bg-muted px-3 py-2 text-[12px] text-ih-fg-2 space-y-1"
+        >
+          <p className="text-[11px] font-bold uppercase tracking-wider text-ih-fg-3">
+            {m.hub_publish_gate_heading()}
+          </p>
+          {paymentRequired && (
+            <p>
+              {m.hub_publish_gate_held_payment()}{" "}
+              <a href="#hub-gate-payment" onClick={onClose} className="font-bold text-ih-primary hover:underline">
+                {m.hub_publish_gate_change_payment()}
+              </a>
+            </p>
+          )}
+          {agreementRequired && (
+            <p>
+              {m.hub_publish_gate_held_agreement()}{" "}
+              <a href="#hub-gate-agreement" onClick={onClose} className="font-bold text-ih-primary hover:underline">
+                {m.hub_publish_gate_change_agreement()}
+              </a>
+            </p>
+          )}
+          {!paymentRequired && !agreementRequired && <p>{m.hub_publish_gate_none()}</p>}
+        </div>
         {/* No theme picker — rides the editor's effective default (server
             'modern'); the action sends theme:"modern" explicitly. */}
 

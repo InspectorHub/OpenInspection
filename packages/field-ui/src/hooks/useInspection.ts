@@ -88,7 +88,7 @@ export interface InspectionSchema {
 
 export type ResultMap = Record<string, Record<string, unknown>>;
 
-export type SaveStatus = "idle" | "saving" | "saved" | "error";
+export type SaveStatus = "idle" | "saving" | "saved" | "saved-local" | "error";
 
 export type ActiveView = "items" | "property";
 

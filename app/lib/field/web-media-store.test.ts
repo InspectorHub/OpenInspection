@@ -5,7 +5,9 @@
  * Pending photos already sit in users' browsers, so the database name, version,
  * object store, key path and stored row shape are pinned here against RAW
  * IndexedDB access (not through the module under test): a change to any of them
- * would orphan photos that have not uploaded yet.
+ * would orphan photos that have not uploaded yet. The defect-addressing fields
+ * (#475) were added as OPTIONAL fields on the photo row: rows written before
+ * them still load (as item photos), so the layout constants above are unchanged.
  *
  * Uses fake-indexeddb, no server. Imported here rather than through a global
  * setup file, which would load the polyfill for every spec.
@@ -15,7 +17,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import type { PendingMediaRecord } from "@core/field-ui/media-types";
 import { addOfflinePhotos } from "@core/field-ui/collab/offline-photo-batch";
 import { offlinePhotoRejectionMessages } from "@core/field-ui/editor/photo-rejection-messages";
-import { projectResults, seedResultsDoc } from "@core/field-ui/shared/results-doc";
+import { projectResults, seedResultsDoc, upsertCanned } from "@core/field-ui/shared/results-doc";
 import * as Y from "yjs";
 import { MAX_PHOTO_BYTES } from "../../../server/lib/media/store-photo";
 import { sniffPhotoType } from "../../../server/lib/media/sniff";
@@ -186,6 +188,7 @@ describe("web media store: PendingMediaStore behaviour", () => {
     it("toStored and fromStored are inverses for every kind (photoIndex is not stored)", () => {
         const recs: PendingMediaRecord[] = [
             photo("a"),
+            { kind: "photo", pendingId: "a-defect", inspectionId: "i", createdAt: 4, blob: new Blob([JPEG_HEAD]), meta: { targetType: "defect", findingKey: FK, itemId: "i1", customId: "c1", defectKind: "custom" } },
             { kind: "crop", pendingId: "b", inspectionId: "i", createdAt: 2, blob: new Blob(["b"]), meta: { findingKey: FK, itemId: "i1", photoIndex: -1, photoKey: "k", crop, sectionId: "s1" } },
             { kind: "annotate", pendingId: "c", inspectionId: "i", createdAt: 3, blob: new Blob(["c"]), meta: { findingKey: FK, itemId: "i1", photoIndex: -1, photoKey: "k", nodesJson: "[1]", sectionId: "s1" } },
         ];
@@ -211,13 +214,24 @@ describe("web media store: PendingMediaStore behaviour", () => {
         await expect(webMediaStore.delete("never-there")).resolves.toBeUndefined();
     });
 
-    it("put rejects for a defect photo, which the stored shape cannot address", async () => {
+    it("put stores a defect photo with its addressing, and get returns it as a defect photo (#475)", async () => {
         const rec: PendingMediaRecord = {
             kind: "photo", pendingId: "defect-1", inspectionId: "i", createdAt: 1, blob: new Blob([JPEG_HEAD]),
             meta: { targetType: "defect", findingKey: FK, itemId: "i1", customId: "c1", defectKind: "custom" },
         };
-        await expect(webMediaStore.put(rec)).rejects.toThrow("defect");
-        expect(await webMediaStore.get("defect-1")).toBeNull();
+        await webMediaStore.put(rec);
+        const read = await webMediaStore.get("defect-1");
+        expect(read).toMatchObject({ kind: "photo", meta: { targetType: "defect", findingKey: FK, itemId: "i1", customId: "c1", defectKind: "custom" } });
+        // The row itself carries the addressing — the drain (and a restart
+        // reload) reads it from here, not from the doc.
+        const row = await rawGet("defect-1");
+        expect(row).toMatchObject({ defectKind: "custom", defectId: "c1" });
+    });
+
+    it("a photo row with only half its defect addressing loads as an item photo", async () => {
+        await rawPut({ pendingId: "half-defect", inspectionId: "insp-9", findingKey: FK, kind: "photo", blob: new Blob(["p"]), defectKind: "canned", enqueuedAt: 5 });
+        const rec = await webMediaStore.get("half-defect");
+        expect(rec).toMatchObject({ kind: "photo", meta: { targetType: "item", findingKey: FK, itemId: "i1" } });
     });
 
     it("objectUrl is null for an absent record", async () => {
@@ -267,19 +281,18 @@ describe("web media store: put refuses a photo the server would permanently refu
         expect(await webMediaStore.get("big-2")).not.toBeNull();
     });
 
-    it("the admission check runs before the record is converted: a refused defect photo is reported by its specific reason, and a valid one still hits the conversion error", async () => {
+    it("the admission check runs before the record is converted: a refused defect photo is reported by its specific reason, and a valid one is stored", async () => {
         const defectRec = (id: string, blob: Blob): PendingMediaRecord => ({
             kind: "photo", pendingId: id, inspectionId: "insp-v", createdAt: 1, blob,
             meta: { targetType: "defect", findingKey: FK, itemId: "i1", customId: "c1", defectKind: "custom" },
         });
-        // Conversion would throw a non-coded error for any defect photo; the over-limit and non-image ones must win with their code.
+        // The over-limit and non-image ones must win with their code.
         expect((await rejection(defectRec("d-big", new Blob([JPEG_HEAD, new Uint8Array(MAX_PHOTO_BYTES)]))))?.code).toBe("TOO_LARGE");
         expect((await rejection(defectRec("d-txt", new Blob([TEXT_BYTES]))))?.code).toBe("UNSUPPORTED_TYPE");
-        // CONTROL: an admissible defect photo reaches the conversion and fails there without a reason code.
-        const converted = await rejection(defectRec("d-ok", new Blob([JPEG_HEAD])));
-        expect(converted).toBeInstanceOf(Error);
-        expect(converted?.code).toBeUndefined();
-        expect(await webMediaStore.list("insp-v")).toEqual([]);
+        // CONTROL: an admissible defect photo is stored with its addressing (#475).
+        expect(await rejection(defectRec("d-ok", new Blob([JPEG_HEAD])))).toBeNull();
+        expect(await webMediaStore.get("d-ok")).toMatchObject({ kind: "photo", meta: { targetType: "defect", customId: "c1", defectKind: "custom" } });
+        expect(await webMediaStore.list("insp-v")).toHaveLength(1);
     });
 
     it("the web store applies the SERVER's rules: the same ceiling and the same sniffer (executable coupling)", async () => {
@@ -307,5 +320,26 @@ describe("web media store: put refuses a photo the server would permanently refu
         expect(entries).toHaveLength(2);
         expect(await webMediaStore.list("insp-b")).toHaveLength(2);
         expect(offlinePhotoRejectionMessages(result, files.length).length).toBe(3); // summary + one sentence per reason
+    });
+
+    it("an offline defect batch through the real store: queued with its addressing, on the defect row (#475)", async () => {
+        const doc = new Y.Doc();
+        seedResultsDoc(doc, [{ findingKey: FK }]);
+        upsertCanned(doc, FK, "defects", { cannedId: "c1", included: true });
+        const file = new File([JPEG_HEAD, "a"], "ok.jpg", { type: "image/jpeg" });
+        const result = await addOfflinePhotos(webMediaStore, doc, {
+            inspectionId: "insp-d", findingKey: FK, itemId: "i1", source: "library",
+            defectTarget: { kind: "canned", id: "c1" }, sectionId: "s1",
+        }, [file]);
+        expect(result).toEqual({ rejected: 0, reasons: {} });
+        // The stored record carries the defect addressing, so the drain (and
+        // a restart reload) can resolve the key into the defect row.
+        const stored = await webMediaStore.list("insp-d");
+        expect(stored).toHaveLength(1);
+        expect(stored[0]).toMatchObject({ kind: "photo", meta: { targetType: "defect", findingKey: FK, itemId: "i1", customId: "c1", defectKind: "canned" } });
+        // The pending entry is on the defect row, not the item's photos.
+        const defects = (projectResults(doc)[FK]?.tabs as { defects?: Array<{ cannedId: string; photos?: unknown[] }> } | undefined)?.defects ?? [];
+        expect(defects.find((d) => d.cannedId === "c1")?.photos).toHaveLength(1);
+        expect((projectResults(doc)[FK]?.photos ?? []) as unknown[]).toHaveLength(0);
     });
 });

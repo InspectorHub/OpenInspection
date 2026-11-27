@@ -51,6 +51,16 @@ export interface StoredPendingMedia {
     crop?: unknown;
     /** annotate: the serialized Konva node tree. */
     nodesJson?: string;
+    /**
+     * photo: the defect this photo is pinned to — absent = an item photo.
+     * #475 — added as optional fields, so rows written before this change
+     * (neither field) still load as item photos: no version bump, no
+     * migration. Both must be present for the row to address a defect;
+     * `fromStored` falls back to an item photo when either is missing.
+     */
+    defectKind?: "canned" | "custom";
+    /** photo: the canned `cannedId` or custom `id` of that defect. */
+    defectId?: string;
     /** ms epoch. */
     enqueuedAt: number;
 }
@@ -77,9 +87,14 @@ export function toStored(rec: PendingMediaRecord): StoredPendingMedia {
         enqueuedAt: rec.createdAt,
     };
     if (rec.kind === "photo") {
-        // The stored shape has no defect addressing; refuse rather than silently
-        // attach a defect photo to its item.
-        if (rec.meta.targetType === "defect") throw new Error("web media store cannot queue a defect photo");
+        // #475 — a defect photo stores its addressing on the row (see the
+        // optional fields on StoredPendingMedia). Refusing it here was the
+        // old behaviour: it made every offline defect photo vanish with
+        // "could not be added" even though the queue, the pending doc entry
+        // and the drain all knew the defect.
+        if (rec.meta.targetType === "defect") {
+            return { ...base, kind: "photo", defectKind: rec.meta.defectKind, defectId: rec.meta.customId };
+        }
         return { ...base, kind: "photo" };
     }
     if (rec.kind === "crop") {
@@ -103,6 +118,14 @@ export function fromStored(row: StoredPendingMedia): PendingMediaRecord {
     const itemId = itemIdFromFindingKey(row.findingKey);
     const sectionId = sectionIdFromFindingKey(row.findingKey);
     if (row.kind === "photo") {
+        // #475 — a defect photo round-trips its addressing: the drain (and a
+        // restart reload) needs targetType + customId + defectKind to swap
+        // the uploaded key into the defect's photos array. Either field
+        // missing means a row from before this change, or a half-written
+        // one: it loads as an item photo rather than addressing nowhere.
+        if (row.defectKind && row.defectId) {
+            return { ...common, kind: "photo", meta: { targetType: "defect", findingKey: row.findingKey, itemId, customId: row.defectId, defectKind: row.defectKind } };
+        }
         return { ...common, kind: "photo", meta: { targetType: "item", findingKey: row.findingKey, itemId } };
     }
     const derivative = {

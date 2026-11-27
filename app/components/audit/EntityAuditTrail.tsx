@@ -18,6 +18,26 @@ export interface AuditEntry {
 }
 
 function actionLabel(action: string): string {
+  // #528 — inspection-family events carry their own meaning; the generic
+  // create/update/delete suffixes would render a publish as "Changed".
+  // These keys mirror the live audit registry entries
+  // (server/lib/audit-registry.ts); anything unlisted falls through below.
+  switch (action) {
+    case "inspection.published":
+      return m.audit_action_inspection_published();
+    case "inspection.report_retracted":
+      return m.audit_action_inspection_report_retracted();
+    case "inspection.send_pdf":
+      return m.audit_action_inspection_send_pdf();
+    case "inspection.send_sms":
+      return m.audit_action_inspection_send_sms();
+    case "inspection.order_updated":
+      return m.audit_action_inspection_order_updated();
+    case "inspection.complete":
+      return m.audit_action_inspection_complete();
+    default:
+      break;
+  }
   if (action.endsWith(".create") || action.endsWith(".created")) return m.audit_action_created();
   if (action.endsWith(".update") || action.endsWith(".updated")) return m.audit_action_updated();
   if (action.endsWith(".delete") || action.endsWith(".deleted")) return m.audit_action_deleted();

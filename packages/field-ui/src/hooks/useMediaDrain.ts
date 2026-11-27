@@ -16,6 +16,7 @@ import type * as Y from 'yjs';
 import { drainMediaQueue, PermanentUploadError } from '../collab/media-upload-queue';
 import type { MediaUploader as DrainUploader, UploadResult } from '../collab/media-upload-queue';
 import { clearPendingDerivative, dropPendingPhoto } from '../collab/pending-photo-drop';
+import { dropPendingDefectPhoto, resolvePendingDefectPhoto } from '../collab/defect-photo-binding';
 import { resolvePendingPhoto } from '../collab/results-binding';
 import { useFieldDataSource } from '../context';
 import { onlinePhotoRejectionMessages } from '../editor/photo-rejection-messages';
@@ -66,14 +67,29 @@ export function useMediaDrain(
             uploader: asDrainUploader(dataSource.media.uploader(inspectionId, liveDoc)),
             onUploaded: (rec, result) => {
                 // Swap the pending doc entry to the real key + clear pending fields.
-                resolvePendingPhoto(
-                    liveDoc,
-                    rec.meta.findingKey,
-                    rec.pendingId,
-                    rec.kind,
-                    rec.kind === 'photo' ? undefined : rec.meta.photoKey,
-                    result,
-                );
+                // #475 — a defect-targeted photo swaps into the DEFECT's
+                // photos array, not the item's; the queue record's meta says
+                // which one.
+                if (rec.kind === 'photo' && rec.meta.targetType === 'defect') {
+                    if (result.key) {
+                        resolvePendingDefectPhoto(
+                            liveDoc,
+                            rec.meta.findingKey,
+                            { kind: rec.meta.defectKind, id: rec.meta.customId },
+                            rec.pendingId,
+                            result.key,
+                        );
+                    }
+                } else {
+                    resolvePendingPhoto(
+                        liveDoc,
+                        rec.meta.findingKey,
+                        rec.pendingId,
+                        rec.kind,
+                        rec.kind === 'photo' ? undefined : rec.meta.photoKey,
+                        result,
+                    );
+                }
                 revokeRef.current?.(rec.pendingId);
                 if (rec.kind === 'photo') outcomes.push({ index: outcomes.length, ok: true });
             },
@@ -85,7 +101,17 @@ export function useMediaDrain(
                 // below cannot hide it.
                 if (rec.kind === 'photo') {
                     outcomes.push({ index: outcomes.length, ok: false, error: reason });
-                    dropPendingPhoto(liveDoc, rec.meta.findingKey, rec.pendingId);
+                    // #475 — drop the pending entry from the array it lives in.
+                    if (rec.meta.targetType === 'defect') {
+                        dropPendingDefectPhoto(
+                            liveDoc,
+                            rec.meta.findingKey,
+                            { kind: rec.meta.defectKind, id: rec.meta.customId },
+                            rec.pendingId,
+                        );
+                    } else {
+                        dropPendingPhoto(liveDoc, rec.meta.findingKey, rec.pendingId);
+                    }
                 } else {
                     clearPendingDerivative(liveDoc, rec.meta.findingKey, rec.meta.photoKey, rec.pendingId);
                 }

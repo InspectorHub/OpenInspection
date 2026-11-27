@@ -11,6 +11,7 @@ describe("SaveStatusIndicator", () => {
   it.each([
     ["saving", () => m.editor_header_save_saving(), "text-ih-watch-fg"],
     ["saved", () => m.editor_header_save_saved(), "text-ih-ok-fg"],
+    ["saved-local", () => m.editor_header_save_saved_local(), "text-ih-watch-fg"],
     ["error", () => m.editor_header_save_error(), "text-ih-bad-fg"],
   ] as const)("%s shows its words in its own tone", (status, text, tone) => {
     render(<SaveStatusIndicator status={status} />);
@@ -19,7 +20,7 @@ describe("SaveStatusIndicator", () => {
     expect(el.className).toContain(tone);
   });
 
-  it.each(["saving", "saved", "error"] as const)("%s is announced politely to a screen reader", (status) => {
+  it.each(["saving", "saved", "saved-local", "error"] as const)("%s is announced politely to a screen reader", (status) => {
     render(<SaveStatusIndicator status={status} />);
     const el = screen.getByTestId("save-status");
     expect(el.getAttribute("role")).toBe("status");

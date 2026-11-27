@@ -10,8 +10,10 @@
  */
 
 import type * as Y from 'yjs';
-import type { PendingMediaStore, PhotoSource } from '../media-types';
+import type { PendingMediaStore, PhotoSource, PhotoUploadMeta } from '../media-types';
+import { parseFindingKey } from '../shared/finding-key';
 import { enqueueMedia } from './media-upload-queue';
+import { appendPendingPhotoToDefect } from './defect-photo-binding';
 import { appendPendingPhoto } from './results-binding';
 
 export interface OfflinePhotoTarget {
@@ -19,6 +21,17 @@ export interface OfflinePhotoTarget {
     findingKey:   string;
     itemId:       string;
     source:       PhotoSource;
+    /**
+     * #475 — set when the photo is pinned to a defect row instead of the
+     * item. The queue record then carries `targetType: 'defect'` (with
+     * `customId` / `defectKind`) so the drain swaps the real key into the
+     * defect's photos array, and the pending doc entry lands on that row
+     * instead of the item's. Absent = an item photo, the original shape.
+     * `sectionId` is required with it: the defect append delegates to the
+     * section/item add helpers.
+     */
+    defectTarget?: { kind: 'canned' | 'custom'; id: string };
+    sectionId?: string;
 }
 
 type OfflinePhotoRejectionReason = 'unsupportedType' | 'tooLarge';
@@ -55,20 +68,30 @@ export async function addOfflinePhotos(
 ): Promise<OfflinePhotoBatchResult> {
     let rejected = 0;
     const reasons: OfflinePhotoBatchResult['reasons'] = {};
+    const { defectTarget, sectionId } = target;
+    const unitId = parseFindingKey(target.findingKey).unitId;
+    const unit = unitId === '_default' ? null : unitId;
     for (const blob of files) {
         const pendingId = crypto.randomUUID();
         let stored = false;
         try {
+            const meta: PhotoUploadMeta = defectTarget
+                ? { targetType: 'defect', findingKey: target.findingKey, itemId: target.itemId, source: target.source, customId: defectTarget.id, defectKind: defectTarget.kind }
+                : { targetType: 'item', findingKey: target.findingKey, itemId: target.itemId, source: target.source };
             await enqueueMedia(store, {
                 pendingId,
                 inspectionId: target.inspectionId,
                 kind: 'photo',
                 blob,
-                meta: { targetType: 'item', findingKey: target.findingKey, itemId: target.itemId, source: target.source },
+                meta,
                 createdAt: Date.now(),
             });
             stored = true;
-            appendPendingPhoto(doc, target.findingKey, pendingId);
+            if (defectTarget && sectionId) {
+                appendPendingPhotoToDefect(doc, sectionId, target.itemId, defectTarget, pendingId, unit);
+            } else {
+                appendPendingPhoto(doc, target.findingKey, pendingId);
+            }
         } catch (error) {
             rejected += 1;
             // Only the store's own refusal carries a code the editor may explain; a failure while appending is unknown.

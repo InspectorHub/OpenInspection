@@ -335,6 +335,9 @@ describe('collab-findings-api – save no-ops', () => {
         expect(() => api.debounceSave()).not.toThrow();
         expect(() => api.saveNow()).not.toThrow();
         expect(JSON.stringify(projectResults(doc))).toBe(before);
-        expect(setSaveStatus).toHaveBeenCalledWith('saved');
+        // #477 — a local-doc-only save reports 'saved-local', never 'saved':
+        // the server has not confirmed it yet.
+        expect(setSaveStatus).toHaveBeenCalledWith('saved-local');
+        expect(setSaveStatus).not.toHaveBeenCalledWith('saved');
     });
 });

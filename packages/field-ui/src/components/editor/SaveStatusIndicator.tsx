@@ -1,10 +1,15 @@
 import { m } from "../../i18n";
 
-export type SaveStatus = "idle" | "saving" | "saved" | "error";
+export type SaveStatus = "idle" | "saving" | "saved" | "saved-local" | "error";
 
 /**
  * The save indicator: Saving, Saved, or Save failed (nothing while idle). The desktop header and the phone and
  * tablet app bars show the same one, so a failed save is never visible in only some layouts.
+ *
+ * #477 — "Saved" is split in two. A write that reached the local Yjs doc but
+ * has not been confirmed by the server shows "Saved on this device" (amber:
+ * held here, not yet synced); only the collab sync step promotes it to
+ * "Saved". A write that never reached the server must never read as saved.
  */
 export function SaveStatusIndicator({ status, held = false }: { status: SaveStatus; held?: boolean }) {
  // The collab connection kept a stale offline copy it could not back up and is not syncing (lineage guard): said before any save state.
@@ -24,7 +29,7 @@ export function SaveStatusIndicator({ status, held = false }: { status: SaveStat
   role="status"
   aria-live="polite"
   className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 text-[11px] font-bold ${
-   status === "saving"
+   status === "saving" || status === "saved-local"
    ? "text-ih-watch-fg"
    : status === "saved"
    ? "text-ih-ok-fg"
@@ -35,6 +40,11 @@ export function SaveStatusIndicator({ status, held = false }: { status: SaveStat
    <>
    <span className="w-1.5 h-1.5 rounded-full bg-ih-watch animate-pulse" />
    {m.editor_header_save_saving()}
+   </>
+  ) : status === "saved-local" ? (
+   <>
+   <span className="w-1.5 h-1.5 rounded-full bg-ih-watch" />
+   {m.editor_header_save_saved_local()}
    </>
   ) : status === "saved" ? (
    <>

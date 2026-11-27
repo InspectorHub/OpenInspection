@@ -55,8 +55,10 @@ export function GateToggle({
 
     if (!canEdit) return null;
 
+    // #497 — the id is the publish modal's gate-state link target: the
+    // modal states a held gate and links here, to the control that writes it.
     return (
-        <div className="mt-4 pt-3 border-t border-ih-border">
+        <div id={testId} className="mt-4 pt-3 border-t border-ih-border">
             <label className="flex items-start gap-2 text-[12px] text-ih-fg-3 cursor-pointer">
                 <input
                     type="checkbox"

@@ -238,5 +238,13 @@
   "editor_savetpl_body_back": "Sobrescribe la plantilla de origen con la estructura actual de esta inspección. Las inspecciones futuras creadas a partir de ella adoptan el cambio; los informes ya publicados conservan su instantánea congelada.",
   "editor_savetpl_name_label": "Nombre de la plantilla",
   "editor_savetpl_name_placeholder": "Plantilla personalizada",
-  "editor_publish_notify_client": "Enviar los avisos de informe actualizado"
+  "editor_publish_notify_client": "Enviar los avisos de informe actualizado",
+  "editor_header_save_saved_local": "Guardado en este dispositivo",
+  "editor_offline_download": "Descargar para uso sin conexión",
+  "editor_offline_not_downloaded": "Esta inspección aún no está descargada para uso sin conexión. Descárguela antes de perder la señal: el informe y sus fotos se guardan en este dispositivo.",
+  "editor_offline_not_downloaded_offline": "Esta inspección no está descargada para uso sin conexión. Los cambios se guardan en este dispositivo, pero el informe y sus fotos podrían no abrirse sin señal.",
+  "editor_offline_downloading": "Descargando para uso sin conexión…",
+  "editor_offline_downloaded": "Descargada para uso sin conexión.",
+  "editor_offline_photos_cached": "{cached} de {total} fotos guardadas en este dispositivo.",
+  "editor_offline_download_failed": "La descarga no terminó. Revise su conexión e inténtelo de nuevo."
 }

@@ -36,3 +36,16 @@ test('shows an empty state when the entity has no recorded changes', async () =>
   fireEvent.click(screen.getByRole('button', { name: /history/i }));
   expect(await screen.findByText('No recorded changes yet.')).toBeTruthy();
 });
+
+// #528 — inspection-family events render their own label, not "Changed".
+test('inspection events render their own labels', async () => {
+  renderTrail([
+    { id: 'a3', action: 'inspection.send_pdf', actorId: 'u1', actorName: 'Ed Editor', createdAt: 1_700_000_300_000 },
+    { id: 'a2', action: 'inspection.published', actorId: 'u1', actorName: 'Ed Editor', createdAt: 1_700_000_200_000 },
+    { id: 'a1', action: 'inspection.order_updated', actorId: 'u1', actorName: 'Ed Editor', createdAt: 1_700_000_100_000 },
+  ]);
+  fireEvent.click(screen.getByRole('button', { name: /history/i }));
+  expect(await screen.findByText('Published')).toBeTruthy();
+  expect(screen.getByText('Report sent (PDF)')).toBeTruthy();
+  expect(screen.getByText('Order updated')).toBeTruthy();
+});

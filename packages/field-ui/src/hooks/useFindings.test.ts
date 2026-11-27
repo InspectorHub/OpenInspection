@@ -44,15 +44,58 @@ describe('useFindings (results, setResults, options)', () => {
     expect(b.result.current.getResult('i1')).toEqual({});
   });
 
-  it('before the doc connects, writes are inert and the save indicator settles', () => {
+  // #477 — before the doc connects, a write is QUEUED (not dropped) and the
+  // indicator reads "saving", never "saved": nothing has reached the server.
+  it('before the doc connects, writes queue and report saving, never saved', () => {
     const opts = options();
     const setResults = vi.fn();
     const { result } = renderHook(() => useFindings({}, setResults, opts));
     result.current.setRating('s1', 'i1', 'good');
     expect(setResults).not.toHaveBeenCalled();
+    expect(opts.setSaveStatus).toHaveBeenCalledWith('saving');
+    expect(opts.setSaveStatus).not.toHaveBeenCalledWith('saved');
     result.current.saveNow();
-    expect(opts.setSaveStatus).toHaveBeenCalledWith('saved');
+    expect(opts.setSaveStatus).not.toHaveBeenCalledWith('saved');
     expect(result.current.getPhotoCount('i1')).toBe(0);
+  });
+
+  // #477 — when the doc arrives, the queued write flushes into it.
+  it('flushes a pre-connect write into the doc once it connects', () => {
+    const doc = new Y.Doc();
+    const setSaveStatus = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ collab }: { collab?: { doc: Y.Doc } }) =>
+        useFindings({}, vi.fn(), {
+          sectionIdForItem: (itemId: string) => (itemId.startsWith('i') ? 's1' : null),
+          setDirty: vi.fn(),
+          setSaveStatus,
+          inspectionId: 'insp-1',
+          collab,
+        }),
+      { initialProps: { collab: undefined as { doc: Y.Doc } | undefined } },
+    );
+    result.current.setRating('s1', 'i1', 'good');
+    // commitNotes, not setNotes: setNotes is the optimistic keystroke echo
+    // and only commitNotes writes the doc (on blur in the editor).
+    result.current.commitNotes('s1', 'i1', 'Cracked flashing');
+    expect(readResultMap(doc)[findingKey(null, 's1', 'i1')]).toBeUndefined();
+    rerender({ collab: { doc } });
+    expect(readResultMap(doc)[findingKey(null, 's1', 'i1')]?.rating).toBe('good');
+    expect(readResultMap(doc)[findingKey(null, 's1', 'i1')]?.notes).toBe('Cracked flashing');
+    expect(setSaveStatus).toHaveBeenCalledWith('saved-local');
+    expect(setSaveStatus).not.toHaveBeenCalledWith('saved');
+  });
+
+  // #477 — with a live doc, a save flush reports "saved on this device":
+  // the write reached the local doc, and only the sync step may call it saved.
+  it('with a live doc, saveNow reports saved-local, never saved', () => {
+    const doc = new Y.Doc();
+    const opts = options({ collab: { doc } });
+    const { result } = renderHook(() => useFindings({}, vi.fn(), opts));
+    result.current.setRating('s1', 'i1', 'good');
+    result.current.saveNow();
+    expect(opts.setSaveStatus).toHaveBeenCalledWith('saved-local');
+    expect(opts.setSaveStatus).not.toHaveBeenCalledWith('saved');
   });
 
   it('before the doc connects, adding a video reports that it was NOT written', () => {

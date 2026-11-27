@@ -32,7 +32,7 @@ afterEach(cleanup);
 
 function renderModal(
     blockingCount: number,
-    opts: { isAmendment?: boolean; noticeChoice?: boolean; autoSign?: boolean; orderCompleted?: boolean } = {},
+    opts: { isAmendment?: boolean; noticeChoice?: boolean; autoSign?: boolean; orderCompleted?: boolean; paymentRequired?: boolean; agreementRequired?: boolean } = {},
 ) {
     const Stub = createRoutesStub([
         {
@@ -52,6 +52,8 @@ function renderModal(
                         // existing /publish/i selectors stay unambiguous.
                         orderCompleted={opts.orderCompleted ?? true}
                         blockingCount={blockingCount}
+                        paymentRequired={opts.paymentRequired ?? false}
+                        agreementRequired={opts.agreementRequired ?? false}
                         fetcher={fetcher as never}
                         submitting={false}
                         error={undefined}
@@ -194,6 +196,43 @@ describe("PublishReportModal — no notify switches (F79)", () => {
         expect(document.querySelector('input[name="requirePayment"]')).toBeNull();
         expect(screen.queryByRole("checkbox", { name: /signature/i })).toBeNull();
         expect(screen.queryByRole("checkbox", { name: /payment/i })).toBeNull();
+    });
+});
+
+/**
+ * #497 — the second half of the dead-toggle fix. #526 removed the toggles;
+ * this modal now STATES the actual gate state from the inspection row and
+ * links to the GateToggle that writes each gate. A sentence, never a
+ * control: there is nothing here to operate.
+ */
+describe("PublishReportModal — gate state (#497)", () => {
+    it("states a held payment gate and links to the Invoice card gate", async () => {
+        renderModal(0, { paymentRequired: true });
+        expect(await screen.findByTestId("publish-gate-state")).toBeTruthy();
+        expect(screen.getByText(/held until payment/i)).toBeTruthy();
+        const link = screen.getByRole("link", { name: /invoice card/i });
+        expect(link.getAttribute("href")).toBe("#hub-gate-payment");
+    });
+
+    it("states a held agreement gate and links to the Agreements card gate", async () => {
+        renderModal(0, { agreementRequired: true });
+        expect(await screen.findByTestId("publish-gate-state")).toBeTruthy();
+        expect(screen.getByText(/held until the agreement is signed/i)).toBeTruthy();
+        const link = screen.getByRole("link", { name: /agreements card/i });
+        expect(link.getAttribute("href")).toBe("#hub-gate-agreement");
+    });
+
+    it("says so plainly when no gate is set", async () => {
+        renderModal(0);
+        expect(await screen.findByTestId("publish-gate-state")).toBeTruthy();
+        expect(screen.getByText(/no delivery gates are set/i)).toBeTruthy();
+    });
+
+    it("states both gates when both hold", async () => {
+        renderModal(0, { paymentRequired: true, agreementRequired: true });
+        expect(await screen.findByTestId("publish-gate-state")).toBeTruthy();
+        expect(screen.getByText(/held until payment/i)).toBeTruthy();
+        expect(screen.getByText(/held until the agreement is signed/i)).toBeTruthy();
     });
 });
 

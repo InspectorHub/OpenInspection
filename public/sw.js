@@ -24,6 +24,10 @@
 //   { type: 'clear-user-cache' }                 purge USER_CACHE and forget the user (sign-out).
 //   { type: 'queue-changed' }                    register the background sync.
 //   { type: 'forget-inspection', id }            forget that inspection's cached reads, pages and photo files (after a delete).
+//   { type: 'download-inspection', id, urls }    #476 — fetch each URL now (while online) and store it in USER_CACHE
+//                                                stamped for this user, so the inspection opens offline. Replies
+//                                                { type: 'download-inspection-result', id, ok, cached, total }
+//                                                on event.ports[0] when one was supplied.
 
 const SW_VERSION   = 'v4-a1';
 const STATIC_CACHE = `openinspection-static-${SW_VERSION}`;
@@ -49,6 +53,13 @@ const PRECACHE_ASSETS = [
 const INSPECTION_READ = /^\/api\/inspections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\/results)?$/i;
 const INSPECTION_ID_ONLY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const INSPECTION_ID = /^\/api\/inspections\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+// #476 — the photo route the editor actually serves photos through
+// (`/api/inspections/<id>/photo?key=…`). The old PHOTO_FILE_PREFIX
+// (`/api/inspections/files/…`) names a route nothing serves any more, so
+// photos fetched while online were never cached and a downloaded inspection
+// opened offline with broken images. The UUID shape keeps the reserved
+// static segments out, exactly as INSPECTION_READ does.
+const PHOTO_ROUTE = /^\/api\/inspections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/photo$/i;
 const PHOTO_FILE_PREFIX = '/api/inspections/files/';
 const LOGOUT_PATHS = ['/logout', '/agent-logout'];
 
@@ -132,6 +143,49 @@ async function clearUserCache() {
   await caches.delete(USER_CACHE);
 }
 
+// #476 — store one response in USER_CACHE stamped for this user, addressed
+// by URL string (the download path has no fetch-event Request to pass).
+// Shares the stamping with putForUser: an entry without the marker is never
+// served, so a download that skipped it would look stored and open nothing.
+async function putUrlForUser(url, response, marker) {
+  const headers = new Headers(response.headers);
+  headers.set(USER_HEADER, marker);
+  const stamped = new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+  const cache = await caches.open(USER_CACHE);
+  await cache.put(url, stamped);
+}
+
+// #476 — deliberately download one inspection for offline use: fetch each
+// URL now, while online, and store it in USER_CACHE stamped for this user.
+// A URL that fails (or is not same-origin) is skipped and the rest still
+// land, so one bad photo never costs the whole inspection; the caller
+// reports `cached` out of `total`. With no known user nothing is stored
+// (fail closed, like every other USER_CACHE write).
+async function downloadInspection(urls) {
+  const marker = await readMarker();
+  const total = urls.length;
+  if (!marker) return { ok: false, cached: 0, total };
+  let cached = 0;
+  for (const raw of urls) {
+    try {
+      const url = new URL(raw, self.location.origin);
+      if (url.origin !== self.location.origin) continue;
+      const response = await fetch(url.href);
+      if (response.ok && response.status === 200) {
+        await putUrlForUser(url.href, response.clone(), marker);
+        cached++;
+      }
+    } catch {
+      // One URL failing must not stop the rest.
+    }
+  }
+  return { ok: true, cached, total };
+}
+
 // Record who is signed in. A different user (or nobody) means every USER_CACHE entry belongs to someone else.
 async function setUser(marker) {
   const next = typeof marker === 'string' && marker.length > 0 && marker.length <= 128 ? marker : null;
@@ -165,7 +219,7 @@ self.addEventListener('fetch', (event) => {
   if (sameOrigin && url.pathname.startsWith('/api/')) {
     // Photo files served from R2 via our API: keys are UUIDs and immutable, but who may read one is
     // not, so they are cached per user like everything else that depends on access.
-    if (url.pathname.startsWith(PHOTO_FILE_PREFIX) || INSPECTION_READ.test(url.pathname)) {
+    if (url.pathname.startsWith(PHOTO_FILE_PREFIX) || PHOTO_ROUTE.test(url.pathname) || INSPECTION_READ.test(url.pathname)) {
       event.respondWith(userCacheFirst(event, request));
     }
     return; // every other API call: network-only; offline editing is handled by the Yjs/IndexedDB layer
@@ -344,6 +398,23 @@ self.addEventListener('message', (event) => {
     // Like every message here it comes from a page this worker controls (same origin, through `controller.postMessage`).
     // The id is checked to be a whole inspection id, so a crafted one cannot match more than one inspection.
     if (typeof data.id === 'string' && INSPECTION_ID_ONLY.test(data.id)) event.waitUntil(forgetInspection(data.id));
+  } else if (data.type === 'download-inspection') {
+    // #476 — the page asked to download one inspection for offline use. The
+    // id is a whole inspection id and the URLs are capped, so a crafted
+    // message cannot make the worker fetch an unbounded list or another
+    // inspection's data; each URL is re-checked same-origin inside
+    // downloadInspection. The result goes back on the message port the page
+    // supplied (MessageChannel), so the page can show cached/not-cached.
+    if (typeof data.id === 'string' && INSPECTION_ID_ONLY.test(data.id) && Array.isArray(data.urls)) {
+      const urls = data.urls.filter((u) => typeof u === 'string').slice(0, 200);
+      event.waitUntil((async () => {
+        const result = await downloadInspection(urls);
+        const reply = { type: 'download-inspection-result', id: data.id, ...result };
+        try {
+          if (event.ports && event.ports[0]) event.ports[0].postMessage(reply);
+        } catch { /* the page went away; the cache still holds what landed */ }
+      })());
+    }
   }
 });
 

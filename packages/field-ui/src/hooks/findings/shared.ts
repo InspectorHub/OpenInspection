@@ -18,7 +18,7 @@ export type { AttachedRepairItem } from '../../shared/findings-shared';
 export interface FindingsOptions {
   sectionIdForItem: (itemId: string) => string | null;
   setDirty: (v: boolean) => void;
-  setSaveStatus: (s: "idle" | "saving" | "saved" | "error") => void;
+  setSaveStatus: (s: "idle" | "saving" | "saved" | "saved-local" | "error") => void;
   inspectionId: string;
   /** #181 — the editor routes every write through the Yjs doc (collab). */
   collab?: { doc: import("yjs").Doc };
