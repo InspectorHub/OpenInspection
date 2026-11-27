@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { reportActions } from '~/routes/inspector-portal';
+import { reportActions, shouldShowPublishGate } from '~/routes/inspector-portal';
+import type { PublishBlockingDefect } from '@core/field-ui/shared/types';
 
 const publishCaps = { publish: true, edit: true };
 const noCaps = { publish: false, edit: true };
@@ -48,5 +49,29 @@ describe('reportActions', () => {
 
   it('in_progress with neither publish nor report editing (office staff) → nothing to take', () => {
     expect(reportActions(officeCaps, 'in_progress')).toEqual([]);
+  });
+});
+
+describe('shouldShowPublishGate', () => {
+  // Review item 1 — the hub's Publish button runs the same readiness
+  // endpoint the editor calls, on demand, and shows the editor's
+  // PublishGateModal with the defect list instead of the publish dialog.
+  // The verdict mirrors the editor's handlePublishClick.
+  it('a failed check (null) falls through to the publish dialog', () => {
+    expect(shouldShowPublishGate(null)).toBe(false);
+  });
+
+  it('ready with no warnings → the publish dialog', () => {
+    expect(shouldShowPublishGate({ ready: true, blockingDefects: [], warningDefects: [] })).toBe(false);
+  });
+
+  it('ready with warnings → the gate (IA-7 "Publish anyway" path)', () => {
+    const warning: PublishBlockingDefect = { sectionId: 's', sectionTitle: 'Roof', itemId: 'i', itemLabel: 'Roof', cannedId: 'c', cannedTitle: 'Missing shingles', missing: ['location'], unresolvedTokens: [] };
+    expect(shouldShowPublishGate({ ready: true, blockingDefects: [], warningDefects: [warning] })).toBe(true);
+  });
+
+  it('not ready → the gate, even with no warnings', () => {
+    const blocking: PublishBlockingDefect = { sectionId: 's', sectionTitle: 'Roof', itemId: 'i', itemLabel: 'Roof', cannedId: 'c', cannedTitle: 'Missing shingles', missing: ['trade'], unresolvedTokens: [] };
+    expect(shouldShowPublishGate({ ready: false, blockingDefects: [blocking], warningDefects: [] })).toBe(true);
   });
 });

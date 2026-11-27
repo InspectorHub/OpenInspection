@@ -15,9 +15,11 @@
  *      left open, so the count informs and the decision stays theirs. A
  *      disabled publish button here would take that decision away.
  *
- * The count is all the hub has: its payload carries `{ ready, blockingCount }`
- * and not the defects themselves — those come from a separate endpoint the
- * editor calls. Listing them here would be a server change, not a copy change.
+ * The count is all THIS modal has: its payload carries `{ ready, blockingCount }`
+ * and not the defects themselves. The list lives one step earlier — the
+ * Publish button runs the readiness endpoint on demand and shows the editor's
+ * PublishGateModal with the defects before this modal ever opens — so this
+ * modal still shows the count, and the gate shows the list.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";

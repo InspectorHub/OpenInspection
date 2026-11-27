@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLoaderData, Link, useRouteError, useFetcher, useNavigate, useRevalidator } from "react-router";
 import type { ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/inspector-portal";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
+import type { PublishReadiness } from "@core/field-ui/shared/types";
+import { PublishGateModal } from "@core/field-ui/components/editor/PublishGateModal";
 import { useCapability, useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import {
   deleteFacts,
@@ -36,6 +38,7 @@ import { StatutoryDeliverable } from "~/components/statutory/StatutoryDeliverabl
 import { SignaturePad } from "@core/field-ui/components/SignaturePad";
 import { RequestPaymentModal } from "~/components/inspector-portal/RequestPaymentModal";
 import { PublishReportModal } from "~/components/inspector-portal/PublishReportModal";
+import { createWebPublishReadiness } from "~/lib/field/web-publish-readiness";
 import { CreateReinspectionModal } from "~/components/inspector-portal/CreateReinspectionModal";
 import { PublishNotice } from "~/components/inspector-portal/PublishNotice";
 import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEditor";
@@ -624,6 +627,17 @@ export function reportActions(
   return caps.edit ? ['submit'] : [];
 }
 
+/**
+ * Publish pre-flight verdict (review item 1): whether the readiness the hub
+ * fetched on demand should open the gate modal instead of the publish dialog.
+ * Null — the check could not be made — falls through to publish, so a flaky
+ * pre-flight never blocks the act. The editor's handlePublishClick reads the
+ * same verdict.
+ */
+export function shouldShowPublishGate(readiness: PublishReadiness | null): boolean {
+  return readiness !== null && (!readiness.ready || (readiness.warningDefects?.length ?? 0) > 0);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page component                                                     */
 /* ------------------------------------------------------------------ */
@@ -731,6 +745,23 @@ export default function InspectionHubPage() {
   const agreementModal = useModalFetcher<typeof action>("send-agreement");
   const paymentModal = useModalFetcher<typeof action>("request-payment");
   const publishModal = useModalFetcher<typeof action>("publish");
+
+  // Publish pre-flight (review item 1): the hub used to show only a count of
+  // blocking defects — its payload carries { ready, blockingCount }. Before
+  // opening the publish dialog, ask the same readiness endpoint the editor
+  // calls, on demand; when defects block (or warn), show the editor's
+  // PublishGateModal with the list instead.
+  const [gateReadiness, setGateReadiness] = useState<PublishReadiness | null>(null);
+  const [gateOpen, setGateOpen] = useState(false);
+  const handlePublishClick = useCallback(async () => {
+    const readiness = await createWebPublishReadiness().check(inspection.id);
+    if (shouldShowPublishGate(readiness)) {
+      setGateReadiness(readiness);
+      setGateOpen(true);
+      return;
+    }
+    publishModal.setOpen(true);
+  }, [inspection.id, publishModal]);
 
   // IA-65 — signer management on the inspection. The send modal serializes its
   // signer rows into the action; the pre-sign modal is keyed by envelope id
@@ -1114,7 +1145,7 @@ export default function InspectionHubPage() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => publishModal.setOpen(true)}
+                    onClick={handlePublishClick}
                   >
                     {m.inspections_hub_report_publish()}
                   </Button>
@@ -1147,7 +1178,7 @@ export default function InspectionHubPage() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => publishModal.setOpen(true)}
+                    onClick={handlePublishClick}
                   >
                     {m.inspections_hub_report_publish()}
                   </Button>
@@ -1388,6 +1419,27 @@ export default function InspectionHubPage() {
         submitting={publishModal.busy}
         error={publishModal.error}
         onClose={() => publishModal.setOpen(false)}
+      />
+
+      {/* Publish pre-flight gate — the defect list the hub used to show only
+          as a count, in the editor's own PublishGateModal. onJump navigates
+          into the editor, where defects get fixed: the editor has no
+          per-defect deep link yet, so this lands on the editor for the
+          inspection and the list names section › item › defect. onProceed is
+          the IA-7 warning path ("Publish anyway") — it opens the publish
+          dialog with the soft gaps acknowledged. */}
+      <PublishGateModal
+        open={gateOpen}
+        readiness={gateReadiness}
+        onClose={() => setGateOpen(false)}
+        onProceed={() => {
+          setGateOpen(false);
+          publishModal.setOpen(true);
+        }}
+        onJump={() => {
+          setGateOpen(false);
+          navigate(`/inspections/${inspection.id}/edit`);
+        }}
       />
 
       {/* Send-report modal — shared Modal primitive (no window.confirm). Only
