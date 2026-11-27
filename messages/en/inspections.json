@@ -393,5 +393,11 @@
   "inspections_hub_retract_cancel": "Keep it published",
   "inspections_hub_retract_confirm": "Retract and expire links",
   "inspections_hub_reports_unpublished_edits": "Unpublished edits",
-  "inspections_hub_history_title": "Inspection history"
+  "inspections_hub_history_title": "Inspection history",
+  "hub_publish_gate_heading": "Delivery gates",
+  "hub_publish_gate_held_payment": "Report is held until payment.",
+  "hub_publish_gate_change_payment": "Change it on the Invoice card",
+  "hub_publish_gate_held_agreement": "Report is held until the agreement is signed.",
+  "hub_publish_gate_change_agreement": "Change it on the Agreements card",
+  "hub_publish_gate_none": "No delivery gates are set — the client can open the report as soon as it is published."
 }

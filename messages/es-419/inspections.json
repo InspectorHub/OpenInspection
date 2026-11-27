@@ -393,5 +393,11 @@
   "inspections_hub_retract_cancel": "Mantener publicado",
   "inspections_hub_retract_confirm": "Retirar y vencer enlaces",
   "inspections_hub_reports_unpublished_edits": "Cambios sin publicar",
-  "inspections_hub_history_title": "Historial de la inspección"
+  "inspections_hub_history_title": "Historial de la inspección",
+  "hub_publish_gate_heading": "Puertas de entrega",
+  "hub_publish_gate_held_payment": "El informe queda retenido hasta el pago.",
+  "hub_publish_gate_change_payment": "Cambiarlo en la tarjeta de factura",
+  "hub_publish_gate_held_agreement": "El informe queda retenido hasta la firma del acuerdo.",
+  "hub_publish_gate_change_agreement": "Cambiarlo en la tarjeta de acuerdos",
+  "hub_publish_gate_none": "No hay puertas de entrega: el cliente podrá abrir el informe en cuanto se publique."
 }

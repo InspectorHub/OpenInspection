@@ -1500,6 +1500,8 @@ export default function InspectionHubPage() {
         autoSign={inspection.autoSignOnPublish ?? false}
         orderCompleted={inspection.status === INSPECTION_STATUS.COMPLETED}
         blockingCount={hub.publishReadiness.blockingCount}
+        paymentRequired={inspection.paymentRequired}
+        agreementRequired={inspection.agreementRequired}
         fetcher={publishModal.fetcher}
         submitting={publishModal.busy}
         error={publishModal.error}
