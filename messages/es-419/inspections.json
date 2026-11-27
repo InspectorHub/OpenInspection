@@ -392,5 +392,6 @@
   "inspections_hub_retract_body": "Esto retira el informe de sus clientes y vence todos los enlaces que recibieron. Para cambiar el informe mientras los clientes siguen viendo la última versión publicada, abra el editor y elija Editar y volver a publicar.",
   "inspections_hub_retract_cancel": "Mantener publicado",
   "inspections_hub_retract_confirm": "Retirar y vencer enlaces",
-  "inspections_hub_reports_unpublished_edits": "Cambios sin publicar"
+  "inspections_hub_reports_unpublished_edits": "Cambios sin publicar",
+  "inspections_hub_history_title": "Historial de la inspección"
 }

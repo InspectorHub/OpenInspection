@@ -270,5 +270,11 @@
   "outbound_verify_body": "Your company is new, so we check once before each client email goes out on our shared sender. It only takes a moment.",
   "outbound_verify_cancel": "Cancel",
   "outbound_verify_load_failed": "The check could not load. Check your connection and try again.",
-  "command_palette_settings_offline_packages": "Settings - Import offline package"
+  "command_palette_settings_offline_packages": "Settings - Import offline package",
+  "audit_action_inspection_published": "Published",
+  "audit_action_inspection_report_retracted": "Report retracted",
+  "audit_action_inspection_send_pdf": "Report sent (PDF)",
+  "audit_action_inspection_send_sms": "Report sent (SMS)",
+  "audit_action_inspection_order_updated": "Order updated",
+  "audit_action_inspection_complete": "Inspection completed"
 }

@@ -392,5 +392,6 @@
   "inspections_hub_retract_body": "This withdraws the report from your clients and expires every link they were sent. To change the report while clients keep seeing the last published version, open the editor and choose Edit and republish instead.",
   "inspections_hub_retract_cancel": "Keep it published",
   "inspections_hub_retract_confirm": "Retract and expire links",
-  "inspections_hub_reports_unpublished_edits": "Unpublished edits"
+  "inspections_hub_reports_unpublished_edits": "Unpublished edits",
+  "inspections_hub_history_title": "Inspection history"
 }

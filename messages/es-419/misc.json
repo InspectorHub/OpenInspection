@@ -270,5 +270,11 @@
   "outbound_verify_body": "Su empresa es nueva, así que verificamos una vez antes de cada correo a clientes desde nuestro remitente compartido. Solo toma un momento.",
   "outbound_verify_cancel": "Cancelar",
   "outbound_verify_load_failed": "No se pudo cargar la verificación. Revise su conexión e inténtelo de nuevo.",
-  "command_palette_settings_offline_packages": "Configuración - Importar paquete sin conexión"
+  "command_palette_settings_offline_packages": "Configuración - Importar paquete sin conexión",
+  "audit_action_inspection_published": "Publicado",
+  "audit_action_inspection_report_retracted": "Informe retirado",
+  "audit_action_inspection_send_pdf": "Informe enviado (PDF)",
+  "audit_action_inspection_send_sms": "Informe enviado (SMS)",
+  "audit_action_inspection_order_updated": "Pedido actualizado",
+  "audit_action_inspection_complete": "Inspección completada"
 }
