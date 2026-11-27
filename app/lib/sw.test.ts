@@ -99,7 +99,7 @@ function makeHarness(opts: { network?: (req: { url: string }) => Promise<Respons
         },
         get: (p: string, mode = 'cors') => dispatch('fetch', { request: { method: 'GET', url: ORIGIN + p, mode } }),
         send: (method: string, p: string) => dispatch('fetch', { request: { method, url: ORIGIN + p, mode: 'cors' } }),
-        message: (data: unknown) => dispatch('message', { data }),
+        message: (data: unknown, ports?: unknown[]) => dispatch('message', { data, ports }),
         activate: () => dispatch('activate', {}),
         install: () => dispatch('install', {}),
         names: () => [...store.keys()],
@@ -491,5 +491,72 @@ describe('sw.js: forget-inspection message (the page deletes through a route act
             { type: 'something-else', id: ID },
         ]) await h.message(msg);
         expect(h.allUserPaths()).toHaveLength(before);
+    });
+});
+
+describe('sw.js: download for offline (#476)', () => {
+    const PHOTO = `/api/inspections/${ID}/photo?key=tenant%2Fphoto-1.jpg`;
+    const URLS = [`/inspections/${ID}/edit`, `/api/inspections/${ID}`, `/api/inspections/${ID}/results`, PHOTO];
+
+    function port() {
+        const posted: unknown[] = [];
+        return { posted, port: { postMessage: (msg: unknown) => { posted.push(msg); } } };
+    }
+
+    it('caches the photo route per user, like the inspection read', async () => {
+        const h = makeHarness();
+        await h.message({ type: 'set-user', marker: 'user-a' });
+        expect((await h.get(PHOTO)).responded).toBe(true);
+        // allUserPaths reports pathnames only; the photo entry differs from
+        // the inspection read by its query, which the pathname drops.
+        expect(h.allUserPaths()).toContain(`/api/inspections/${ID}/photo`);
+        await h.message({ type: 'set-user', marker: 'user-b' });
+        expect(h.allUserPaths()).toEqual([]);
+    });
+
+    it('stores the editor page, payloads and photos, and replies with the counts on the port', async () => {
+        const h = makeHarness();
+        await h.message({ type: 'set-user', marker: 'user-a' });
+        const p = port();
+        await h.message({ type: 'download-inspection', id: ID, urls: URLS }, [p.port]);
+        expect(p.posted).toEqual([{ type: 'download-inspection-result', id: ID, ok: true, cached: 4, total: 4 }]);
+        expect(h.allUserPaths().sort()).toEqual(URLS.map((u) => new URL(u, ORIGIN).pathname).sort());
+    });
+
+    it('stores nothing while no user is known, and still replies ok:false', async () => {
+        const h = makeHarness();
+        const p = port();
+        await h.message({ type: 'download-inspection', id: ID, urls: URLS }, [p.port]);
+        expect(p.posted).toEqual([{ type: 'download-inspection-result', id: ID, ok: false, cached: 0, total: 4 }]);
+        expect(h.allUserPaths()).toEqual([]);
+    });
+
+    it('skips a failing URL and still stores the rest', async () => {
+        const h = makeHarness();
+        await h.message({ type: 'set-user', marker: 'user-a' });
+        // The worker fetches by URL string, not by { url } — read both shapes.
+        h.setNetwork(async (req: string | { url: string }) => {
+            const url = typeof req === 'string' ? req : req.url;
+            if (url.includes('/results')) throw new Error('offline');
+            return new Response('ok', { status: 200 });
+        });
+        const p = port();
+        await h.message({ type: 'download-inspection', id: ID, urls: URLS }, [p.port]);
+        expect(p.posted).toEqual([{ type: 'download-inspection-result', id: ID, ok: true, cached: 3, total: 4 }]);
+        expect(h.allUserPaths()).toHaveLength(3);
+    });
+
+    it('CONTROL - a malformed id, a non-array urls, or another inspection id stores nothing', async () => {
+        const h = makeHarness();
+        await h.message({ type: 'set-user', marker: 'user-a' });
+        const p = port();
+        for (const msg of [
+            { type: 'download-inspection', id: 'not-a-uuid', urls: URLS },
+            { type: 'download-inspection', id: ID, urls: 'nope' },
+            { type: 'download-inspection', id: ID },
+            { type: 'download-inspection', id: 42, urls: URLS },
+        ]) await h.message(msg, [p.port]);
+        expect(p.posted).toEqual([]);
+        expect(h.allUserPaths()).toEqual([]);
     });
 });

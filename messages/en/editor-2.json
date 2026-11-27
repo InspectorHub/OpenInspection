@@ -239,5 +239,12 @@
   "editor_savetpl_name_label": "Template name",
   "editor_savetpl_name_placeholder": "Custom Template",
   "editor_publish_notify_client": "Send the report-updated notices",
-  "editor_header_save_saved_local": "Saved on this device"
+  "editor_header_save_saved_local": "Saved on this device",
+  "editor_offline_download": "Download for offline use",
+  "editor_offline_not_downloaded": "This inspection isn't downloaded for offline use yet. Download it before you lose signal — the report and its photos are stored on this device.",
+  "editor_offline_not_downloaded_offline": "This inspection isn't downloaded for offline use. Changes are stored on this device, but the report and its photos may not open without signal.",
+  "editor_offline_downloading": "Downloading for offline use…",
+  "editor_offline_downloaded": "Downloaded for offline use.",
+  "editor_offline_photos_cached": "{cached} of {total} photos stored on this device.",
+  "editor_offline_download_failed": "The download didn't finish. Check your connection and try again."
 }

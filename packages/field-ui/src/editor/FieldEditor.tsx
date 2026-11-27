@@ -29,6 +29,7 @@ import { usePresence } from "../hooks/usePresence";
 import { useResultsDoc } from "../collab/use-results-doc";
 import { useMediaDrain } from "../hooks/useMediaDrain";
 import { addOfflinePhotos } from "../collab/offline-photo-batch";
+import { collectPhotoKeys, coreOfflineUrls, downloadForOffline, offlineCopyStatus, type OfflineCopyStatus } from "../offline/download-for-offline";
 import { offlinePhotoRejectionMessages, onlinePhotoRejectionMessages } from "./photo-rejection-messages";
 import { useResultsProjection } from "../hooks/useResultsProjection";
 import { useSpeedRating } from "../hooks/useSpeedRating";
@@ -655,10 +656,87 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
     <div className="mb-4"><RevisionBanner status={data.revisionStatus}
       inspectionDate={String(state.inspection.date ?? "").slice(0, 10)} /></div>
   ) : null;
+  // #476 — "Download for offline use". The service worker only caches what
+  // the device has already fetched, so an inspection opened for the first
+  // time in a dead zone opens nothing. This banner states the cached state
+  // (checked against the worker's per-user cache) and, while online, offers
+  // one tap to fetch the editor page + loader payload + photos now. The
+  // check re-runs when the photo count changes and when the device comes
+  // back online; while offline with no cached copy it says so, without a
+  // button that could not work.
+  const inspectionIdForOffline = String(state.inspection.id);
+  const offlinePhotoKeys = useMemo(() => collectPhotoKeys(state.results), [state.results]);
+  const offlinePhotoUrls = useMemo(
+    () => offlinePhotoKeys.map((key) => dataSource.urls.photo(inspectionIdForOffline, key)),
+    [dataSource, inspectionIdForOffline, offlinePhotoKeys],
+  );
+  const offlinePhotoUrlsRef = useRef(offlinePhotoUrls);
+  offlinePhotoUrlsRef.current = offlinePhotoUrls;
+  const [offlineStatus, setOfflineStatus] = useState<OfflineCopyStatus | null>(null);
+  const [offlineDownloading, setOfflineDownloading] = useState(false);
+  const [online, setOnline] = useState(() => dataSource.isOnline());
+  useEffect(() => dataSource.onOnlineChange((isOnline) => setOnline(isOnline)), [dataSource]);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const status = await offlineCopyStatus(inspectionIdForOffline, offlinePhotoUrlsRef.current);
+      if (alive) setOfflineStatus(status);
+    })();
+    return () => { alive = false; };
+  }, [inspectionIdForOffline, offlinePhotoKeys.length, online]);
+  const handleOfflineDownload = useCallback(async () => {
+    if (offlineDownloading) return;
+    setOfflineDownloading(true);
+    try {
+      const result = await downloadForOffline(inspectionIdForOffline, [
+        ...coreOfflineUrls(inspectionIdForOffline),
+        ...offlinePhotoUrlsRef.current,
+      ]);
+      const status = await offlineCopyStatus(inspectionIdForOffline, offlinePhotoUrlsRef.current);
+      setOfflineStatus(status);
+      if (!result.ok || result.cached !== result.total) {
+        notify(m.editor_offline_download_failed(), "error", { durationMs: 8000 });
+      }
+    } finally {
+      setOfflineDownloading(false);
+    }
+  }, [inspectionIdForOffline, offlineDownloading, notify]);
+  const offlineBannerEl = (() => {
+    if (!offlineStatus || !offlineStatus.supported) return null;
+    const fullyCached = offlineStatus.inspectionCached && offlineStatus.photosCached === offlineStatus.photosTotal;
+    if (fullyCached) {
+      return (
+        <div data-testid="offline-download-state" data-state="cached" className="mb-4 flex items-center gap-2 rounded-md border border-ih-border bg-ih-bg-muted px-3 py-2 text-[12px] text-ih-fg-2">
+          <svg className="w-3.5 h-3.5 shrink-0 text-ih-ok-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span>{m.editor_offline_downloaded()}</span>
+          {offlineStatus.photosTotal > 0 && (
+            <span className="text-ih-fg-3">{m.editor_offline_photos_cached({ cached: offlineStatus.photosCached, total: offlineStatus.photosTotal })}</span>
+          )}
+        </div>
+      );
+    }
+    return (
+      <div data-testid="offline-download-state" data-state={online ? "not-cached" : "not-cached-offline"} className="mb-4 flex flex-wrap items-center gap-2 rounded-md border border-ih-watch bg-ih-watch-bg px-3 py-2 text-[12px] text-ih-watch-fg">
+        <span className="flex-1 min-w-40">{online ? m.editor_offline_not_downloaded() : m.editor_offline_not_downloaded_offline()}</span>
+        {online && (
+          <button
+            type="button"
+            onClick={() => void handleOfflineDownload()}
+            disabled={offlineDownloading}
+            className="shrink-0 px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
+          >
+            {offlineDownloading ? m.editor_offline_downloading() : m.editor_offline_download()}
+          </button>
+        )}
+      </div>
+    );
+  })();
   // The host's publish-state banner (published / editing again / published elsewhere), ahead of the revision banner.
   const serverLocked = collab?.locked === true;
   useEffect(() => { if (serverLocked) onServerLocked(true); }, [serverLocked, onServerLocked]);
-  const topBannersEl = <>{slots.renderPublishBanner?.({ openPublish: () => void handlePublishClick(), locked: serverLocked })}{revisionBannerEl}</>;
+  const topBannersEl = <>{offlineBannerEl}{slots.renderPublishBanner?.({ openPublish: () => void handlePublishClick(), locked: serverLocked })}{revisionBannerEl}</>;
  const structure = useStructureEdit({
   inspectionId: String(state.inspection.id), rawSnapshot: data.templateSnapshot,
   collabEditing: fieldSession.collabEditing,
