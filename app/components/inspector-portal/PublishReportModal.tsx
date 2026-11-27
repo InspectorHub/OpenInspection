@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, type useFetcher } from "react-router";
 import { useHumanGatedSubmit } from "~/components/OutboundVerification";
 import { Modal, Button, Checkbox, Textarea } from "@core/shared-ui";
@@ -12,13 +13,13 @@ const FORM_ID = "ih-publish-report-form";
 
 export function PublishReportModal({
   open,
-  agreementRequired,
-  paymentRequired,
   isAmendment,
   noticeChoice = false,
   courtesyTranslationEnabled,
   courtesyTranslationLocale,
   clientPrefersTranslation,
+  autoSign,
+  orderCompleted,
   blockingCount,
   fetcher,
   submitting,
@@ -27,8 +28,6 @@ export function PublishReportModal({
   onPublishSubmit,
 }: {
   open: boolean;
-  agreementRequired: boolean;
-  paymentRequired: boolean;
   /** IA-40 — this publish creates versionNumber > 1; ask what changed. */
   isAmendment: boolean;
   /**
@@ -59,6 +58,19 @@ export function PublishReportModal({
    * product made on somebody's behalf.
    */
   clientPrefersTranslation: boolean;
+  /**
+   * #506 — whether the inspector signature is auto-applied on publish, the
+   * stored flag the box defaults from. Same choice the editor's PublishModal
+   * offers, in the same words (`editor_publish_autosign`); the action PATCHes
+   * it before publishing, so ticking here signs THIS publish.
+   */
+  autoSign: boolean;
+  /**
+   * #506 — whether the on-site work is already marked complete. When it is
+   * not, the footer offers "Mark complete and publish" beside "Publish
+   * report", mirroring the editor modal's two-button footer.
+   */
+  orderCompleted: boolean;
   /**
    * How many items the report-status gate still counts as unresolved.
    *
@@ -91,6 +103,15 @@ export function PublishReportModal({
   onPublishSubmit?: (choice: { offered: boolean; notified: boolean }) => void;
 }) {
   const gatedSubmit = useHumanGatedSubmit();
+  // #506 — which footer button submitted this form. React STATE, not the
+  // submitter's name/value: the human gate re-fires the submit with a bare
+  // requestSubmit(), so a submitter value would be lost on the real submit.
+  // State is safe where an imperative write was not: a click is a discrete
+  // event, so React flushes the update synchronously before the browser's
+  // default submit action runs — and the gate's macrotask before the re-fire
+  // leaves further margin. (A ref + onClick write was tried first and the
+  // probe showed the value never moved: the write raced the submit.)
+  const [markComplete, setMarkComplete] = useState(false);
   return (
     <Modal
       open={open}
@@ -101,9 +122,28 @@ export function PublishReportModal({
           <Button variant="ghost" size="sm" onClick={onClose}>
             {m.common_cancel()}
           </Button>
-          <Button variant="primary" size="sm" type="submit" form={FORM_ID} pending={submitting}>
+          <Button
+            variant="primary"
+            size="sm"
+            type="submit"
+            form={FORM_ID}
+            pending={submitting}
+            onClick={() => setMarkComplete(false)}
+          >
             {submitting ? m.hub_publish_pending() : m.hub_publish_submit()}
           </Button>
+          {!orderCompleted && (
+            <Button
+              variant="secondary"
+              size="sm"
+              type="submit"
+              form={FORM_ID}
+              pending={submitting}
+              onClick={() => setMarkComplete(true)}
+            >
+              {submitting ? m.hub_publish_pending() : m.editor_publish_mark_complete_and_publish()}
+            </Button>
+          )}
         </>
       }
     >
@@ -122,6 +162,7 @@ export function PublishReportModal({
         }}
       >
         <input type="hidden" name="intent" value="publish" />
+        <input type="hidden" name="markComplete" value={markComplete ? "true" : "false"} />
         {blockingCount > 0 && (
           <p className="rounded-md border border-ih-watch bg-ih-watch-bg px-3 py-2 text-[12px] text-ih-watch-fg">
             {m.hub_publish_unresolved({ count: blockingCount })}
@@ -169,15 +210,17 @@ export function PublishReportModal({
           </p>
         )}
 
+        {/* #506 — the signature/payment gate checkboxes are GONE. They posted
+            requireSignature/requirePayment, which the publish endpoint accepts
+            but never uses (the validation schema says so outright), so ticking
+            them changed nothing about what the client must do before viewing
+            — a dead control in the F79 shape. The gates are set by GateToggle
+            on the hub card beside the Publish button, which is the control
+            that actually writes them, with its own permission rule. */}
         <Checkbox
-          name="requireSignature"
-          label={m.hub_publish_require_signature()}
-          defaultChecked={agreementRequired}
-        />
-        <Checkbox
-          name="requirePayment"
-          label={m.hub_publish_require_payment()}
-          defaultChecked={paymentRequired}
+          name="autoSignOnPublish"
+          label={m.editor_publish_autosign()}
+          defaultChecked={autoSign}
         />
 
         {/* #23 — the per-publish opt-in. DEFAULT OFF, and it is a checkbox

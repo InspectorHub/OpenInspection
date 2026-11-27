@@ -32,7 +32,7 @@ afterEach(cleanup);
 
 function renderModal(
     blockingCount: number,
-    opts: { isAmendment?: boolean; noticeChoice?: boolean } = {},
+    opts: { isAmendment?: boolean; noticeChoice?: boolean; autoSign?: boolean; orderCompleted?: boolean } = {},
 ) {
     const Stub = createRoutesStub([
         {
@@ -42,18 +42,70 @@ function renderModal(
                 return (
                     <PublishReportModal
                         open
-                        agreementRequired={false}
-                        paymentRequired={false}
                         isAmendment={opts.isAmendment ?? false}
                         noticeChoice={opts.noticeChoice}
                         courtesyTranslationEnabled={false}
                         courtesyTranslationLocale="es-419"
                         clientPrefersTranslation={false}
+                        autoSign={opts.autoSign ?? false}
+                        // Completed by default: one publish button, so the
+                        // existing /publish/i selectors stay unambiguous.
+                        orderCompleted={opts.orderCompleted ?? true}
                         blockingCount={blockingCount}
                         fetcher={fetcher as never}
                         submitting={false}
                         error={undefined}
                         onClose={() => {}}
+                    />
+                );
+            },
+        },
+    ]);
+    render(<Stub initialEntries={["/"]} />);
+}
+
+type Fetcher = Parameters<typeof PublishReportModal>[0]["fetcher"];
+
+function makeCapturingFetcher(onSubmitted: (data: FormData) => void): Fetcher {
+    function Form({ onSubmit, ...rest }: FormHTMLAttributes<HTMLFormElement>) {
+        return (
+            <form
+                {...rest}
+                onSubmit={(e) => {
+                    onSubmit?.(e);
+                    if (!e.defaultPrevented) onSubmitted(new FormData(e.currentTarget));
+                    e.preventDefault();
+                }}
+            />
+        );
+    }
+    return { state: "idle", data: undefined, Form } as unknown as Fetcher;
+}
+
+function renderModalWithFetcher(
+    opts: { isAmendment?: boolean; noticeChoice?: boolean; autoSign?: boolean; orderCompleted?: boolean; onPublishSubmit?: (choice: { offered: boolean; notified: boolean }) => void },
+    onSubmitted: (data: FormData) => void,
+) {
+    const Stub = createRoutesStub([
+        {
+            path: "/",
+            Component() {
+                return (
+                    <PublishReportModal
+                        open
+                        isAmendment={opts.isAmendment ?? false}
+                        noticeChoice={opts.noticeChoice}
+                        courtesyTranslationEnabled={false}
+                        courtesyTranslationLocale="es-419"
+                        clientPrefersTranslation={false}
+                        autoSign={opts.autoSign ?? false}
+                        orderCompleted={opts.orderCompleted ?? true}
+                        blockingCount={0}
+                        fetcher={makeCapturingFetcher(onSubmitted)}
+                        submitting={false}
+                        error={undefined}
+                        onClose={() => {}}
+                        onPublishSubmit={opts.onPublishSubmit}
                     />
                 );
             },
@@ -99,9 +151,11 @@ describe("PublishReportModal unresolved-items notice", () => {
  * that decides it. That sentence is asserted here alongside the absence: a modal
  * that dropped the switches and said nothing would otherwise pass.
  *
- * The two remaining toggles are the positive control. They prove the harness
- * renders toggle rows at all, so "no notify checkbox" means absent rather than
- * unrendered.
+ * The auto-sign toggle is the positive control. It proves the harness renders
+ * toggle rows at all, so "no notify checkbox" means absent rather than
+ * unrendered. (The signature/payment gate toggles used to be that control;
+ * #506 removed them — they posted values the publish endpoint accepts but
+ * never uses, the same F79 shape, and the gates live in GateToggle instead.)
  */
 describe("PublishReportModal — no notify switches (F79)", () => {
     it("renders no notify-client / notify-agent control", async () => {
@@ -121,13 +175,25 @@ describe("PublishReportModal — no notify switches (F79)", () => {
         expect(link.getAttribute("href")).toBe("/settings/automations");
     });
 
-    // POSITIVE CONTROL: the gate toggles are still switches on this form, so the
-    // absence assertions above are about these two flags and not about a modal
-    // that renders no checkboxes at all.
-    it("still offers the two gates the server does honour", async () => {
+    // POSITIVE CONTROL: the auto-sign toggle is still a switch on this form,
+    // so the absence assertions above are about the notify flags and not
+    // about a modal that renders no checkboxes at all.
+    it("still offers the auto-sign toggle", async () => {
         renderModal(0);
-        expect(await screen.findByRole("checkbox", { name: /signature/i })).toBeTruthy();
-        expect(await screen.findByRole("checkbox", { name: /payment/i })).toBeTruthy();
+        expect(await screen.findByRole("checkbox", { name: /auto-sign/i })).toBeTruthy();
+    });
+
+    // #506 — the signature/payment gate toggles are gone: they posted
+    // requireSignature/requirePayment, which the publish endpoint accepts but
+    // never uses, so ticking them changed nothing about what the client must
+    // do before viewing. The gates are set by GateToggle on the hub card.
+    it("offers no signature/payment gate control", async () => {
+        renderModal(0);
+        expect(await screen.findByRole("button", { name: /publish/i })).toBeTruthy();
+        expect(document.querySelector('input[name="requireSignature"]')).toBeNull();
+        expect(document.querySelector('input[name="requirePayment"]')).toBeNull();
+        expect(screen.queryByRole("checkbox", { name: /signature/i })).toBeNull();
+        expect(screen.queryByRole("checkbox", { name: /payment/i })).toBeNull();
     });
 });
 
@@ -150,56 +216,6 @@ describe("PublishReportModal — no notify switches (F79)", () => {
  * the submit via `requestSubmit`, so the capture waits for the second event.
  */
 describe("PublishReportModal — republish notice choice (#484)", () => {
-    type Fetcher = Parameters<typeof PublishReportModal>[0]["fetcher"];
-
-    function makeCapturingFetcher(onSubmitted: (data: FormData) => void): Fetcher {
-        function Form({ onSubmit, ...rest }: FormHTMLAttributes<HTMLFormElement>) {
-            return (
-                <form
-                    {...rest}
-                    onSubmit={(e) => {
-                        onSubmit?.(e);
-                        if (!e.defaultPrevented) onSubmitted(new FormData(e.currentTarget));
-                        e.preventDefault();
-                    }}
-                />
-            );
-        }
-        return { state: "idle", data: undefined, Form } as unknown as Fetcher;
-    }
-
-    function renderModalWithFetcher(
-        opts: { isAmendment?: boolean; noticeChoice?: boolean; onPublishSubmit?: (choice: { offered: boolean; notified: boolean }) => void },
-        onSubmitted: (data: FormData) => void,
-    ) {
-        const Stub = createRoutesStub([
-            {
-                path: "/",
-                Component() {
-                    return (
-                        <PublishReportModal
-                            open
-                            agreementRequired={false}
-                            paymentRequired={false}
-                            isAmendment={opts.isAmendment ?? false}
-                            noticeChoice={opts.noticeChoice}
-                            courtesyTranslationEnabled={false}
-                            courtesyTranslationLocale="es-419"
-                            clientPrefersTranslation={false}
-                            blockingCount={0}
-                            fetcher={makeCapturingFetcher(onSubmitted)}
-                            submitting={false}
-                            error={undefined}
-                            onClose={() => {}}
-                            onPublishSubmit={opts.onPublishSubmit}
-                        />
-                    );
-                },
-            },
-        ]);
-        render(<Stub initialEntries={["/"]} />);
-    }
-
     async function submitForm() {
         const form = document.getElementById("ih-publish-report-form") as HTMLFormElement;
         fireEvent.submit(form);
@@ -306,9 +322,92 @@ describe("PublishReportModal — shared-ui primitives (review item 2)", () => {
         expect(box.tagName).toBe("TEXTAREA");
     });
 
-    it("the gate toggles render as labelled checkboxes", async () => {
+    it("the auto-sign toggle renders as a labelled checkbox", async () => {
         renderModal(0);
-        expect(await screen.findByRole("checkbox", { name: /signature/i })).toBeTruthy();
-        expect(await screen.findByRole("checkbox", { name: /payment/i })).toBeTruthy();
+        expect(await screen.findByRole("checkbox", { name: /auto-sign/i })).toBeTruthy();
+    });
+});
+
+/**
+ * #506 — one set of publish options: the hub modal gains the editor's
+ * mark-complete + auto-sign powers, and loses the gate checkboxes the server
+ * never honoured.
+ *
+ * The mark-complete choice rides React state the footer button sets in its
+ * onClick — not the submitter's name/value, which the human gate's bare
+ * requestSubmit() re-fire would drop. The auto-sign box is an ordinary
+ * checkbox: ticked posts `autoSignOnPublish=on`, unticked posts nothing, and
+ * the action writes the box's state either way.
+ */
+describe("PublishReportModal — one set of publish options (#506)", () => {
+    it("offers the auto-sign choice, unchecked by default", async () => {
+        renderModal(0);
+        const box = await screen.findByRole("checkbox", { name: /auto-sign/i });
+        expect((box as HTMLInputElement).checked).toBe(false);
+        expect(document.querySelector('input[name="autoSignOnPublish"]')).toBeTruthy();
+    });
+
+    it("defaults the auto-sign box from the stored flag", async () => {
+        renderModal(0, { autoSign: true });
+        const box = await screen.findByRole("checkbox", { name: /auto-sign/i });
+        expect((box as HTMLInputElement).checked).toBe(true);
+    });
+
+    it("offers no mark-complete button once the work is complete", async () => {
+        renderModal(0, { orderCompleted: true });
+        expect(await screen.findByRole("button", { name: /^publish report$/i })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: /mark complete/i })).toBeNull();
+    });
+
+    it("offers mark-complete beside publish while the work is open", async () => {
+        renderModal(0, { orderCompleted: false });
+        expect(await screen.findByRole("button", { name: /^publish report$/i })).toBeTruthy();
+        expect(await screen.findByRole("button", { name: /mark complete and publish/i })).toBeTruthy();
+    });
+
+    it("posts markComplete=true from the mark-complete button", async () => {
+        const onSubmitted = vi.fn();
+        renderModalWithFetcher({ orderCompleted: false }, (data) => {
+            onSubmitted(Object.fromEntries(data.entries()));
+        });
+        const button = await screen.findByRole("button", { name: /mark complete and publish/i });
+        fireEvent.click(button);
+        await waitFor(() => expect(onSubmitted).toHaveBeenCalled());
+        expect(onSubmitted).toHaveBeenCalledWith(expect.objectContaining({ markComplete: "true" }));
+    });
+
+    it("posts markComplete=false from the just-publish button", async () => {
+        const onSubmitted = vi.fn();
+        renderModalWithFetcher({ orderCompleted: false }, (data) => {
+            onSubmitted(Object.fromEntries(data.entries()));
+        });
+        const button = await screen.findByRole("button", { name: /^publish report$/i });
+        fireEvent.click(button);
+        await waitFor(() => expect(onSubmitted).toHaveBeenCalled());
+        expect(onSubmitted).toHaveBeenCalledWith(expect.objectContaining({ markComplete: "false" }));
+    });
+
+    it("posts autoSignOnPublish=on when the box is ticked", async () => {
+        const onSubmitted = vi.fn();
+        renderModalWithFetcher({}, (data) => {
+            onSubmitted(Object.fromEntries(data.entries()));
+        });
+        const box = await screen.findByRole("checkbox", { name: /auto-sign/i });
+        fireEvent.click(box);
+        fireEvent.submit(document.getElementById("ih-publish-report-form") as HTMLFormElement);
+        await waitFor(() => expect(onSubmitted).toHaveBeenCalled());
+        expect(onSubmitted).toHaveBeenCalledWith(expect.objectContaining({ autoSignOnPublish: "on" }));
+    });
+
+    it("posts no autoSignOnPublish when the box is left unticked", async () => {
+        const onSubmitted = vi.fn();
+        renderModalWithFetcher({}, (data) => {
+            onSubmitted(Object.fromEntries(data.entries()));
+        });
+        await screen.findByRole("checkbox", { name: /auto-sign/i });
+        fireEvent.submit(document.getElementById("ih-publish-report-form") as HTMLFormElement);
+        await waitFor(() => expect(onSubmitted).toHaveBeenCalled());
+        const posted = onSubmitted.mock.calls[0][0] as Record<string, string>;
+        expect(posted).not.toHaveProperty("autoSignOnPublish");
     });
 });

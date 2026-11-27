@@ -16,7 +16,7 @@ import {
   latestPublishedAt,
   type HubPayload,
 } from "~/lib/hub-blocks";
-import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
+import { REPORT_STATUS, INSPECTION_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "../../server/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { RetractReportControl } from "~/components/inspector-portal/RetractReportControl";
@@ -108,6 +108,8 @@ interface HubData extends HubPayload {
     clientLocale: string | null;
     /** #23 — whether this workspace may PRODUCE a courtesy translation. */
     courtesyTranslationEnabled: boolean;
+    /** #506 — whether the inspector signature is auto-applied on publish; the hub publish dialog's auto-sign default. */
+    autoSignOnPublish: boolean;
     // The order-wide gate's release record; null while still gated.
     unlockedAt: string | null;
     unlockedByName: string | null;
@@ -413,6 +415,17 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const intent = formData.get("intent");
   const api = createApi(context, { token });
 
+  // `complete` is not on the typed client (like submit/return/unpublish).
+  // One helper for both callers — the publish branch's "Mark complete and
+  // publish" and the lifecycle button's own intent — so the untyped cast
+  // lives in one place, not one per branch.
+  const completeEndpoint = () =>
+    (
+      api.inspections[":id"] as unknown as {
+        complete: { $post: (args: { param: { id: string } }) => Promise<Response> };
+      }
+    ).complete.$post({ param: { id } });
+
   // IA-65 — signing requests live on the inspection now; both intents keep
   // their bodies in inspector-portal-actions beside the People intents.
   if (intent === "delete") return deleteInspectionViaApi(api, id);
@@ -451,6 +464,32 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   }
 
   if (intent === "publish") {
+    // #506 — "Mark complete and publish": fire complete first — idempotent and
+    // non-blocking, so a failure there never stops the publish that follows.
+    // Mirrors the editor action, which does the same before its publish.
+    if (formData.get("markComplete") === "true") {
+      await completeEndpoint().catch(() => undefined);
+    }
+    // #506 — AUTO-SIGN IS SET HERE, AND AWAITED, because the publish handler
+    // decides whether to sign by re-reading the inspection row. Mirrors the
+    // editor action: the checkbox used to fire alongside the publish, so the
+    // two raced. Unlike the editor, the hub modal's box is an ordinary
+    // unchecked-by-default checkbox, so an unticked publish sends no field
+    // at all — the PATCH therefore always runs, writing the box's state
+    // (ticked or not) rather than only its "on" case, so unticking means
+    // "do not sign". A refused write stops the publish: it would otherwise
+    // sign (or not) by the OLD flag.
+    const savedAutoSign = await api.inspections[":id"].$patch({
+      param: { id },
+      json: { autoSignOnPublish: formData.get("autoSignOnPublish") === "on" },
+    });
+    if (!savedAutoSign.ok) {
+      return await toActionResult(
+        savedAutoSign,
+        "publish",
+        "Couldn't save the signing preference, so the report was not published.",
+      );
+    }
     // theme: the editor's PublishModal posts no `theme`, so it rides the
     // schema default ('modern'). We send the same value explicitly here —
     // the hub deliberately renders NO theme picker (YAGNI), matching the
@@ -465,8 +504,10 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       param: { id },
       json: {
         theme: "modern",
-        requireSignature: formData.get("requireSignature") === "on",
-        requirePayment: formData.get("requirePayment") === "on",
+        // #506 — the gate checkboxes are gone from the modal: the server
+        // ignores requireSignature/requirePayment on publish (they are
+        // accepted but not used), and the gates are set by GateToggle on
+        // the hub card. Posting them here would revive a dead control.
         ...(summary ? { summary } : {}),
         // #484 — the republish notice choice, mirroring the editor's
         // PublishModal: only the modal's amendment checkbox posts this, and
@@ -513,10 +554,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   }
 
   if (intent === "complete") {
-    const completeApi = api.inspections[":id"] as unknown as {
-      complete: { $post: (args: { param: { id: string } }) => Promise<Response> };
-    };
-    const res = await completeApi.complete.$post({ param: { id } });
+    const res = await completeEndpoint();
     return toActionResult(res, "complete", m.inspections_hub_lifecycle_error());
   }
 
@@ -1413,13 +1451,13 @@ export default function InspectionHubPage() {
       {/* Publish modal — shared Modal primitive (no window.confirm) */}
       <PublishReportModal
         open={publishModal.open}
-        agreementRequired={inspection.agreementRequired}
-        paymentRequired={inspection.paymentRequired}
         isAmendment={nextPublishIsAmendment}
         noticeChoice={primaryEditingAgain}
         courtesyTranslationEnabled={inspection.courtesyTranslationEnabled ?? false}
         courtesyTranslationLocale={COURTESY_TRANSLATION_LOCALE}
         clientPrefersTranslation={inspection.clientLocale === COURTESY_TRANSLATION_LOCALE}
+        autoSign={inspection.autoSignOnPublish ?? false}
+        orderCompleted={inspection.status === INSPECTION_STATUS.COMPLETED}
         blockingCount={hub.publishReadiness.blockingCount}
         fetcher={publishModal.fetcher}
         submitting={publishModal.busy}

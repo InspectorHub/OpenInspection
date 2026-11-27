@@ -171,6 +171,10 @@ export const InspectionHubSchema = z.object({
     paymentStatus:     z.string().describe('Payment status: unpaid | partial | paid'),
     paymentRequired:   z.boolean().describe('Whether report is payment-gated'),
     agreementRequired: z.boolean().describe('Whether report is agreement-gated'),
+    // #506 — whether the inspector signature is auto-applied when the report
+    // is published. The hub publish dialog offers the same auto-sign choice
+    // the editor's does, so it needs the stored flag for the default.
+    autoSignOnPublish: z.boolean().describe('Whether the inspector signature is auto-applied when the report is published.'),
     unlockedAt: z.string().nullable().describe('When the order-wide report gate was manually released; null when still gated.'),
     unlockedByName: z.string().nullable().describe('Who released the gate, resolved to a name for reading.'),
     unlockReason: z.string().nullable().describe('Why the gate was released.'),
