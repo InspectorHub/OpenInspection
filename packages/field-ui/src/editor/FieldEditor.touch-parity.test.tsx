@@ -64,12 +64,15 @@ describe.each([["tablet", TABLET], ["phone", PHONE]] as const)("%s: More drawer 
 });
 
 describe.each([["tablet", TABLET], ["phone", PHONE]] as const)("%s: save indicator", (_tree, width) => {
-  it("shows Saved after a save and nothing while idle", async () => {
+  // #477 — Ctrl+S reports "Saved on this device", not "Saved": the write
+  // reached the local doc and the harness's fake connector fires no
+  // post-write sync to promote it, which is exactly the honest state.
+  it("shows Saved on this device after a save and nothing while idle", async () => {
     mountForRatings(width);
     await screen.findByRole("banner");
     expect(screen.queryByTestId("save-status")).toBeNull();
     fireEvent.keyDown(document.body, { key: "s", ctrlKey: true });
-    await waitFor(() => expect(within(screen.getByRole("banner")).getByTestId("save-status").textContent).toBe(m.editor_header_save_saved()));
+    await waitFor(() => expect(within(screen.getByRole("banner")).getByTestId("save-status").textContent).toBe(m.editor_header_save_saved_local()));
   });
 });
 

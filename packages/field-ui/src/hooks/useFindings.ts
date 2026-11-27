@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { ResultMap } from "../data-source-types";
 import {
   findingKey,
@@ -22,9 +22,13 @@ export {
  * the live Y.Doc via {@link buildCollabFindingsApi}; the legacy per-field CAS /
  * offline-queue write path was retired. The editor always supplies `collab.doc`
  * once the doc connects (a client-only effect), so this hook only has to bridge
- * the brief SSR / first-paint window before the connection initialises — during
- * which it returns a read-only / local-optimistic API (no persistence), because
- * the editor cannot accept user input before its first paint anyway.
+ * the brief SSR / first-paint window before the connection initialises.
+ *
+ * #477 — that window used to SILENTLY DROP writes: the pre-connect fallback
+ * was inert no-ops that still reported "saved". Writes made before the doc
+ * connects are now QUEUED here and flushed through the live API the moment
+ * the doc arrives, and while they wait the indicator reads "saving" — never
+ * "saved". A write that has not reached the server is never reported as saved.
  */
 export function useFindings(
   results: ResultMap,
@@ -34,6 +38,11 @@ export function useFindings(
   const { sectionIdForItem, setDirty, setSaveStatus } = options;
   // Phase U (Batch C1) — active per-unit scope (null = `_default` common scope).
   const activeUnitId = options.activeUnitId ?? null;
+
+  // #477 — pre-connect write queue (see above). Held in a ref so it survives
+  // the re-renders between first paint and the doc connecting.
+  const pendingWritesRef = useRef<Array<(api: CollabFindingsApi) => void>>([]);
+  const doc = options.collab?.doc ?? null;
 
   // Composite-key-preferred read helper (shared by the collab API and the
   // pre-connect fallback below). Phase U: resolve the composite key under the
@@ -53,6 +62,29 @@ export function useFindings(
     [results, sectionIdForItem, activeUnitId],
   );
 
+  // Flush the queued writes through the live API once the doc exists. Runs
+  // only when there is something queued; the flush reports 'saved-local'
+  // (in the doc, not yet server-confirmed) and the editor promotes it to
+  // 'saved' on the collab sync step.
+  useEffect(() => {
+    if (!doc) return;
+    const queued = pendingWritesRef.current;
+    if (queued.length === 0) return;
+    pendingWritesRef.current = [];
+    const api = buildCollabFindingsApi(doc, {
+      getResult,
+      sectionIdForItem,
+      setResults,
+      setDirty,
+      setSaveStatus,
+      activeUnitId,
+    });
+    for (const write of queued) write(api);
+    setDirty(true);
+    setSaveStatus("saved-local");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc]);
+
   // #181 — collab is the only write path. Once the doc is live, return the pure
   // collab write API (every write goes to the doc via the binding).
   if (options.collab?.doc) {
@@ -66,38 +98,49 @@ export function useFindings(
     });
   }
 
-  // Pre-connect window (SSR / first paint, before the doc connects). The editor
-  // renders but cannot yet persist. Reads work; writes are inert no-ops with a
-  // settled save status so the indicator never hangs. This window closes within
-  // a tick of mount when `useResultsDoc` sets the live handle.
-  const noop = () => {};
-  const settled = () => setSaveStatus("saved");
+  // Pre-connect window (SSR / first paint, before the doc connects). Reads
+  // work; writes are QUEUED (#477) and flushed by the effect above the
+  // moment the doc arrives, so a tap in this window is never a silent
+  // no-op. While writes wait the indicator reads "saving" — never "saved".
+  // This window closes within a tick of mount when `useResultsDoc` sets the
+  // live handle. `cloneLast` / `batchSetRating` / `addVideoToItem` are the
+  // exceptions: they answer from current state (or report placement), so
+  // they keep reporting "not written" instead of queueing a stale read.
+  const queueWrite = (write: (api: CollabFindingsApi) => void): void => {
+    pendingWritesRef.current.push(write);
+    setSaveStatus("saving");
+  };
+  // A save flush with nothing queued has nothing to wait for: leave the
+  // status alone rather than claiming anything.
+  const pendingSave = (): void => {
+    if (pendingWritesRef.current.length > 0) setSaveStatus("saving");
+  };
   const fallback: CollabFindingsApi = {
     getResult,
-    setRating: noop,
-    setNotes: noop,
-    commitNotes: noop,
-    setItemValue: noop,
-    setItemAttribute: noop,
-    toggleCannedComment: noop,
-    setDefectFields: noop,
-    insertComment: noop,
+    setRating: (sectionId, itemId, rating) => queueWrite((api) => api.setRating(sectionId, itemId, rating)),
+    setNotes: (sectionId, itemId, notes) => queueWrite((api) => api.setNotes(sectionId, itemId, notes)),
+    commitNotes: (sectionId, itemId, notes) => queueWrite((api) => api.commitNotes(sectionId, itemId, notes)),
+    setItemValue: (sectionId, itemId, value) => queueWrite((api) => api.setItemValue(sectionId, itemId, value)),
+    setItemAttribute: (sectionId, itemId, attributeId, value) => queueWrite((api) => api.setItemAttribute(sectionId, itemId, attributeId, value)),
+    toggleCannedComment: (sectionId, itemId, tabName, cannedId, included) => queueWrite((api) => api.toggleCannedComment(sectionId, itemId, tabName, cannedId, included)),
+    setDefectFields: (sectionId, itemId, cannedId, patch) => queueWrite((api) => api.setDefectFields(sectionId, itemId, cannedId, patch)),
+    insertComment: (sectionId, itemId, text, withExtraNewline) => queueWrite((api) => api.insertComment(sectionId, itemId, text, withExtraNewline)),
     cloneLast: () => false,
     batchSetRating: () => 0,
-    addPhotoToItem: noop,
+    addPhotoToItem: (itemId, photoKey) => queueWrite((api) => api.addPhotoToItem(itemId, photoKey)),
     addVideoToItem: () => false,
-    addPhotoToDefect: noop,
-    orderPhotoBatch: noop,
+    addPhotoToDefect: (itemId, target, photoKey) => queueWrite((api) => api.addPhotoToDefect(itemId, target, photoKey)),
+    orderPhotoBatch: (itemId, selection) => queueWrite((api) => api.orderPhotoBatch(itemId, selection)),
     getPhotoCount: (itemId: string) => {
       const photos = getResult(itemId).photos as unknown[] | undefined;
       return Array.isArray(photos) ? photos.length : 0;
     },
-    addCustomDefect: noop,
-    toggleCustomDefect: noop,
-    attachRepairItem: noop,
-    detachRepairItem: noop,
-    debounceSave: settled,
-    saveNow: settled,
+    addCustomDefect: (sectionId, itemId, defect) => queueWrite((api) => api.addCustomDefect(sectionId, itemId, defect)),
+    toggleCustomDefect: (sectionId, itemId, customId, included) => queueWrite((api) => api.toggleCustomDefect(sectionId, itemId, customId, included)),
+    attachRepairItem: (itemId, snap) => queueWrite((api) => api.attachRepairItem(itemId, snap)),
+    detachRepairItem: (itemId, recommendationId) => queueWrite((api) => api.detachRepairItem(itemId, recommendationId)),
+    debounceSave: pendingSave,
+    saveNow: pendingSave,
   };
   return fallback;
 }

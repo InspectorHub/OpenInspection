@@ -42,7 +42,7 @@ import {
 } from './results-binding';
 
 /** Save-status the editor surfaces. Mirrors the legacy `setSaveStatus` arg. */
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'saved-local' | 'error';
 
 /**
  * The deps the editor wires in (all already available on the editor side).
@@ -355,13 +355,15 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
     };
 
     // No-op in collab: the Durable Object persists the doc; there is no save-all
-    // round-trip to debounce or flush. Surface a settled status so the editor's
-    // save indicator does not hang on "saving".
+    // round-trip to debounce or flush. #477 — the write reached the LOCAL doc
+    // only, so this reports 'saved-local' ("Saved on this device"), never
+    // 'saved': the server has not confirmed it yet. The editor promotes
+    // 'saved-local' to 'saved' on the collab sync step.
     const debounceSave = (): void => {
-        setSaveStatus('saved');
+        setSaveStatus('saved-local');
     };
     const saveNow = (): void => {
-        setSaveStatus('saved');
+        setSaveStatus('saved-local');
     };
 
     return {

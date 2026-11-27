@@ -204,7 +204,12 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  const drainRef = useRef<() => void>(() => {});
  // A host whose read-only page is a published report opts out of the live socket (`liveWhenReadOnly`): the server accepts it and
  // closes it on every open. The key makes read-only <-> editable a NEW connection, so a lock seen on the old one is not inherited.
- const collab = useResultsDoc(String(data.inspection.id), () => drainRef.current(), liveWhenReadOnly || !pageReadOnly, pageReadOnly ? "read-only" : "editable");
+ // #477 — "Saved" requires the sync step: a write that reached the local doc
+ // reports 'saved-local' ("Saved on this device"), and this onSynced
+ // callback is what promotes it to 'saved' once the server has confirmed it.
+ const saveStatusRef = useRef(state.saveStatus);
+ saveStatusRef.current = state.saveStatus;
+ const collab = useResultsDoc(String(data.inspection.id), () => { drainRef.current(); if (saveStatusRef.current === "saved-local") state.setSaveStatus("saved"); }, liveWhenReadOnly || !pageReadOnly, pageReadOnly ? "read-only" : "editable");
  // Read-only: the document is still read, projected and synced, but no write helper is ever handed it. A Yjs map `set`
  // does not pass through `doc.transact`, so withholding the document is the one guard that cannot be bypassed.
  const writeDoc = readOnly ? null : collab?.doc ?? null;
