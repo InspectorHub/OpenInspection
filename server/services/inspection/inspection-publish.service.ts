@@ -349,6 +349,8 @@ export class InspectionPublishService extends InspectionSubService {
             paymentStatus: string;
             paymentRequired: boolean;
             agreementRequired: boolean;
+            /** #506 — whether the inspector signature is auto-applied on publish. */
+            autoSignOnPublish: boolean;
             // The order-wide gate's release record. Null when still gated.
             unlockedAt: string | null;
             unlockedByName: string | null;
@@ -549,6 +551,9 @@ export class InspectionPublishService extends InspectionSubService {
                 paymentStatus:     insp.paymentStatus,
                 paymentRequired:   insp.paymentRequired === true,
                 agreementRequired: insp.agreementRequired === true,
+                // #506 — the stored auto-sign flag, for the hub publish
+                // dialog's default (same choice the editor's dialog offers).
+                autoSignOnPublish: insp.autoSignOnPublish === true,
                 unlockedAt:        safeISODate(insp.unlockedAt) ?? null,
                 // The NAME, not the id: this record exists to be read by a
                 // person later, and an opaque uuid tells them nothing.

@@ -85,6 +85,21 @@ export interface EditorData {
   relianceText: RelianceText;
   commercialPresets: CommercialPresets;
   nextPublishIsAmendment: boolean; reopenedForEditing?: boolean; // reopened with "Edit and republish": the only state where the server honours the publish notice choice
+  /**
+   * #506 — whether this workspace may PRODUCE a courtesy translation (#23).
+   * Gates the editor publish dialog's opt-in, the same power the hub modal
+   * has. It never gates a reader: a translation already delivered stays
+   * visible when this is switched off. Optional so hosts that predate it
+   * (the App) keep compiling: absent reads as off.
+   */
+  courtesyTranslationEnabled?: boolean;
+  /** #506 — the locale a translation would be produced in, e.g. `es-419`. */
+  courtesyTranslationLocale?: string;
+  /**
+   * #506 — the primary client's preferred language, for the publish dialog's
+   * translation nudge. Null when unknown; absent reads as unknown.
+   */
+  clientLocale?: string | null;
   /** Null unless the session context reports a cooling window. */
   outboundCoolingWindow: OutboundCoolingWindow | null;
   /** Null on legacy inspections created before every inspection got a results row. */

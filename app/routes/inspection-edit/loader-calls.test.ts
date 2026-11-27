@@ -2,7 +2,7 @@
 /**
  * The editor loader asks only for data the inspection can have.
  *
- * Six reads are common to every inspection. Units and unit progress exist for
+ * Seven reads are common to every inspection. Units and unit progress exist for
  * multi-unit and commercial jobs, compliance artifacts only for a full PCA
  * report, and the statutory-form answers only when the template declares a
  * statutory form (the endpoints 404 otherwise, which meant "nothing here").
@@ -41,6 +41,7 @@ vi.mock("~/lib/api-client.server", () => ({
         tags: { index: { $get: rec("tags", () => []) } },
         sessionContext: { context: { $get: rec("session", () => ({ branding: { tenantSlug: "co" }, videoProvider: "r2", collabEditing: true })) } },
         defectCategories: { "defect-categories": { $get: rec("defect-categories", () => []) } },
+        integrationsAi: { config: { $get: rec("ai-config", () => ({ courtesyTranslationEnabled: false })) } },
     }),
 }));
 
@@ -49,7 +50,7 @@ import { routeArgs } from "../../../tests/helpers/route-args";
 
 const CONTEXT = new RouterContextProvider() as unknown as Parameters<typeof loader>[0]["context"];
 const run = () => loader(routeArgs(new Request("http://localhost/inspections/i1/edit"), { params: { id: "i1" }, context: CONTEXT }) as never);
-const COMMON = ["inspection", "results", "report-data", "tags", "session", "defect-categories"];
+const COMMON = ["inspection", "results", "report-data", "tags", "session", "defect-categories", "ai-config"];
 type Out = {
     units: unknown[]; unitProgress: { total: number }; compliance: { reportSignoffs: unknown[] };
     statutoryDetails: unknown; statutoryCoverage: unknown;
@@ -62,7 +63,7 @@ beforeEach(() => {
 });
 
 describe("editor loader reads", () => {
-    it("a single-family inspection makes only the six common reads and gets the empty defaults", async () => {
+    it("a single-family inspection makes only the seven common reads and gets the empty defaults", async () => {
         seam.inspection.propertyType = "single_family";
         const out = await run() as unknown as Out;
         expect(seam.calls.sort()).toEqual([...COMMON].sort());

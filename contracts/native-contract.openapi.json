@@ -5835,6 +5835,11 @@
                                   "nullable": true,
                                   "description": "Phone number of the primary client, or null when none is recorded."
                                 },
+                                "clientLocale": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "description": "The primary client's preferred language (contacts.locale), or null when unknown."
+                                },
                                 "signedByClient": {
                                   "type": "boolean",
                                   "description": "True when the client has signed an agreement for this inspection."

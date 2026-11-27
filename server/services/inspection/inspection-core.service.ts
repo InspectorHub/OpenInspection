@@ -182,6 +182,10 @@ export class InspectionCoreService extends InspectionSubService {
                 clientName: primaryClient?.name ?? null,
                 clientEmail: primaryClient?.email ?? null,
                 clientPhone: primaryClient?.phone ?? null,
+                // #506 — the primary client's preferred language, for the
+                // editor publish dialog's translation nudge (same field the
+                // hub payload carries). getPrimaryClient already projects it.
+                clientLocale: primaryClient?.locale ?? null,
                 status: result.status as InspectionStatus,
                 date: result.date as string,
                 inspectorId: result.inspectorId as string | null,

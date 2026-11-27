@@ -130,6 +130,7 @@
   "new_inspection_step_confirm": "Confirmar",
   "new_inspection_title": "Nueva inspección",
   "new_inspection_create": "Crear la inspección",
+  "new_inspection_create_failed": "No se pudo crear la inspección. Sus datos siguen aquí. Inténtelo de nuevo.",
   "rating_editor_error_name_required": "El nombre es obligatorio",
   "rating_editor_error_slug": "El nombre debe producir un identificador de 2 caracteres o más",
   "rating_editor_error_min_levels": "Agregue al menos 2 niveles",

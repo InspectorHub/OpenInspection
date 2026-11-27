@@ -130,6 +130,7 @@
   "new_inspection_step_confirm": "Confirm",
   "new_inspection_title": "New Inspection",
   "new_inspection_create": "Create Inspection",
+  "new_inspection_create_failed": "Couldn't create the inspection. Your entries are still here. Try again.",
   "rating_editor_error_name_required": "Name is required",
   "rating_editor_error_slug": "Name must produce a 2+ character slug",
   "rating_editor_error_min_levels": "Add at least 2 levels",

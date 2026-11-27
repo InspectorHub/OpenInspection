@@ -52,6 +52,7 @@ export function encodeCommand(cmd: FieldCommand): EncodedCommand {
                 autoSignOnPublish: cmd.autoSignOnPublish === undefined ? undefined : flag(cmd.autoSignOnPublish),
                 summary: cmd.summary,
                 notifyClient: cmd.notifyClient === undefined ? undefined : flag(cmd.notifyClient),
+                translateTo: cmd.translateTo,
             });
         case "save-property-facts":
             return build("save-property-facts", { payload: JSON.stringify(cmd.payload) });

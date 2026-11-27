@@ -27,6 +27,8 @@ export interface PublishExtras {
   summary?: string;
   /** Republish only: true when the inspector chose to notify the client of the update. Absent means no. */
   notifyClient?: boolean;
+  /** #506 — the courtesy-translation opt-in (#23): the locale to produce. Absent means none. Same power the hub modal has. */
+  translateTo?: string;
 }
 
 export interface PublishFlow {
@@ -80,6 +82,7 @@ export function usePublishFlow(inspectionId: string, options: PublishFlowOptions
       ...(markComplete ? { markComplete: true } : {}),
       ...(extras.summary ? { summary: extras.summary } : {}),
       ...(extras.notifyClient ? { notifyClient: true } : {}),
+      ...(extras.translateTo ? { translateTo: extras.translateTo } : {}),
     });
     if (isIgnored(result)) return;
     if (result.ok) {

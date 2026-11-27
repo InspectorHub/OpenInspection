@@ -119,6 +119,10 @@ export const INSPECTION_ROW_FIELDS = {
  */
 export const INSPECTION_COMPUTED_FIELDS = {
     clientPhone: z.string().nullable().optional().describe('Phone number of the primary client, or null when none is recorded.'),
+    // #506 — the primary client's preferred language, so a publish surface can
+    // NUDGE toward a courtesy translation; the decision stays explicit and
+    // nothing is produced automatically. Same field the hub payload carries.
+    clientLocale: z.string().nullable().optional().describe("The primary client's preferred language (contacts.locale), or null when unknown."),
     signedByClient: z.boolean().optional().describe('True when the client has signed an agreement for this inspection.'),
 } as const;
 

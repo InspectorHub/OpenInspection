@@ -173,6 +173,10 @@ export function NewInspectionWizard({
   // configured billing portal (CTA hidden); a string is the billingPortalUrl.
   const [quotaExceeded, setQuotaExceeded] = useState<string | null | undefined>(undefined);
   const [quotaWindow, setQuotaWindow] = useState(quotaAllowance);
+  // #482 — a failed create (any non-quota rejection) keeps the wizard open
+  // and shows the server's message on the Confirm step instead of closing
+  // and discarding the filled form. `null` = no failure recorded.
+  const [createError, setCreateError] = useState<string | null>(null);
 
   // Drop a service's price override (used when unselecting, clearing the input,
   // or when the entered price matches the catalog price = "no override").
@@ -250,6 +254,7 @@ export function NewInspectionWizard({
       setNewAgentName("");
       setNewAgentEmail("");
       setQuotaExceeded(undefined);
+      setCreateError(null);
       return;
     }
     // At-open quota gate — seed quotaExceeded from the caller-supplied prop
@@ -267,19 +272,24 @@ export function NewInspectionWizard({
   // A successful create returns a redirect from the action, which React
   // Router follows directly — fetcher.data never populates on that path, so
   // this effect only ever fires for a completed (non-redirect) response:
-  // either the free-tier cap panel below, or the pre-existing close-on-any-
-  // other-outcome behavior (unchanged from before this quota feature).
+  // either the free-tier cap panel below, or a failed create (#482) that
+  // keeps the wizard open and shows the server's message on the Confirm
+  // step instead of closing and discarding the filled form.
   useEffect(() => {
     if (fetcher.state !== "idle" || !fetcher.data) return;
     const data = fetcher.data as {
       intent?: string;
       ok?: boolean;
-      error?: { code?: string; details?: { billingPortalUrl?: string | null; cap?: number; resetsAt?: string } };
+      error?: { code?: string; message?: string; details?: { billingPortalUrl?: string | null; cap?: number; resetsAt?: string } };
     };
     if (data.intent !== "create") return;
     if (data.ok === false && data.error?.code === "QUOTA_EXHAUSTED") {
       setQuotaExceeded(data.error.details?.billingPortalUrl ?? null);
       setQuotaWindow({ cap: data.error.details?.cap ?? 0, resetsAt: data.error.details?.resetsAt ?? null });
+      return;
+    }
+    if (data.ok === false) {
+      setCreateError(data.error?.message ?? m.new_inspection_create_failed());
       return;
     }
     onClose();
@@ -413,6 +423,9 @@ export function NewInspectionWizard({
   });
 
   function handleSubmit() {
+    // A retry starts clean — a stale failure message must not linger while
+    // the new submit is in flight (#482).
+    setCreateError(null);
     // Returns false and does nothing if a create is already in flight — the
     // button below is disabled too, but that only takes effect on the NEXT
     // render, which a double click beats.
@@ -535,6 +548,7 @@ export function NewInspectionWizard({
 
           {step === "confirm" && (
             <ConfirmStep
+              createError={createError}
               date={date}
               setDate={setDate}
               time={time}

@@ -33,6 +33,35 @@ export function answerText(h: Pick<HeldBack, "status" | "code">): string | null 
     return text === "" ? null : text;
 }
 
+/**
+ * A refused queued change in plain words (#485): the server's `op` is one of
+ * three outbox operations (`inspection.create` / `.update` / `.complete`), and
+ * the row used to print that code as its headline. An op this version does not
+ * know is shown as it came — inventing a paraphrase would hide what failed.
+ */
+export function attentionOpText(op: string): string {
+    switch (op) {
+        case "inspection.create":
+            return m.offline_import_attention_op_create();
+        case "inspection.update":
+            return m.offline_import_attention_op_update();
+        case "inspection.complete":
+            return m.offline_import_attention_op_complete();
+        default:
+            return op;
+    }
+}
+
+/**
+ * Why a queued change was not attempted, in plain words (#485). The only
+ * reason the server sends today is `blocked_by_failed_update`; anything else
+ * is shown as it came rather than paraphrased into a guess.
+ */
+export function attentionReasonText(reason: string): string {
+    if (reason === "blocked_by_failed_update") return m.offline_import_attention_reason_blocked();
+    return reason;
+}
+
 function explainPackageRejected(h: HeldBack): HeldBackExplanation {
     const label = m.offline_import_reason_package_rejected();
     if (h.code === "PACKAGE_EXPIRED") {

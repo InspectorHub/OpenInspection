@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLoaderData, Link, useRouteError, useFetcher, useNavigate, useRevalidator } from "react-router";
 import type { ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/inspector-portal";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
+import type { PublishReadiness } from "@core/field-ui/shared/types";
+import { PublishGateModal } from "@core/field-ui/components/editor/PublishGateModal";
 import { useCapability, useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import {
   deleteFacts,
@@ -14,7 +16,7 @@ import {
   latestPublishedAt,
   type HubPayload,
 } from "~/lib/hub-blocks";
-import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
+import { REPORT_STATUS, INSPECTION_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "../../server/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { RetractReportControl } from "~/components/inspector-portal/RetractReportControl";
@@ -36,8 +38,9 @@ import { StatutoryDeliverable } from "~/components/statutory/StatutoryDeliverabl
 import { SignaturePad } from "@core/field-ui/components/SignaturePad";
 import { RequestPaymentModal } from "~/components/inspector-portal/RequestPaymentModal";
 import { PublishReportModal } from "~/components/inspector-portal/PublishReportModal";
+import { createWebPublishReadiness } from "~/lib/field/web-publish-readiness";
 import { CreateReinspectionModal } from "~/components/inspector-portal/CreateReinspectionModal";
-import { PublishNotice } from "~/components/inspector-portal/PublishNotice";
+import { PublishNotice, type PublishNoticeChoice } from "~/components/inspector-portal/PublishNotice";
 import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEditor";
 import { RouteErrorNotice } from "~/components/RouteErrorNotice";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
@@ -113,6 +116,8 @@ interface HubData extends HubPayload {
     clientLocale: string | null;
     /** #23 — whether this workspace may PRODUCE a courtesy translation. */
     courtesyTranslationEnabled: boolean;
+    /** #506 — whether the inspector signature is auto-applied on publish; the hub publish dialog's auto-sign default. */
+    autoSignOnPublish: boolean;
     // The order-wide gate's release record; null while still gated.
     unlockedAt: string | null;
     unlockedByName: string | null;
@@ -425,6 +430,17 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const intent = formData.get("intent");
   const api = createApi(context, { token });
 
+  // `complete` is not on the typed client (like submit/return/unpublish).
+  // One helper for both callers — the publish branch's "Mark complete and
+  // publish" and the lifecycle button's own intent — so the untyped cast
+  // lives in one place, not one per branch.
+  const completeEndpoint = () =>
+    (
+      api.inspections[":id"] as unknown as {
+        complete: { $post: (args: { param: { id: string } }) => Promise<Response> };
+      }
+    ).complete.$post({ param: { id } });
+
   // IA-65 — signing requests live on the inspection now; both intents keep
   // their bodies in inspector-portal-actions beside the People intents.
   if (intent === "delete") return deleteInspectionViaApi(api, id);
@@ -471,6 +487,32 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   }
 
   if (intent === "publish") {
+    // #506 — "Mark complete and publish": fire complete first — idempotent and
+    // non-blocking, so a failure there never stops the publish that follows.
+    // Mirrors the editor action, which does the same before its publish.
+    if (formData.get("markComplete") === "true") {
+      await completeEndpoint().catch(() => undefined);
+    }
+    // #506 — AUTO-SIGN IS SET HERE, AND AWAITED, because the publish handler
+    // decides whether to sign by re-reading the inspection row. Mirrors the
+    // editor action: the checkbox used to fire alongside the publish, so the
+    // two raced. Unlike the editor, the hub modal's box is an ordinary
+    // unchecked-by-default checkbox, so an unticked publish sends no field
+    // at all — the PATCH therefore always runs, writing the box's state
+    // (ticked or not) rather than only its "on" case, so unticking means
+    // "do not sign". A refused write stops the publish: it would otherwise
+    // sign (or not) by the OLD flag.
+    const savedAutoSign = await api.inspections[":id"].$patch({
+      param: { id },
+      json: { autoSignOnPublish: formData.get("autoSignOnPublish") === "on" },
+    });
+    if (!savedAutoSign.ok) {
+      return await toActionResult(
+        savedAutoSign,
+        "publish",
+        "Couldn't save the signing preference, so the report was not published.",
+      );
+    }
     // theme: the editor's PublishModal posts no `theme`, so it rides the
     // schema default ('modern'). We send the same value explicitly here —
     // the hub deliberately renders NO theme picker (YAGNI), matching the
@@ -485,19 +527,28 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       param: { id },
       json: {
         theme: "modern",
-        requireSignature: formData.get("requireSignature") === "on",
-        requirePayment: formData.get("requirePayment") === "on",
+        // #506 — the gate checkboxes are gone from the modal: the server
+        // ignores requireSignature/requirePayment on publish (they are
+        // accepted but not used), and the gates are set by GateToggle on
+        // the hub card. Posting them here would revive a dead control.
         ...(summary ? { summary } : {}),
+        // #484 — the republish notice choice, mirroring the editor's
+        // PublishModal: only the modal's amendment checkbox posts this, and
+        // only when ticked. The server honours it on amendments only (a
+        // first publish, and a republish after a retract, ignore it), so
+        // omitting it when unticked rides the default false.
+        ...(formData.get("notifyClient") === "on" ? { notifyClient: true } : {}),
         // #23 — a LOCALE or nothing. Absent is the default and means no; a
         // failure to produce one never fails the publish.
         ...(translateTo ? { translateTo } : {}),
       },
     });
     // F79 — nothing about WHO was emailed travels back, because this form does
-    // not know. The publish modal's notify switches posted two flags the service
-    // never read; delivery is the workspace's `report.published` automation rules'
-    // decision. `PublishNotice` confirms the publish and names that authority,
-    // which is all either side can honestly say.
+    // not know. Delivery is the workspace's automation rules' decision; the one
+    // choice the publisher has is `notifyClient` on an amendment, which only
+    // decides whether the `report.amended` rules fire at all. `PublishNotice`
+    // confirms the publish and names that authority, which is all either side
+    // can honestly say.
     return await toActionResult(res, "publish", m.inspections_hub_error_publish());
   }
 
@@ -526,10 +577,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   }
 
   if (intent === "complete") {
-    const completeApi = api.inspections[":id"] as unknown as {
-      complete: { $post: (args: { param: { id: string } }) => Promise<Response> };
-    };
-    const res = await completeApi.complete.$post({ param: { id } });
+    const res = await completeEndpoint();
     return toActionResult(res, "complete", m.inspections_hub_lifecycle_error());
   }
 
@@ -619,16 +667,36 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  * The order lifecycle is deliberately not an input: it tracks the job, not the
  * report, and gating on it here left the card empty for every inspection that
  * was never marked completed. Returns an ordered array of action identifiers.
+ *
+ * `editingAgain` — a published report reopened with "Edit and republish" — is
+ * an amendment in progress, not a finished one: the inspector is mid-correction
+ * and the hub offers the same Publish the editor does, opening the same modal
+ * with the same notify-client choice (#484). Without it, the amendment could
+ * only leave through the editor, and the hub's checkbox was unreachable.
  */
 export function reportActions(
   caps: { publish: boolean; edit: boolean },
   reportStatus: string,
+  editingAgain = false,
 ): Array<'submit' | 'publish' | 'return' | 'unpublish'> {
-  if (reportStatus === REPORT_STATUS.PUBLISHED) return caps.publish ? ['unpublish'] : [];
+  if (reportStatus === REPORT_STATUS.PUBLISHED) {
+    return caps.publish ? (editingAgain ? ['publish', 'unpublish'] : ['unpublish']) : [];
+  }
   if (reportStatus === REPORT_STATUS.SUBMITTED) return caps.publish ? ['publish', 'return'] : [];
   // in_progress (or unknown). Submitting for review writes to the report, so it needs the same access the report editor does.
   if (caps.publish) return ['publish'];
   return caps.edit ? ['submit'] : [];
+}
+
+/**
+ * Publish pre-flight verdict (review item 1): whether the readiness the hub
+ * fetched on demand should open the gate modal instead of the publish dialog.
+ * Null — the check could not be made — falls through to publish, so a flaky
+ * pre-flight never blocks the act. The editor's handlePublishClick reads the
+ * same verdict.
+ */
+export function shouldShowPublishGate(readiness: PublishReadiness | null): boolean {
+  return readiness !== null && (!readiness.ready || (readiness.warningDefects?.length ?? 0) > 0);
 }
 
 /* ------------------------------------------------------------------ */
@@ -739,6 +807,23 @@ export default function InspectionHubPage() {
   const paymentModal = useModalFetcher<typeof action>("request-payment");
   const publishModal = useModalFetcher<typeof action>("publish");
 
+  // Publish pre-flight (review item 1): the hub used to show only a count of
+  // blocking defects — its payload carries { ready, blockingCount }. Before
+  // opening the publish dialog, ask the same readiness endpoint the editor
+  // calls, on demand; when defects block (or warn), show the editor's
+  // PublishGateModal with the list instead.
+  const [gateReadiness, setGateReadiness] = useState<PublishReadiness | null>(null);
+  const [gateOpen, setGateOpen] = useState(false);
+  const handlePublishClick = useCallback(async () => {
+    const readiness = await createWebPublishReadiness().check(inspection.id);
+    if (shouldShowPublishGate(readiness)) {
+      setGateReadiness(readiness);
+      setGateOpen(true);
+      return;
+    }
+    publishModal.setOpen(true);
+  }, [inspection.id, publishModal]);
+
   // IA-65 — signer management on the inspection. The send modal serializes its
   // signer rows into the action; the pre-sign modal is keyed by envelope id
   // (which row's "Sign now" was pressed) and closes itself on success.
@@ -827,9 +912,15 @@ export default function InspectionHubPage() {
   // dismissal.
   const publishNotice = publishModal.succeeded;
 
+  // Item 3 — what the last publish submit chose, snapshotted by the modal at
+  // submit time (see PublishReportModal.onPublishSubmit). The banner reads
+  // this, not the live report state: after the publish the report is
+  // published again and `primaryEditingAgain` is false.
+  const [lastPublishNotice, setLastPublishNotice] = useState<PublishNoticeChoice | null>(null);
+
   // `publish` is the user's permission; the report's own eligibility lives in
   // canPublish, which reportShipped above reads.
-  const reportActionList = reportActions({ publish: canPublishCap && access.canAct, edit: canEditReports }, inspection.reportStatus);
+  const reportActionList = reportActions({ publish: canPublishCap && access.canAct, edit: canEditReports }, inspection.reportStatus, primaryEditingAgain);
 
   // IA-40 — when a version already exists, the next publish increments to
   // versionNumber > 1 (an amendment), so the publish modal asks what changed.
@@ -922,7 +1013,7 @@ export default function InspectionHubPage() {
         }
       />
 
-      <PublishNotice show={publishNotice} />
+      <PublishNotice show={publishNotice} notice={lastPublishNotice} />
 
       {/* Six blocks — responsive 2-col grid (1-col on mobile).
           `items-start`: grid rows stretch their items to equal height by
@@ -1114,6 +1205,18 @@ export default function InspectionHubPage() {
                 >
                   {m.inspections_hub_report_repair_log()}
                 </Link>
+                {/* #484 — a published report being edited again offers the same
+                    Publish the not-yet-shipped states do: same button, same
+                    modal, same notify-client choice as the editor. */}
+                {reportActionList.includes('publish') && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handlePublishClick}
+                  >
+                    {m.inspections_hub_report_publish()}
+                  </Button>
+                )}
                 {reportActionList.includes('unpublish') && <RetractReportControl />}
               </div>
             </>
@@ -1142,7 +1245,7 @@ export default function InspectionHubPage() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => publishModal.setOpen(true)}
+                    onClick={handlePublishClick}
                   >
                     {m.inspections_hub_report_publish()}
                   </Button>
@@ -1184,7 +1287,7 @@ export default function InspectionHubPage() {
             </>
           )}
 
-          {/* IA-40 — Report versions. The signed, immutable version history had
+          {/* IA-40 — Published versions. The signed, immutable version history had
               no entry point anywhere in the app; this is it. Each amendment
               links to a field-level diff against its immediate predecessor. */}
           {versions.length > 0 && (
@@ -1374,17 +1477,40 @@ export default function InspectionHubPage() {
       {/* Publish modal — shared Modal primitive (no window.confirm) */}
       <PublishReportModal
         open={publishModal.open}
-        agreementRequired={inspection.agreementRequired}
-        paymentRequired={inspection.paymentRequired}
         isAmendment={nextPublishIsAmendment}
+        noticeChoice={primaryEditingAgain}
         courtesyTranslationEnabled={inspection.courtesyTranslationEnabled ?? false}
         courtesyTranslationLocale={COURTESY_TRANSLATION_LOCALE}
         clientPrefersTranslation={inspection.clientLocale === COURTESY_TRANSLATION_LOCALE}
+        autoSign={inspection.autoSignOnPublish ?? false}
+        orderCompleted={inspection.status === INSPECTION_STATUS.COMPLETED}
         blockingCount={hub.publishReadiness.blockingCount}
         fetcher={publishModal.fetcher}
         submitting={publishModal.busy}
         error={publishModal.error}
         onClose={() => publishModal.setOpen(false)}
+        onPublishSubmit={setLastPublishNotice}
+      />
+
+      {/* Publish pre-flight gate — the defect list the hub used to show only
+          as a count, in the editor's own PublishGateModal. onJump navigates
+          into the editor, where defects get fixed: the editor has no
+          per-defect deep link yet, so this lands on the editor for the
+          inspection and the list names section › item › defect. onProceed is
+          the IA-7 warning path ("Publish anyway") — it opens the publish
+          dialog with the soft gaps acknowledged. */}
+      <PublishGateModal
+        open={gateOpen}
+        readiness={gateReadiness}
+        onClose={() => setGateOpen(false)}
+        onProceed={() => {
+          setGateOpen(false);
+          publishModal.setOpen(true);
+        }}
+        onJump={() => {
+          setGateOpen(false);
+          navigate(`/inspections/${inspection.id}/edit`);
+        }}
       />
 
       {/* Send-report modal — shared Modal primitive (no window.confirm). Only

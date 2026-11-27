@@ -67,6 +67,7 @@ vi.mock('~/lib/api-client.server', () => ({
         tags: { index: { $get: async () => null } },
         sessionContext: { context: { $get: async () => (sessionContextBody === null ? null : json(sessionContextBody)) } },
         defectCategories: { 'defect-categories': { $get: async () => null } },
+        integrationsAi: { config: { $get: async () => null } },
     })),
 }));
 

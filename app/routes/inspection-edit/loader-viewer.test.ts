@@ -28,6 +28,7 @@ vi.mock("~/lib/api-client.server", () => ({
         tags: { index: { $get: () => ok([]) } },
         sessionContext: { context: { $get: () => { calls.push("session"); return ok(SESSION); } } },
         defectCategories: { "defect-categories": { $get: () => ok([]) } },
+        integrationsAi: { config: { $get: () => ok({ courtesyTranslationEnabled: false }) } },
     }),
 }));
 
