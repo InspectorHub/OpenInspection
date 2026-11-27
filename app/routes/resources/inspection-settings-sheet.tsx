@@ -1,19 +1,14 @@
 /**
  * C-12 — BFF resource route for InspectionSettingsSheet component.
  *
- * loader: bundles GET /api/inspections/:id + /api/inspections/templates +
- *         /api/team/members into one server call so the component has no
- *         raw client-side fetches.
+ * loader: the settings read (`loadInspectionSettings` — inspection row,
+ * template list, cover-picker photos) plus the team members, in one server
+ * call so the component has no raw client-side fetches.
  */
 import type { Route } from "./+types/inspection-settings-sheet";
 import { getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { flattenMedia } from "@core/field-ui/shared/inspection-media";
-
-interface Template {
-    id: string;
-    name: string;
-}
+import { loadInspectionSettings } from "~/lib/inspection-settings-loader.server";
 
 interface Member {
     id: string;
@@ -21,14 +16,7 @@ interface Member {
     role: string;
 }
 
-// DB-16 — a flat photo the inspector can pick as the report cover.
-interface CoverPhoto {
-    key: string;
-    url: string;
-    label: string;
-}
-
-const EMPTY = { inspection: null, templates: [] as Template[], members: [] as Member[], photos: [] as CoverPhoto[] };
+const EMPTY = { inspection: null, templates: [] as { id: string; name: string }[], members: [] as Member[], photos: [] as { key: string; url: string; label: string }[] };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
     const token = await getToken(context, request);
@@ -39,29 +27,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     if (!inspectionId) return EMPTY;
 
     const api = createApi(context, { token });
-    const hdr = { headers: { "x-token-relay": "1" } } as const;
 
-    const [inspRes, tplRes, membersRes, mediaRes] = await Promise.all([
-        api.inspections[":id"].$get({ param: { id: inspectionId } }, hdr).catch(() => null),
-        api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }, hdr).catch(() => null),
-        api.team.members.$get({}, hdr).catch(() => null),
-        api.inspections[":id"].media.$get({ param: { id: inspectionId } }, hdr).catch(() => null),
+    const [sheet, membersRes] = await Promise.all([
+        loadInspectionSettings(api, inspectionId),
+        api.team.members.$get({}).catch(() => null),
     ]);
-
-    let inspection: Record<string, unknown> | null = null;
-    if (inspRes?.ok) {
-        const body = (await inspRes.json()) as { data?: Record<string, unknown> };
-        const raw = body?.data ?? {};
-        inspection = (raw.inspection as Record<string, unknown>) ?? raw;
-    }
-
-    const templates: Template[] = [];
-    if (tplRes?.ok) {
-        const body = (await tplRes.json()) as { data?: Template[] };
-        for (const t of body?.data ?? []) {
-            if (t?.id && t?.name) templates.push({ id: t.id, name: t.name });
-        }
-    }
 
     const members: Member[] = [];
     if (membersRes?.ok) {
@@ -71,19 +41,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         }
     }
 
-    // DB-16 — flatten attached + pool photos into one pickable cover list.
-    // Dedup by R2 key (shared flattenMedia helper): results.data can store an
-    // item under BOTH a composite (unit::section::item) and a bare itemId key,
-    // which makes the media center surface the same photo twice; the cover grid
-    // must show each photo once.
-    // Request small thumbnails (?w=240) for the grid so the browser doesn't pull
-    // full-resolution originals; the photo endpoint resizes when CF Images is
-    // available and falls back to the original otherwise.
-    const thumb = (url: string) => (url.includes("?") ? `${url}&w=240` : `${url}?w=240`);
-    const mediaBody = mediaRes?.ok ? ((await mediaRes.json()) as Parameters<typeof flattenMedia>[0]) : null;
-    const photos: CoverPhoto[] = flattenMedia(mediaBody).map((p) => ({ key: p.key, url: thumb(p.url), label: p.label }));
-
-    return { inspection, templates, members, photos };
+    return { ...sheet, members };
 }
 
 // The sheet loads this data once when it opens (explicit fetcher.load) and then

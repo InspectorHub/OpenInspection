@@ -6,8 +6,8 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 167,
-    "dollarMethods": 604,
+    "files": 169,
+    "dollarMethods": 609,
     "apiWorker": 11
   },
   "fanOut": {
@@ -45,6 +45,14 @@
     },
     "app/lib/inspection-order-actions.ts": {
       "dollarMethods": 8,
+      "apiWorker": 0
+    },
+    "app/lib/inspection-settings-actions.ts": {
+      "dollarMethods": 5,
+      "apiWorker": 0
+    },
+    "app/lib/inspection-settings-loader.server.ts": {
+      "dollarMethods": 3,
       "apiWorker": 0
     },
     "app/lib/inspection-visits.ts": {
@@ -464,7 +472,7 @@
       "apiWorker": 0
     },
     "app/routes/resources/inspection-settings-sheet.tsx": {
-      "dollarMethods": 4,
+      "dollarMethods": 1,
       "apiWorker": 0
     },
     "app/routes/resources/marketplace-install.tsx": {

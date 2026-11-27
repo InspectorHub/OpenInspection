@@ -7,25 +7,23 @@
  * open the editor. IA-87 already moved the order facts to the portal; this is
  * the rest of the sheet, as its own card beside the Report card it governs.
  *
- * It reads through the same BFF resource route the sheet used
- * (`/resources/inspection-settings-sheet`, via `createWebSettingsSheet`) and
- * writes through the hub route's own `save-settings` / `set-cover` /
- * `upload-cover` / `crop-cover` intents, which call the same API the editor's
- * action called. The form state, the null-for-inherit convention and the
- * cover flow (pick, upload, crop) are the sheet's, moved here unchanged.
+ * It reads from the hub loader (`initialSettings`, loaded server-side by
+ * `loadInspectionSettings`) and writes through the hub route's own
+ * `save-settings` / `set-cover` / `upload-cover` / `crop-cover` intents, which
+ * call the same API the editor's action called. The form state and the
+ * null-for-inherit convention are the sheet's, moved here unchanged. The
+ * retry button is the only client fetch: it re-reads through the BFF resource
+ * route (`/resources/inspection-settings-sheet`, via `createWebSettingsSheet`).
+ * The cover picker lives in `InspectionSettingsCover`.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useFetcher } from "react-router";
-import { Button, Card, useActionLatch } from "@core/shared-ui";
-import { CoverCropper, coverCropFor, type StoredCoverCrop } from "@core/field-ui/components/media-studio/CoverCropper";
-import { fullResUrl } from "@core/field-ui/components/media-studio/cropImage";
-import { photoRefusal } from "@core/field-ui/shared/photo-admission";
-import { onlinePhotoRejectionMessages } from "@core/field-ui/editor/photo-rejection-messages";
+import { Button, Card } from "@core/shared-ui";
 import { m as fieldM } from "@core/field-ui/i18n";
-import type { CoverPhotoOption, ReportProfileOption, SettingsSheetData, TemplateSummary } from "@core/field-ui/data-source-types";
+import type { ReportProfileOption, SettingsSheetData, TemplateSummary } from "@core/field-ui/data-source-types";
 import { createWebSettingsSheet } from "~/lib/field/web-settings-sheet";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { BlockHeading } from "~/components/inspector-portal/BlockHeading";
+import { InspectionSettingsCover } from "~/components/inspector-portal/InspectionSettingsCover";
 import { m } from "~/paraglide/messages";
 import type { action } from "~/routes/inspector-portal";
 
@@ -41,28 +39,33 @@ interface SettingsForm {
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-export function InspectionSettingsCard({ inspectionId, canEdit }: { inspectionId: string; canEdit: boolean }) {
-    const [loading, setLoading] = useState(true);
-    const [loadFailed, setLoadFailed] = useState(false);
-    const [templates, setTemplates] = useState<TemplateSummary[]>([]);
-    const [profiles, setProfiles] = useState<ReportProfileOption[]>([]);
-    const [sheetInspection, setSheetInspection] = useState<Record<string, unknown> | null>(null);
-    const [form, setForm] = useState<SettingsForm>({ templateId: "", requireDefectFieldsOverride: "", profileOverride: "" });
+function formFromSheet(d: SettingsSheetData | null): SettingsForm {
+    const insp = d?.inspection;
+    return {
+        templateId: (insp?.templateId as string) || "",
+        requireDefectFieldsOverride: (insp?.requireDefectFieldsOverride as SettingsForm["requireDefectFieldsOverride"]) || "",
+        profileOverride: (insp?.profileOverride as string) || "",
+    };
+}
+
+/** Cover key lives on the inspection row; the detail API exposes it as `coverPhotoId` (raw) or `coverPhoto` (formatted) — read either. */
+function coverKeyFromSheet(d: SettingsSheetData | null): string {
+    const insp = d?.inspection;
+    return ((insp?.coverPhotoId ?? insp?.coverPhoto) as string | null) ?? "";
+}
+
+export function InspectionSettingsCard({ inspectionId, initialSettings, canEdit }: { inspectionId: string; initialSettings: SettingsSheetData | null | undefined; canEdit: boolean }) {
+    const [sheet, setSheet] = useState<SettingsSheetData | null>(initialSettings ?? null);
+    const [form, setForm] = useState<SettingsForm>(() => formFromSheet(initialSettings ?? null));
+    const [loading, setLoading] = useState(false);
+    // Missing data (a loader that predates the settings read, or one that
+    // failed) is a failed load, not a crash: the card offers a retry, which
+    // re-reads through the resource route.
+    const [loadFailed, setLoadFailed] = useState(initialSettings == null || initialSettings.inspection === null);
     const [saveState, setSaveState] = useState<SaveState>("idle");
-    const [coverError, setCoverError] = useState<string | null>(null);
-    // DB-16 — report cover picker. `photos` are all of the inspection's photos;
-    // `coverKey` is the chosen cover R2 key (optimistic).
-    const [photos, setPhotos] = useState<CoverPhotoOption[]>([]);
-    const [coverKey, setCoverKey] = useState<string>("");
-    const [uploadingCover, setUploadingCover] = useState(false);
-    const coverFileRef = useRef<HTMLInputElement>(null);
-    const [cropSource, setCropSource] = useState<{ key: string; url: string } | null>(null);
-    // The crop saved during THIS card session: `crop-cover` does not reload the section, so `sheetInspection`
-    // still holds the crop from when it loaded, and re-cropping would re-open on a frame already replaced.
-    const [sessionCrop, setSessionCrop] = useState<{ key: string; crop: StoredCoverCrop } | null>(null);
-    // The crop the in-flight crop-cover submit carries: only the answer confirms it, so the session crop is
-    // recorded from here, not at submit time — a failed crop must not become the frame a re-crop re-opens on.
-    const pendingCrop = useRef<{ key: string; crop: StoredCoverCrop } | null>(null);
+
+    const templates: TemplateSummary[] = sheet?.templates ?? [];
+    const profiles: ReportProfileOption[] = sheet?.profiles ?? [];
 
     const mounted = useRef(true);
     const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -76,36 +79,18 @@ export function InspectionSettingsCard({ inspectionId, canEdit }: { inspectionId
 
     // The settings save: one guarded submit for the whole form, so Enter plus a click in one frame send one request.
     const { fetcher: saveFetcher, submit: saveSubmit, busy: saveBusy } = useGuardedSubmit<typeof action>();
-    // One fetcher for every cover write (pick, clear, upload, crop): they all rewrite the cover of this inspection.
-    const coverFetcher = useFetcher<typeof action>();
-    const coverBusy = coverFetcher.state !== "idle";
-    // One guard for every cover write: they all rewrite the cover of this inspection.
-    const coverLatch = useActionLatch(coverBusy);
-    // The cover key the last set-cover submit optimistically showed, so a refused write can put it back.
-    const coverBefore = useRef("");
 
     const applyLoaded = useCallback((d: SettingsSheetData) => {
-        const insp = d.inspection;
-        if (insp) {
-            setForm({
-                templateId: (insp.templateId as string) || "",
-                requireDefectFieldsOverride: (insp.requireDefectFieldsOverride as SettingsForm["requireDefectFieldsOverride"]) || "",
-                profileOverride: (insp.profileOverride as string) || "",
-            });
-        }
-        setSheetInspection(insp);
-        setTemplates(d.templates ?? []);
-        setProfiles(d.profiles ?? []);
-        setPhotos(d.photos ?? []);
-        // Cover key lives on the inspection row; the detail API exposes it as
-        // `coverPhotoId` (raw) or `coverPhoto` (formatted) — read either.
-        setCoverKey(((insp?.coverPhotoId ?? insp?.coverPhoto) as string | null) ?? "");
+        setSheet(d);
+        setForm(formFromSheet(d));
+        setLoadFailed(d.inspection === null);
         setLoading(false);
     }, []);
 
-    // Read the settings when the card mounts; the skeleton shows until the answer lands. The newest read wins: an
-    // answer to an earlier one is dropped. No answer, or the empty shape the route gives when the session expired
-    // (no inspection), offers a retry, not a form that would save blanks over the stored values.
+    // The retry is the only client fetch. The newest read wins: an answer to an
+    // earlier one is dropped. No answer, or the empty shape the route gives when
+    // the session expired (no inspection), offers a retry, not a form that would
+    // save blanks over the stored values.
     const loadSeq = useRef(0);
     const loadSettings = useCallback(() => {
         const seq = (loadSeq.current += 1);
@@ -124,12 +109,6 @@ export function InspectionSettingsCard({ inspectionId, canEdit }: { inspectionId
                 applyLoaded(d);
             });
     }, [inspectionId, applyLoaded]);
-    useEffect(() => {
-        loadSettings();
-        return () => {
-            loadSeq.current += 1;
-        };
-    }, [loadSettings]);
 
     // The save's answer drives the pill. B-17 lesson: "idle" alone is not "saved" — gate on the action's ok.
     useEffect(() => {
@@ -146,48 +125,6 @@ export function InspectionSettingsCard({ inspectionId, canEdit }: { inspectionId
         if (saveBusy) setSaveState("saving");
     }, [saveBusy]);
 
-    // A cover write's answer: set-cover reverts on refusal; upload appends the new photo to the grid and opens it
-    // for cropping; crop records the new key. All three surface the action's error rather than a silent revert.
-    useEffect(() => {
-        if (coverFetcher.state !== "idle" || !coverFetcher.data) return;
-        const data = coverFetcher.data as { intent?: string; ok?: boolean; error?: string; coverKey?: string | null; coverUrl?: string | null };
-        if (data.intent === "set-cover") {
-            if (!data.ok) {
-                setCoverKey(coverBefore.current);
-                setCoverError(data.error ?? m.inspections_hub_error_set_cover());
-            }
-            return;
-        }
-        if (data.intent === "upload-cover") {
-            setUploadingCover(false);
-            if (!data.ok || !data.coverKey) {
-                setCoverError(data.error ?? m.inspections_hub_error_upload_cover());
-                return;
-            }
-            setCoverError(null);
-            setCoverKey(data.coverKey);
-            if (data.coverUrl) {
-                setPhotos((prev) =>
-                    prev.some((p) => p.key === data.coverKey) ? prev : [{ key: data.coverKey as string, url: data.coverUrl as string, label: fieldM.editor_settings_cover_uploaded_label() }, ...prev],
-                );
-                setCropSource({ key: data.coverKey, url: data.coverUrl });
-            }
-            return;
-        }
-        if (data.intent === "crop-cover") {
-            if (!data.ok) {
-                setCoverError(data.error ?? m.inspections_hub_error_crop_cover());
-                return;
-            }
-            setCoverError(null);
-            if (data.coverKey) setCoverKey(data.coverKey);
-            if (pendingCrop.current) {
-                setSessionCrop(pendingCrop.current);
-                pendingCrop.current = null;
-            }
-        }
-    }, [coverFetcher.state, coverFetcher.data]);
-
     function updateForm<K extends keyof SettingsForm>(key: K, value: SettingsForm[K]) {
         setForm((prev) => ({ ...prev, [key]: value }));
     }
@@ -202,48 +139,6 @@ export function InspectionSettingsCard({ inspectionId, canEdit }: { inspectionId
             profileOverride: form.profileOverride === "" ? null : form.profileOverride,
         };
         saveSubmit({ intent: "save-settings", payload: JSON.stringify(payload) }, { method: "post" });
-    }
-
-    function selectCover(key: string) {
-        if (!canEdit) return;
-        setCoverError(null);
-        if (coverKey === key) {
-            coverBefore.current = coverKey;
-            setCoverKey("");
-            // The latch drops a same-frame repeat; a clear dropped because ANOTHER cover write is out puts the
-            // selection back via the set-cover answer effect above.
-            coverLatch(() => {
-                coverFetcher.submit({ intent: "set-cover", coverPhotoId: "" }, { method: "post" });
-            });
-            return;
-        }
-        const photo = photos.find((p) => p.key === key);
-        if (photo) setCropSource({ key, url: photo.url });
-    }
-
-    // DB-16 — direct cover upload. The latch drops a repeat (same frame, or while a check is pending).
-    function uploadCover(file: File) {
-        if (!canEdit) return;
-        coverLatch(() => {
-            setUploadingCover(true);
-            setCoverError(null);
-            // The photo check first (size ceiling, type by bytes): a file the server would refuse is announced with the
-            // photo wording and never sent.
-            void photoRefusal(file).then((refusal) => {
-                if (refusal !== null) {
-                    const [message] = onlinePhotoRejectionMessages([{ index: 0, ok: false, error: refusal }]);
-                    if (mounted.current) {
-                        setCoverError(message ?? fieldM.editor_photo_save_failed());
-                        setUploadingCover(false);
-                    }
-                    return;
-                }
-                const fd = new FormData();
-                fd.set("intent", "upload-cover");
-                fd.set("file", file);
-                coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
-            });
-        });
     }
 
     const inputClass = "mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-1 text-[14px] font-medium focus:border-ih-primary focus:shadow-ih-focus outline-none disabled:opacity-60";
@@ -314,54 +209,15 @@ export function InspectionSettingsCard({ inspectionId, canEdit }: { inspectionId
                     </fieldset>
 
                     {/* Appearance: the cover photo and the style preset are the same
-                        concern, so they are one section. DB-16: pick an existing inspection photo OR upload one directly. */}
+                        concern, so they are one section. */}
                     <fieldset className="space-y-2">
                         <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">{fieldM.editor_settings_legend_appearance()}</legend>
-                        <span className={`${labelClass} block pt-1`}>{fieldM.editor_settings_legend_cover()}</span>
-                        <input
-                            ref={coverFileRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) uploadCover(file);
-                                e.target.value = ""; // allow re-selecting the same file
-                            }}
+                        <InspectionSettingsCover
+                            inspection={sheet?.inspection ?? null}
+                            initialPhotos={sheet?.photos ?? []}
+                            initialCoverKey={coverKeyFromSheet(sheet)}
+                            canEdit={canEdit}
                         />
-                        {photos.length === 0 ? (
-                            <p className="text-[12px] text-ih-fg-3">{fieldM.editor_settings_cover_empty()}</p>
-                        ) : (
-                            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2" data-testid="hub-settings-cover-grid">
-                                {photos.map((p) => {
-                                    const selected = coverKey === p.key;
-                                    return (
-                                        <button
-                                            key={p.key}
-                                            type="button"
-                                            onClick={() => selectCover(p.key)}
-                                            title={selected ? fieldM.editor_settings_cover_current() : p.label ? fieldM.editor_settings_cover_set_labeled({ label: p.label }) : fieldM.editor_settings_cover_set()}
-                                            disabled={!canEdit}
-                                            className={`relative aspect-square rounded-md overflow-hidden border-2 transition-colors ${selected ? "border-ih-primary" : "border-ih-border hover:border-ih-primary/60"} disabled:opacity-60`}
-                                        >
-                                            <img src={p.url} alt={p.label || fieldM.editor_settings_cover_photo_alt()} className="w-full h-full object-cover" loading="lazy" />
-                                            {selected && (
-                                                <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-ih-fg-inverse text-[9px] font-bold text-center py-0.5">{fieldM.editor_settings_cover_badge()}</span>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-                        {canEdit && (
-                            <div className="pt-1 space-y-1">
-                                <Button variant="secondary" size="sm" onClick={() => coverFileRef.current?.click()} pending={coverBusy && uploadingCover}>
-                                    {coverBusy && uploadingCover ? fieldM.editor_uploading() : fieldM.editor_settings_cover_upload()}
-                                </Button>
-                                <p className="text-[11px] text-ih-fg-3">{fieldM.editor_settings_cover_hint()}</p>
-                            </div>
-                        )}
-                        {coverError && <p className="text-[12px] font-medium text-ih-bad-fg">{coverError}</p>}
 
                         {/* Report Style Presets — collapsed by default (progressive disclosure: the default path never touches this). */}
                         <details className="pt-2">
@@ -397,33 +253,6 @@ export function InspectionSettingsCard({ inspectionId, canEdit }: { inspectionId
                         </div>
                     )}
                 </form>
-            )}
-            {cropSource && (
-                <CoverCropper
-                    sourceUrl={fullResUrl(cropSource.url)}
-                    sourceKey={cropSource.key}
-                    initialCrop={sessionCrop?.key === cropSource.key ? sessionCrop.crop : coverCropFor(sheetInspection, cropSource.key)}
-                    onCancel={() => setCropSource(null)}
-                    onSave={(blob, c) => {
-                        const source = cropSource;
-                        const crop = { aspect: c.aspect, orientation: c.orientation, ...c.pixels };
-                        const image = new File([blob], "cover.jpg", { type: "image/jpeg" });
-                        // Checked first: an image the server would refuse is announced, nothing is sent and the cropper stays open.
-                        void photoRefusal(image).then((refusal) => {
-                            if (refusal || !mounted.current) return;
-                            setCropSource(null);
-                            const fd = new FormData();
-                            fd.set("intent", "crop-cover");
-                            fd.set("image", image);
-                            fd.set("sourceKey", source.key);
-                            fd.set("crop", JSON.stringify(crop));
-                            coverLatch(() => {
-                                pendingCrop.current = { key: source.key, crop };
-                                coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
-                            });
-                        });
-                    }}
-                />
             )}
         </Card>
     );
