@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Modal, Button, Banner, buttonClasses, useActionLatch } from "@core/shared-ui";
+import { Modal, Button, Banner, buttonClasses, useActionLatch, Checkbox, Textarea } from "@core/shared-ui";
 import { m } from "../../i18n";
 import { formatShapedDateTime } from "../../shared/format-date";
 import { useFieldDataSource } from "../../context";
@@ -231,43 +231,37 @@ export function PublishModal({ open, inspectionId, progress, status, publishErro
  </div>
  )}
  {isAmendment && (
- <label className="mt-4 block">
- {/* The hub's own publish dialog asks this in these exact words; reusing its
-     keys is what keeps the two from asking differently-worded versions of one
-     question about the same row. */}
- <span className="block text-[12px] font-medium text-ih-fg-2 mb-1">
- {m.inspections_hub_publish_summary_label()}
- </span>
- <textarea
-  value={summary}
-  onChange={(e) => setSummary(e.target.value)}
-  rows={3}
-  maxLength={500}
-  placeholder={m.inspections_hub_publish_summary_ph()}
-  className="w-full rounded-lg border border-ih-border bg-ih-bg-card px-2.5 py-1.5 text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:border-ih-primary focus:ring-1 focus:ring-ih-primary"
- />
- </label>
+  <div className="mt-4">
+   {/* The hub's own publish dialog asks this in these exact words; reusing its
+       keys is what keeps the two from asking differently-worded versions of one
+       question about the same row. The shared Textarea is what keeps the two
+       from RENDERING it differently: same label, same radius. */}
+   <Textarea
+    label={m.inspections_hub_publish_summary_label()}
+    value={summary}
+    onChange={(e) => setSummary(e.target.value)}
+    rows={3}
+    maxLength={500}
+    placeholder={m.inspections_hub_publish_summary_ph()}
+   />
+  </div>
  )}
  {noticeChoice && (
- <label className="mt-4 flex items-center gap-2 text-[12px] font-medium text-ih-fg-2 cursor-pointer select-none">
- <input
-  type="checkbox"
-  checked={notifyClient}
-  onChange={(e) => setNotifyClient(e.target.checked)}
-  className="h-3.5 w-3.5 rounded border-ih-border-strong text-ih-primary"
- />
- {m.editor_publish_notify_client()}
- </label>
+  <div className="mt-4">
+   <Checkbox
+    label={m.editor_publish_notify_client()}
+    checked={notifyClient}
+    onChange={(e) => setNotifyClient(e.target.checked)}
+   />
+  </div>
  )}
- <label className="mt-4 flex items-center gap-2 text-[12px] font-medium text-ih-fg-3 cursor-pointer select-none">
- <input
-  type="checkbox"
-  checked={autoSign}
-  onChange={(e) => onAutoSignToggle(e.target.checked)}
-  className="h-3.5 w-3.5 rounded border-ih-border-strong text-ih-primary"
- />
- {m.editor_publish_autosign()}
- </label>
+ <div className="mt-4">
+  <Checkbox
+   label={m.editor_publish_autosign()}
+   checked={autoSign}
+   onChange={(e) => onAutoSignToggle(e.target.checked)}
+  />
+ </div>
  </Modal>
  <Modal
  open={receiptOpen}

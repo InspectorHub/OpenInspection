@@ -252,3 +252,31 @@ describe("PublishReportModal — republish notice choice (#484)", () => {
         expect(screen.getByTestId("publish-notify-automation")).toBeTruthy();
     });
 });
+
+/**
+ * Review item 2 — both publish modals use the shared-ui primitives instead
+ * of hand-written controls: Checkbox for the toggles, Textarea for the
+ * amendment summary, Button for the footer. These assertions pin the
+ * contract the primitives must keep: the footer publish button stays a
+ * submit button bound to the form, and the summary box keeps its label.
+ */
+describe("PublishReportModal — shared-ui primitives (review item 2)", () => {
+    it("the footer publish button submits the form", async () => {
+        renderModal(0, { isAmendment: true });
+        const publish = await screen.findByRole("button", { name: /publish/i });
+        expect(publish.getAttribute("type")).toBe("submit");
+        expect(publish.getAttribute("form")).toBe("ih-publish-report-form");
+    });
+
+    it("the summary box is labelled by the amendment question", async () => {
+        renderModal(0, { isAmendment: true });
+        const box = await screen.findByLabelText(/What changed in this amendment\?/i);
+        expect(box.tagName).toBe("TEXTAREA");
+    });
+
+    it("the gate toggles render as labelled checkboxes", async () => {
+        renderModal(0);
+        expect(await screen.findByRole("checkbox", { name: /signature/i })).toBeTruthy();
+        expect(await screen.findByRole("checkbox", { name: /payment/i })).toBeTruthy();
+    });
+});

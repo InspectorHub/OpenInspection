@@ -1,6 +1,6 @@
 import { Link, type useFetcher } from "react-router";
 import { useHumanGatedSubmit } from "~/components/OutboundVerification";
-import { Modal, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Modal, Button, Checkbox, Textarea } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import { m } from "~/paraglide/messages";
 
@@ -70,9 +70,9 @@ export function PublishReportModal({
    * precondition: an inspector may have good reason to publish with an item
    * left open, so the count informs and the decision stays theirs.
    *
-   * A count and not a list because a count is all the hub has: its payload
-   * carries `{ ready, blockingCount }`. The defects themselves come from a
-   * separate endpoint the editor calls.
+   * A count and not a list because the list lives one step earlier: the
+   * Publish button runs the readiness endpoint on demand and shows the
+   * editor's PublishGateModal with the defects before this modal ever opens.
    */
   blockingCount: number;
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
@@ -88,21 +88,12 @@ export function PublishReportModal({
       title={m.hub_publish_title()}
       footer={
         <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
-          >
+          <Button variant="ghost" size="sm" onClick={onClose}>
             {m.common_cancel()}
-          </button>
-          <button
-            type="submit"
-            form={FORM_ID}
-            {...pendingProps(submitting)}
-            className={`px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60 ${PENDING_CLASS}`}
-          >
+          </Button>
+          <Button variant="primary" size="sm" type="submit" form={FORM_ID} pending={submitting}>
             {submitting ? m.hub_publish_pending() : m.hub_publish_submit()}
-          </button>
+          </Button>
         </>
       }
     >
@@ -142,7 +133,7 @@ export function PublishReportModal({
             <p className="rounded-md border border-ih-border bg-ih-bg-muted px-3 py-2 text-[12px] text-ih-fg-2">
               {m.report_publish_body_delivery_amendment()}
             </p>
-            <ToggleRow
+            <Checkbox
               name="notifyClient"
               label={m.editor_publish_notify_client()}
               defaultChecked={false}
@@ -160,12 +151,12 @@ export function PublishReportModal({
           </p>
         )}
 
-        <ToggleRow
+        <Checkbox
           name="requireSignature"
           label={m.hub_publish_require_signature()}
           defaultChecked={agreementRequired}
         />
-        <ToggleRow
+        <Checkbox
           name="requirePayment"
           label={m.hub_publish_require_payment()}
           defaultChecked={paymentRequired}
@@ -178,16 +169,12 @@ export function PublishReportModal({
             having to guess from a boolean. */}
         {courtesyTranslationEnabled && (
           <div>
-            <label className="flex items-center gap-2.5 text-[13px] text-ih-fg-1 cursor-pointer">
-              <input
-                type="checkbox"
-                name="translateTo"
-                value={courtesyTranslationLocale}
-                defaultChecked={false}
-                className="rounded border-ih-border text-ih-primary focus:ring-ih-primary"
-              />
-              <span>{m.courtesy_translation_publish_optin()}</span>
-            </label>
+            <Checkbox
+              name="translateTo"
+              value={courtesyTranslationLocale}
+              label={m.courtesy_translation_publish_optin()}
+              defaultChecked={false}
+            />
             {/* The nudge. A fact about the recipient, stated once, next to the
                 control it is relevant to — never a pre-ticked box. */}
             {clientPrefersTranslation && (
@@ -199,45 +186,17 @@ export function PublishReportModal({
         )}
 
         {isAmendment && (
-          <label className="block">
-            <span className="block text-[13px] font-medium text-ih-fg-1 mb-1">
-              {m.inspections_hub_publish_summary_label()}
-            </span>
-            <textarea
-              name="summary"
-              rows={3}
-              maxLength={500}
-              placeholder={m.inspections_hub_publish_summary_ph()}
-              className="w-full rounded-md border border-ih-border bg-ih-bg-card px-2.5 py-1.5 text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:border-ih-primary focus:ring-1 focus:ring-ih-primary"
-            />
-          </label>
+          <Textarea
+            label={m.inspections_hub_publish_summary_label()}
+            name="summary"
+            rows={3}
+            maxLength={500}
+            placeholder={m.inspections_hub_publish_summary_ph()}
+          />
         )}
 
         {error && <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>}
       </fetcher.Form>
     </Modal>
-  );
-}
-
-/** A labeled checkbox row for the publish modal toggles (DS tokens). */
-function ToggleRow({
-  name,
-  label,
-  defaultChecked,
-}: {
-  name: string;
-  label: string;
-  defaultChecked: boolean;
-}) {
-  return (
-    <label className="flex items-center gap-2.5 text-[13px] text-ih-fg-1 cursor-pointer">
-      <input
-        type="checkbox"
-        name={name}
-        defaultChecked={defaultChecked}
-        className="rounded border-ih-border text-ih-primary focus:ring-ih-primary"
-      />
-      <span>{label}</span>
-    </label>
   );
 }
