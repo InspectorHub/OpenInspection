@@ -4,7 +4,7 @@
  *
  * `UpdateInspectionSchema` also accepts `status`, `templateId`, `coverPhotoId`
  * and the property facts. Each of those has its own surface with its own rules
- * — the publish lifecycle owns `status`, the report editor owns the template —
+ * — the publish lifecycle owns `status`, the hub's Settings card owns the template —
  * so a schedule modal quietly carrying one through would be a real hole rather
  * than a style point.
  */

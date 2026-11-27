@@ -230,7 +230,6 @@ export function useInspectionState(opts: UseInspectionOptions) {
   // UI panels
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showCheatsheet, setShowCheatsheet] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [dockOpen, setDockOpen] = useState(false);
   const [burstCameraOpen, setBurstCameraOpen] = useState(false);
   const [burstCameraItemId, setBurstCameraItemId] = useState<string | null>(
@@ -550,8 +549,6 @@ export function useInspectionState(opts: UseInspectionOptions) {
     setShowPublishModal,
     showCheatsheet,
     setShowCheatsheet,
-    settingsOpen,
-    setSettingsOpen,
     dockOpen,
     setDockOpen,
     burstCameraOpen,

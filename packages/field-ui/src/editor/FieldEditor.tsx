@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { INSPECTION_STATUS_COMPLETED } from "../shared/inspection-status";
 import { useFieldDataSource, useFieldEnsureHuman, useFieldSlots } from "../context";
 import type { EditorData, FieldDataSource, PhotoSource } from "../data-source";
-import { ORIGINAL_QUALITY_KEY } from "../shared/original-quality";
+import { readOriginalQuality } from "../shared/original-quality";
 import { findRatingLevel, ratingAdvanceDecision } from "../shared/rating-levels";
 import { makeCustomDefect } from "../shared/custom-defects";
 import { useInspectionState, type InspectionSchema } from "../hooks/useInspection";
@@ -51,7 +51,6 @@ import { reorderItemBySwap } from "../shared/reorder-by-swap";
 import { KeyboardHud } from "../components/editor/KeyboardHud";
 import { InspectorToolsDock } from "../components/editor/InspectorToolsDock";
 import { resolveActivePropertyPreset } from "../shared/property-preset";
-import { InspectionSettingsSheet } from "../components/editor/InspectionSettingsSheet";
 import { VideoCapture } from "../components/media-studio/VideoCapture";
 import { attachUploadedVideo } from "../components/media-studio/attach-uploaded-video";
 import { bakePhoto } from "../components/media-studio/bakePhoto";
@@ -83,7 +82,7 @@ import { MobileBottomDrawer } from "../components/MobileBottomDrawer";
 import { BreadcrumbDropdown, type UnitScopeRow } from "../components/editor/BreadcrumbDropdown";
 import type { ResultMap } from "../hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "../shared/types";
-import { Button, IconButton } from "@core/shared-ui";
+import { IconButton } from "@core/shared-ui";
 import { m } from "../i18n";
 import { ReadOnlyScope, useReadOnly } from "../read-only";
 import { guardPhotoOps, readOnlyKeyboard } from "../read-only-guards";
@@ -93,20 +92,6 @@ import { useScrollTopOnDetails } from "../hooks/useScrollTopOnDetails";
 import { notesCommitTarget } from "../hooks/notes-commit-target";
 import { ItemFilterBar } from "../components/editor/ItemFilterBar";
 import { UnitControls } from "../components/editor/UnitControls";
-
-/**
- * Device-local opt-out for the upload preprocessing pass. Default OFF means
- * preprocessing is ON (downscale + EXIF/GPS strip). Persisted to localStorage
- * so the choice survives reloads and is read at all three photo entry points
- * (item picker, burst commit, offline replay) from one source of truth.
- */
-function originalQualityEnabled(): boolean {
- try {
- return typeof localStorage !== "undefined" && localStorage.getItem(ORIGINAL_QUALITY_KEY) === "1";
- } catch {
- return false;
- }
-}
 
 /**
  * The inspection editor page. It reads everything from its `data` prop, the field data source and the host
@@ -690,7 +675,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
   * Drives VideoCapture checkbox gating and VideoPlayer branch selection. */
  const videoProvider = fieldSession.videoProvider;
  // The preview entry points need an address and a host that can open it; either missing leaves them out.
- const { openPreview, previewReportUrl, restartAfterTemplate } = useHostActions(String(state.inspection.id));
+ const { openPreview, previewReportUrl } = useHostActions(String(state.inspection.id));
 
  /* ---------------------------------------------------------------- */
  /* Photo / media operations (extracted hook) */
@@ -1043,7 +1028,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  // cannot clobber it. The offline branch below keeps the RAW File (Task 5
  // bakes at replay). Single-file selections take this exact same path with
  // a one-element array, so behavior is byte-identical to the old code.
- const orig = originalQualityEnabled();
+ const orig = readOriginalQuality();
  const target = pendingPhotoTargetRef.current;
  pendingPhotoTargetRef.current = null;
  void (async () => {
@@ -1099,7 +1084,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  // N4 — bake each frame before upload. Burst frames are already
  // canvas-captured JPEGs (no EXIF), so this is purely the downscale; it
  // no-ops on frames already below the cap. Honors the original-quality opt-out.
- const orig = originalQualityEnabled();
+ const orig = readOriginalQuality();
  void (async () => {
  const files: Blob[] = [];
  for (let i = 0; i < blobs.length; i++) {
@@ -1589,20 +1574,13 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  );
 
  /* B-22: empty-template CTA — shown instead of normal editor body when the
-  * inspection has no sections (template not applied yet). Opens the
-  * InspectionSettingsSheet where the user can pick a template. */
+  * inspection has no sections (template not applied yet). The template is
+  * chosen on the inspection's hub page now (#529); the editor keeps only the
+  * explanation, no button. */
  const emptyTemplateEl = state.sections.length === 0 ? (
  <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-6">
   <p className="text-[15px] font-semibold text-ih-fg-1">{m.editor_route_empty_template_title()}</p>
   <p className="text-[13px] text-ih-fg-3 max-w-sm">{m.editor_route_empty_template_desc()}</p>
-  {caps.settingsSheet && !readOnly && (
-   <Button
-   variant="primary"
-   onClick={() => state.setSettingsOpen(true)}
-   >
-   {m.editor_route_choose_template()}
-   </Button>
-  )}
  </div>
  ) : null;
 
@@ -1724,18 +1702,6 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
   */
  const finishActionsEl = (
  <>
- {/* Inspection settings sheet */}
- {caps.settingsSheet && (
-  <InspectionSettingsSheet
-  open={state.settingsOpen}
-  onClose={() => state.setSettingsOpen(false)}
-  inspectionId={String(state.inspection.id)}
-  // Template schema drives the whole editor state (frozen at mount in useInspection),
-  // so a template change requires a full route reload — this also fixes the same
-  // staleness for mid-inspection template switches, not just the empty case.
-  onTemplateApplied={restartAfterTemplate}
-  />
- )}
  {/* Publish confirmation modal */}
  <PublishModal
  open={state.showPublishModal}
@@ -1917,7 +1883,6 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  onClose={() => setMobileDrawer(null)}
  onPublish={() => void handlePublishClick()}
  onSign={() => setSignModalOpen(true)}
- onOpenSettings={caps.settingsSheet && !readOnly ? () => state.setSettingsOpen(true) : null}
  onFinishFieldwork={!readOnly && (state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null}
  finishingFieldwork={publishFlow.finishing}
  onPreviewReport={
@@ -1929,7 +1894,6 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  pdfLabel={pdf ? pdf.actionLabel(m.editor_header_preview_pdf_short()) : undefined}
  pdfBusy={pdf?.busy ?? false}
  pdfError={pdf?.error ?? null}
- onChangeTemplate={caps.settingsSheet && !readOnly ? () => state.setSettingsOpen(true) : null}
  onSaveAsNewTemplate={readOnly ? null : () => structure.openSaveTemplate("new")}
  onUpdateSourceTemplate={structure.canSaveBack && !readOnly ? () => structure.openSaveTemplate("back") : null}
  onOpenTheme={caps.themeControl ? () => setMobileDrawer('theme') : null}
@@ -1950,10 +1914,10 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  </>
  );
 
- // Read-only starting while a dialog that writes is open (publish, sign, settings, version history, the cameras) closes it.
+ // Read-only starting while a dialog that writes is open (publish, sign, version history, the cameras) closes it.
  useEffect(() => {
   if (!readOnly) return;
-  state.setShowPublishModal(false); setShowPublishGate(false); setSignModalOpen(false); state.setSettingsOpen(false);
+  state.setShowPublishModal(false); setShowPublishGate(false); setSignModalOpen(false);
   setVersionHistoryOpen(false); state.setBurstCameraOpen(false); setAddMediaChooser(null); setVideoCaptureTarget(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when read-only turns on; the setters are stable
  }, [readOnly]);
@@ -2078,7 +2042,6 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  finishingFieldwork={publishFlow.finishing}
  collabEditing={fieldSession.collabEditing} held={collab?.lineageHold === true}
  onOpenVersionHistory={() => setVersionHistoryOpen(true)}
- onChangeTemplate={() => state.setSettingsOpen(true)}
  onSaveAsNewTemplate={() => structure.openSaveTemplate("new")}
  onUpdateSourceTemplate={() => structure.openSaveTemplate("back")}
  canUpdateSourceTemplate={structure.canSaveBack}

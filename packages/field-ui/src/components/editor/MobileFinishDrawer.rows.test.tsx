@@ -4,19 +4,23 @@
  * Template actions and the Theme. Each is there when the host provides what it calls and absent otherwise; a
  * group with no rows has no heading.
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MobileFinishDrawer, type MobileFinishDrawerProps } from "./MobileFinishDrawer";
+import { ORIGINAL_QUALITY_KEY } from "../../shared/original-quality";
 import { m } from "../../i18n";
 
-afterEach(cleanup);
+beforeEach(() => localStorage.removeItem(ORIGINAL_QUALITY_KEY));
+afterEach(() => {
+  cleanup();
+  localStorage.removeItem(ORIGINAL_QUALITY_KEY);
+});
 
 const props = (over: Partial<MobileFinishDrawerProps> = {}): MobileFinishDrawerProps => ({
   open: true,
   onClose: () => {},
   onPublish: () => {},
   onSign: () => {},
-  onOpenSettings: null,
   onFinishFieldwork: null,
   finishingFieldwork: false,
   onPreviewReport: null,
@@ -64,22 +68,38 @@ describe("More drawer: PDF", () => {
 describe("More drawer: Template group", () => {
   it("lists exactly the actions provided, under a Template heading", () => {
     const saveNew = vi.fn();
-    render(<MobileFinishDrawer {...props({ onChangeTemplate: () => {}, onSaveAsNewTemplate: saveNew, onUpdateSourceTemplate: null })} />);
+    render(<MobileFinishDrawer {...props({ onSaveAsNewTemplate: saveNew, onUpdateSourceTemplate: null })} />);
     expect(within(sheet()).getByText(m.template_menu_template())).toBeTruthy();
-    expect(row(m.template_menu_change())).not.toBeNull();
+    expect(row(m.template_menu_save_new())).not.toBeNull();
     expect(row(m.template_menu_update_source())).toBeNull();
+    // #529 removed the swap-template row with the settings sheet: the label
+    // is a literal here because its message key went with the feature.
+    expect(row("Change template")).toBeNull();
     fireEvent.click(row(m.template_menu_save_new())!);
     expect(saveNew).toHaveBeenCalledTimes(1);
   });
 
-  it("an action the host cannot do is left out: no settings sheet means no Change template; no source means no Update source", () => {
-    render(<MobileFinishDrawer {...props({ onChangeTemplate: null, onSaveAsNewTemplate: () => {}, onUpdateSourceTemplate: () => {} })} />);
-    expect(row(m.template_menu_change())).toBeNull();
+  it("an action the host cannot do is left out: no source means no Update source", () => {
+    render(<MobileFinishDrawer {...props({ onSaveAsNewTemplate: () => {}, onUpdateSourceTemplate: () => {} })} />);
+    expect(row(m.template_menu_save_new())).not.toBeNull();
     expect(row(m.template_menu_update_source())).not.toBeNull();
   });
 
-  it("with none of the three there is no Template heading", () => {
+  it("with neither of the two there is no Template heading", () => {
     render(<MobileFinishDrawer {...props()} />);
     expect(within(sheet()).queryByText(m.template_menu_template())).toBeNull();
+  });
+});
+
+describe("More drawer: upload-quality toggle", () => {
+  it("writes the device-local choice to localStorage and does not close the drawer", () => {
+    const onClose = vi.fn();
+    render(<MobileFinishDrawer {...props({ onClose })} />);
+    const toggle = screen.getByRole("checkbox", { name: new RegExp(m.editor_settings_original_quality()) });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(localStorage.getItem(ORIGINAL_QUALITY_KEY)).toBe("1");
+    expect(onClose).not.toHaveBeenCalled();
+    expect(toggle).toBeChecked();
   });
 });

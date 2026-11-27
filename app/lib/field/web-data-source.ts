@@ -15,7 +15,6 @@ import { createWebPublishReadiness } from "./web-publish-readiness";
 import { createWebVideo } from "./web-video";
 import { createWebMediaPool } from "./web-media-pool";
 import { createWebRepairItems } from "./web-repair-items";
-import { createWebSettingsSheet } from "./web-settings-sheet";
 import { createWebTemplateSearch } from "./web-template-search";
 import { createWebVersionHistory } from "./web-version-history";
 
@@ -86,7 +85,6 @@ export function createWebFieldDataSource(parts: WebDataSourceParts): FieldDataSo
             templateSearch: createWebTemplateSearch(),
             repairItems: createWebRepairItems(),
             mediaPool: createWebMediaPool(),
-            settingsSheet: createWebSettingsSheet(),
             versionHistory: createWebVersionHistory(),
             publishReadiness: createWebPublishReadiness(),
         },

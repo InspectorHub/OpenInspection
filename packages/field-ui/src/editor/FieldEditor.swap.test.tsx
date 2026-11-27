@@ -159,23 +159,6 @@ describe("overlays and item editor state come through a swap", () => {
     await layoutIs("phone");
     expect(((await screen.findByLabelText(m.editor_customdefect_title_aria())) as HTMLInputElement).value).toBe("Cracked flashing");
   });
-
-  it("the report settings sheet keeps the choice made in it", async () => {
-    mountForRatings(390, { data: DATA, resources: fullResources() });
-    await itemsTab();
-    fireEvent.click(screen.getByRole("button", { name: m.editor_mobile_more() }));
-    fireEvent.click(await screen.findByRole("button", { name: m.editor_header_settings() }));
-    const select = async () => {
-      const el = await screen.findByLabelText(new RegExp(m.editor_settings_required_defect_fields()));
-      if (!(el instanceof HTMLSelectElement)) throw new Error("the required-defect-fields control is not a select");
-      return el;
-    };
-    fireEvent.change(await select(), { target: { value: "both" } });
-    expect((await select()).value).toBe("both");
-    resizeViewport(834);
-    await layoutIs("tablet");
-    expect((await select()).value).toBe("both");
-  });
 });
 
 describe("batch select on the phone", () => {

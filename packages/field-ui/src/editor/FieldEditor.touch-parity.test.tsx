@@ -48,27 +48,18 @@ describe.each([["tablet", TABLET], ["phone", PHONE]] as const)("%s: More drawer 
     expect(rowIn(await openMore(), m.editor_header_preview_pdf_short())).toBeNull();
   });
 
-  it("Template: Save as new is always there, Change template needs the settings sheet, Update source needs a source template", async () => {
+  it("Template: Save as new is always there, Update source needs a source template", async () => {
     mountMore(null);
     let sheet = await openMore();
     expect(within(sheet).getByText(m.template_menu_template())).toBeTruthy();
     expect(rowIn(sheet, m.template_menu_save_new())).not.toBeNull();
-    expect(rowIn(sheet, m.template_menu_change())).not.toBeNull();
+    // #529 removed the swap-template row with the settings sheet: the label
+    // is a literal here because its message key went with the feature.
+    expect(rowIn(sheet, "Change template")).toBeNull();
     expect(rowIn(sheet, m.template_menu_update_source())).toBeNull();
-    cleanup();
-    mountMore("settingsSheet");
-    sheet = await openMore();
-    expect(rowIn(sheet, m.template_menu_change())).toBeNull();
-    expect(rowIn(sheet, m.template_menu_save_new())).not.toBeNull();
     cleanup();
     mountMore(null, createEmptyEditorData({ ...DATA, inspection: { ...DATA.inspection, templateId: "t1" } }));
     expect(rowIn(await openMore(), m.template_menu_update_source())).not.toBeNull();
-  });
-
-  it("Change template opens the settings sheet", async () => {
-    mountMore(null);
-    fireEvent.click(rowIn(await openMore(), m.template_menu_change())!);
-    expect(await screen.findAllByRole("dialog", { name: m.editor_header_settings() })).toBeTruthy();
   });
 });
 

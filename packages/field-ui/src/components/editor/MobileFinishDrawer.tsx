@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Button } from "@core/shared-ui";
 import { MobileBottomDrawer } from "../MobileBottomDrawer";
 import { useReadOnly } from "../../read-only";
+import { readOriginalQuality, writeOriginalQuality } from "../../shared/original-quality";
 import { m } from "../../i18n";
 
 export interface MobileFinishDrawerProps {
@@ -10,8 +12,6 @@ export interface MobileFinishDrawerProps {
   onPublish: () => void;
   /** Opens the manual signature modal. */
   onSign: () => void;
-  /** Opens the per-inspection report settings sheet; null when the host has none (the button is left out). */
-  onOpenSettings: (() => void) | null;
   /** Advisory lifecycle move; null once the fieldwork is already complete. */
   onFinishFieldwork: (() => void) | null;
   /** Whether the finish-fieldwork request is in flight. */
@@ -36,8 +36,7 @@ export interface MobileFinishDrawerProps {
   pdfBusy?: boolean;
   /** The host's last PDF error, shown under the row. */
   pdfError?: string | null;
-  /** Template actions, as in the desktop Template menu. Change needs the settings sheet; Update source needs a source template. */
-  onChangeTemplate?: (() => void) | null;
+  /** Template actions, as in the desktop Template menu. Update source needs a source template. */
   onSaveAsNewTemplate?: (() => void) | null;
   onUpdateSourceTemplate?: (() => void) | null;
   /** Opens the Theme drawer; null when the host supplies no theme control (the row is left out). */
@@ -56,7 +55,7 @@ export interface MobileFinishDrawerProps {
  *
  * Publish leads because it is what someone opens this for, then Sign and Finish fieldwork. Below them come the
  * things a phone has no key or dock for: a "Capture" group (speed mode, burst camera) and an "Inspection" group (version
- * history, units, cost items, report settings), each behind the same gate as its desktop control. The
+ * history, units, cost items), each behind the same gate as its desktop control. The
  * template menu and search stay back-office. This opens from the app bar rather than gaining a fifth tab in the
  * bottom nav: a terminal action does not belong in a row of navigation.
  */
@@ -65,7 +64,6 @@ export function MobileFinishDrawer({
   onClose,
   onPublish,
   onSign,
-  onOpenSettings,
   onFinishFieldwork,
   finishingFieldwork,
   onPreviewReport,
@@ -78,12 +76,28 @@ export function MobileFinishDrawer({
   pdfLabel,
   pdfBusy = false,
   pdfError = null,
-  onChangeTemplate = null,
   onSaveAsNewTemplate = null,
   onUpdateSourceTemplate = null,
   onOpenTheme = null,
 }: MobileFinishDrawerProps) {
   const readOnly = useReadOnly();
+  // Device-local upload preference, not a per-inspection setting: it used to
+  // live in the settings sheet (#529 moved the sheet to the hub), and the
+  // desktop header's More menu is its home there — but a phone never mounts
+  // that header, so this drawer carries the same toggle row here, or the
+  // inspector taking the photos could never reach it. Re-read on every open:
+  // the header menu's toggle writes the same key, and this row must show the
+  // current value, not the one from when the drawer mounted.
+  const [originalQuality, setOriginalQuality] = useState(readOriginalQuality);
+  useEffect(() => {
+    if (open) setOriginalQuality(readOriginalQuality());
+  }, [open ]);
+  const toggleOriginalQuality = () => {
+    setOriginalQuality((v) => {
+      writeOriginalQuality(!v);
+      return !v;
+    });
+  };
   const run = (fn: () => void) => {
     onClose();
     fn();
@@ -95,9 +109,7 @@ export function MobileFinishDrawer({
   if (onOpenVersionHistory) inspectionRows.push({ label: m.editor_header_version_history(), run: onOpenVersionHistory });
   if (onOpenUnits) inspectionRows.push({ label: m.editor_route_units(), run: onOpenUnits });
   if (onOpenCostItems) inspectionRows.push({ label: m.editor_route_cost_items(), run: onOpenCostItems });
-  if (onOpenSettings) inspectionRows.push({ label: m.editor_header_settings(), run: onOpenSettings });
   const templateRows: Array<{ label: string; run: () => void }> = [];
-  if (onChangeTemplate) templateRows.push({ label: m.template_menu_change(), run: onChangeTemplate });
   if (onSaveAsNewTemplate) templateRows.push({ label: m.template_menu_save_new(), run: onSaveAsNewTemplate });
   if (onUpdateSourceTemplate) templateRows.push({ label: m.template_menu_update_source(), run: onUpdateSourceTemplate });
   const groupHeading = "px-1 pt-3 pb-1 text-[12px] font-bold text-ih-fg-2";
@@ -177,6 +189,21 @@ export function MobileFinishDrawer({
             {m.nav_theme_label()}
           </Button>
         )}
+        {/* Device-local upload preference — the same toggle the desktop header's More menu carries. A row, not
+            an action: it stays put after the toggle instead of closing the drawer. Shown even in read-only:
+            it writes to this device's storage, not to the inspection. */}
+        <label className="flex items-start gap-2 cursor-pointer min-h-11 touch-manipulation px-1 pt-3">
+          <input
+            type="checkbox"
+            checked={originalQuality}
+            onChange={toggleOriginalQuality}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-ih-primary"
+          />
+          <span>
+            <span className="block text-[13px] font-medium text-ih-fg-1">{m.editor_settings_original_quality()}</span>
+            <span className="block text-[12px] text-ih-fg-3">{m.editor_settings_original_quality_help()}</span>
+          </span>
+        </label>
       </div>
     </MobileBottomDrawer>
   );

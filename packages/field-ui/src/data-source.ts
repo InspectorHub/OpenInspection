@@ -34,7 +34,6 @@ import type {
   UnitProgress,
   RelianceText,
   RepairItemOption,
-  SettingsSheetData,
   VersionSnapshotContent,
   VersionSnapshotEntry,
   VideoFinalizeInput,
@@ -255,11 +254,6 @@ export interface FieldResources {
   repairItems?: { list(): Promise<RepairItemOption[]> };
   /** The inspection's photos for the gallery. `list` never rejects: a failed read answers `answered: false`. */
   mediaPool?: { list(inspectionId: string): Promise<MediaPoolListing> };
-  /**
-   * What the inspection settings sheet reads when it opens. Never rejects; `null` means the host could not
-   * read it (the sheet then offers a retry instead of a form that would save blanks over the stored values).
-   */
-  settingsSheet?: { load(inspectionId: string): Promise<SettingsSheetData | null> };
   /**
    * AI writing assistance for an inspection note (the web host serves it from `/resources/ai-assist`).
    * Never rejects: every failure answers `{ ok: false, error }`. The caller owns the same-frame guard:

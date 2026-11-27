@@ -25,7 +25,6 @@ export {
 export {
   createFakeMediaPool,
   createFakeRepairItems,
-  createFakeSettingsSheet,
   createFakeVersionHistory,
   createFakeVideo,
 } from './fake-panel-resources';
@@ -33,7 +32,6 @@ export type { FakeAiAssist, FakeCommentsLibrary, FakeCostItems, FakeTemplateSear
 export type {
   FakeMediaPool,
   FakeRepairItems,
-  FakeSettingsSheet,
   FakeVersionHistory,
   FakeVideo,
 } from './fake-panel-resources';

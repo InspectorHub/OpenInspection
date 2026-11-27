@@ -17,8 +17,6 @@ export interface EditorCapabilities {
   video: boolean;
   /** The repair-item catalogue: attaching a repair item to a finding. */
   repairItems: boolean;
-  /** The settings sheet: every entry that opens it (header, Template menu, phone More drawer, empty-template call to action). */
-  settingsSheet: boolean;
   /** The host's theme switch: the header control and the phone Theme tab. */
   themeControl: boolean;
   /** A camera API on this device (what the burst camera calls): the phone More drawer's Capture group. */
@@ -39,7 +37,6 @@ export function useEditorCapabilities(): EditorCapabilities {
     versionHistory: resources.versionHistory !== undefined,
     video: resources.video !== undefined,
     repairItems: resources.repairItems !== undefined,
-    settingsSheet: resources.settingsSheet !== undefined,
     themeControl: renderThemeControl !== undefined,
     cameraCapture,
   };
