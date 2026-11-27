@@ -50,7 +50,7 @@ describe.each([["tablet", TABLET], ["phone", PHONE]] as const)("%s: More drawer 
 
   it("Template: Save as new is always there, Update source needs a source template", async () => {
     mountMore(null);
-    let sheet = await openMore();
+    const sheet = await openMore();
     expect(within(sheet).getByText(m.template_menu_template())).toBeTruthy();
     expect(rowIn(sheet, m.template_menu_save_new())).not.toBeNull();
     // #529 removed the swap-template row with the settings sheet: the label

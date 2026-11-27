@@ -71,10 +71,6 @@
     "kind": "record",
     "reason": "The versions the editor opened on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
   },
-  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeSettingsSheet.loads": {
-    "kind": "record",
-    "reason": "The times the editor loaded the settings sheet on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
-  },
   "packages/field-ui/src/testing/fake-resources.ts#FakeTemplateSearch.searches": {
     "kind": "record",
     "reason": "The ordered list of template searches the editor issued on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."

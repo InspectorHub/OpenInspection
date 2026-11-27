@@ -1,5 +1,4 @@
 import { useFieldDataSource } from '../context';
-import { m } from '../i18n';
 
 export interface HostActions {
   /**
@@ -12,11 +11,6 @@ export interface HostActions {
    * `openPreview`.
    */
   previewReportUrl: string | null;
-  /**
-   * The template schema is frozen at mount, so a template change needs a fresh mount, not a data refresh. A host
-   * that cannot restart says so afterwards (this runs after the change was saved, so it is not an entry point).
-   */
-  restartAfterTemplate: () => void;
 }
 
 export function useHostActions(inspectionId: string): HostActions {
@@ -26,9 +20,5 @@ export function useHostActions(inspectionId: string): HostActions {
   return {
     openPreview: openUrl ? (url) => openUrl.call(dataSource, url) : null,
     previewReportUrl: tenantSlug ? dataSource.urls.reportPreview(tenantSlug, inspectionId) : null,
-    restartAfterTemplate: () => {
-      if (dataSource.restartSession) dataSource.restartSession();
-      else dataSource.notify(m.editor_template_applied_reopen(), 'warning');
-    },
   };
 }
