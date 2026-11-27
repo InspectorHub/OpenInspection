@@ -1189,7 +1189,7 @@ export default function InspectionHubPage() {
             </>
           )}
 
-          {/* IA-40 — Report versions. The signed, immutable version history had
+          {/* IA-40 — Published versions. The signed, immutable version history had
               no entry point anywhere in the app; this is it. Each amendment
               links to a field-level diff against its immediate predecessor. */}
           {versions.length > 0 && (

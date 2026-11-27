@@ -110,7 +110,7 @@ test.describe('Subsystem D — units, republish, version diff', () => {
 
         // P9 — the snapshot exists as its own version, flagged as an amendment,
         // and carries a link to the diff against its predecessor.
-        await expect(page.getByText('Report versions')).toBeVisible({ timeout: 20_000 });
+        await expect(page.getByText('Published versions')).toBeVisible({ timeout: 20_000 });
         await expect(page.getByText('Version 2', { exact: true })).toBeVisible();
         await expect(page.getByText('Amendment')).toBeVisible();
         await expect(page.getByText('Fixed roof recommendation per follow-up')).toBeVisible();
