@@ -400,3 +400,87 @@ describe('NewInspectionWizard — address suggestions vs the wizard footer (F1)'
         });
     });
 });
+
+/**
+ * #482 — a failed booking create used to close the wizard and discard the
+ * form the inspector had just filled in. The action returns { ok: false }
+ * for 400/500s; the wizard must stay open and show the server's message on
+ * the Confirm step instead, with the quota branch untouched.
+ *
+ * The failed response is mocked in from mount (same compromise as F1 above):
+ * the effect keys on `intent === 'create'` and the other consumers treat an
+ * unrecognised body as nothing to report, so the assertion still pins the
+ * effect-to-banner chain — the part that used to call onClose().
+ */
+describe('NewInspectionWizard — failed create keeps the form (#482)', () => {
+    const mockedUseFetcher = vi.mocked(useFetcher);
+    let restoreFetcher: (() => void) | null = null;
+
+    function mockFailedCreate(error: { code?: string; message?: string }) {
+        const previous = mockedUseFetcher.getMockImplementation();
+        mockedUseFetcher.mockImplementation((() => ({
+            state: 'idle',
+            data: { intent: 'create', ok: false, error },
+            submit: fetcherMocks.submit,
+            load: vi.fn(),
+            Form: ({ children, ...props }: { children: React.ReactNode; [k: string]: unknown }) =>
+                createElement('form', props, children),
+        })) as never);
+        restoreFetcher = () => {
+            if (previous) mockedUseFetcher.mockImplementation(previous);
+        };
+    }
+
+    afterEach(() => {
+        restoreFetcher?.();
+        restoreFetcher = null;
+    });
+
+    function walkToConfirm(onClose: () => void) {
+        // Minimal walk: property (address + template), then people with
+        // nothing entered — no contact detail, so nothing blocks Next. No
+        // service catalog, so the services step is skipped entirely.
+        const view = render(
+            <NewInspectionWizard
+                open
+                onClose={onClose}
+                templates={[{ id: 'tpl-1', name: 'Standard Inspection' }]}
+                services={[]}
+                teamMembers={[]}
+            />,
+        );
+        const { getByPlaceholderText, getByText, getByLabelText, getAllByRole } = view;
+        fireEvent.change(getByPlaceholderText(/123 Main|St.*City/i), {
+            target: { value: '123 Main Street' },
+        });
+        fireEvent.change(getByLabelText('Report template'), { target: { value: 'Standard' } });
+        fireEvent.mouseDown(getByText('Standard Inspection'));
+
+        const clickNext = () => {
+            const next = (getAllByRole('button') as HTMLButtonElement[])
+                .find((b) => b.textContent?.includes('Next'));
+            expect(next).toBeTruthy();
+            expect(next!.hasAttribute('disabled')).toBe(false);
+            fireEvent.click(next!);
+        };
+        clickNext();
+        clickNext();
+        return view;
+    }
+
+    it('stays open and shows the server message when the create fails', () => {
+        mockFailedCreate({ code: 'VALIDATION_FAILED', message: 'The property address is invalid.' });
+        const onClose = vi.fn();
+        const { getByText } = walkToConfirm(onClose);
+        expect(onClose).not.toHaveBeenCalled();
+        expect(getByText('The property address is invalid.')).toBeTruthy();
+    });
+
+    it('falls back to a plain message when the server sends no message', () => {
+        mockFailedCreate({ code: 'INTERNAL_ERROR' });
+        const onClose = vi.fn();
+        const { getByText } = walkToConfirm(onClose);
+        expect(onClose).not.toHaveBeenCalled();
+        expect(getByText(/Couldn't create the inspection/)).toBeTruthy();
+    });
+});
