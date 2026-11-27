@@ -55,9 +55,25 @@ export interface PublishModalProps {
  autoSign: boolean;
  /** Handler for the auto-sign checkbox. */
  onAutoSignToggle: (checked: boolean) => void;
+ /**
+  * #506 — whether this workspace may PRODUCE a courtesy translation (#23).
+  * The opt-in renders only when it may, same power the hub modal has.
+  * Offering a control the server would refuse is the "a page must never offer
+  * an action the API refuses" rule, and here the refusal costs a publish's
+  * worth of confusion.
+  */
+ courtesyTranslationEnabled?: boolean;
+ /** The locale a translation would be produced in, e.g. `es-419`. */
+ courtesyTranslationLocale?: string;
+ /**
+  * True when the client's own preferred language is the one a translation
+  * would be produced in. A NUDGE and nothing more: it never pre-ticks the
+  * box, because producing a translation spends money.
+  */
+ clientPrefersTranslation?: boolean;
 }
 
-export function PublishModal({ open, inspectionId, progress, status, publishError, isSubmitting, onClose, onPublish, autoSign, onAutoSignToggle, isAmendment, noticeChoice = false, unchangedSinceVersion = null, coolingUnlockAtMs }: PublishModalProps) {
+export function PublishModal({ open, inspectionId, progress, status, publishError, isSubmitting, onClose, onPublish, autoSign, onAutoSignToggle, isAmendment, noticeChoice = false, unchangedSinceVersion = null, coolingUnlockAtMs, courtesyTranslationEnabled = false, courtesyTranslationLocale = "es-419", clientPrefersTranslation = false }: PublishModalProps) {
  // The order lifecycle does not gate publishing (report and order axes are
  // independent). When the on-site work is not yet marked complete, offer an
  // advisory choice — do both, or just publish — but never block.
@@ -102,16 +118,21 @@ export function PublishModal({ open, inspectionId, progress, status, publishErro
  const [summary, setSummary] = useState("");
  // Unchecked every time the dialog opens: telling a client is a decision made for THIS revision.
  const [notifyClient, setNotifyClient] = useState(false);
+ // #506 — unchecked every time the dialog opens, for the same reason the
+ // notify box is: producing a translation spends money, and a default that
+ // spends it is a decision the product made on somebody's behalf.
+ const [translate, setTranslate] = useState(false);
  const extras = (): PublishExtras => ({
   ...(isAmendment && summary.trim() ? { summary: summary.trim() } : {}),
   ...(noticeChoice && notifyClient ? { notifyClient: true } : {}),
+  ...(courtesyTranslationEnabled && translate ? { translateTo: courtesyTranslationLocale } : {}),
  });
  /**
   * What THIS submission was, held in state so the receipt cannot lag: the order reads as published straight after a
   * first publish, so the live props no longer say what was submitted. `null` until something is submitted.
   */
  const [submitted, setSubmitted] = useState<{ choice: boolean; notify: boolean } | null>(null);
- useEffect(() => { if (!open) setNotifyClient(false); }, [open]);
+ useEffect(() => { if (!open) { setNotifyClient(false); setTranslate(false); } }, [open]);
  const [receiptOpen, setReceiptOpen] = useState(false);
  // Two clicks in one frame both run before `isSubmitting` has rendered. The caller can also decline
  // before it submits (the human check is dismissed), which never raises `isSubmitting`, so the latch
@@ -262,6 +283,23 @@ export function PublishModal({ open, inspectionId, progress, status, publishErro
    onChange={(e) => onAutoSignToggle(e.target.checked)}
   />
  </div>
+ {/* #506 — the per-publish opt-in, same power the hub modal has. DEFAULT OFF,
+     and a checkbox rather than a default because producing a translation spends
+     money and the decision stays with whoever incurs it. */}
+ {courtesyTranslationEnabled && (
+  <div className="mt-4">
+   <Checkbox
+    label={m.courtesy_translation_publish_optin()}
+    checked={translate}
+    onChange={(e) => setTranslate(e.target.checked)}
+   />
+   {/* The nudge. A fact about the recipient, stated once, next to the control
+       it is relevant to — never a pre-ticked box. */}
+   {clientPrefersTranslation && (
+    <p className="text-[12px] text-ih-fg-3 mt-1 ml-6">{m.courtesy_translation_publish_nudge()}</p>
+   )}
+  </div>
+ )}
  </Modal>
  <Modal
  open={receiptOpen}

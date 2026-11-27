@@ -12,6 +12,7 @@ import type { CompliancePanelData } from "@core/field-ui/data-source-types";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { revisionStatusForInspection } from "../../../server/lib/statutory/revision-status";
 import { isReportPublished } from "~/lib/status";
+import { COURTESY_TRANSLATION_LOCALE } from "~/lib/courtesy-locale";
 import { deriveReportState } from "./report-state.server";
 import { resolveReportTier } from "../../../server/lib/report-tier";
 import { parseSnapshot } from "./loader-snapshot.server";
@@ -75,8 +76,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const inspP = api.inspections[":id"].$get({ param: { id } });
  const inspBodyP = inspP.then(async (r) => (r.ok ? await r.json() : {}));
  const optionalP = inspBodyP.then((body) => readOptional(api, id, body as Record<string, unknown>));
- // loader-budget-allow: six independent reads plus two derivations of the inspection read (its parsed body and the optional reads started from it), which add no calls of their own
- const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, inspBody, optional] = await Promise.all([
+ // loader-budget-allow: seven independent reads plus two derivations of the inspection read (its parsed body and the optional reads started from it), which add no calls of their own
+ const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, aiCfgRes, inspBody, optional] = await Promise.all([
  inspP,
  // Commercial PCA Phase U (Batch C-lazy) — first paint only needs the common
  // scope. The editor opens at activeUnitId = null (the '_default' scope), so
@@ -96,6 +97,11 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // name/id → color lookup and thread it into every canned-defect chip,
  // instead of resolving color per-defect.
  api.defectCategories["defect-categories"].$get().catch(() => null),
+ // #506 — the workspace's courtesy-translation switch, for the editor publish
+ // dialog's opt-in (same power the hub modal has). A failed read reads as
+ // off, which is what an unreachable config and an unset one look like to
+ // the person on this page.
+ api.integrationsAi.config.$get().catch(() => null),
  inspBodyP,
  optionalP,
  ]);
@@ -392,8 +398,19 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // of the session flips this for the second. The hub asks the same question of
  // `report_versions.length`; both mean "a version already exists".
  const nextPublishIsAmendment = isReportPublished(inspection.reportStatus);
+ // #506 — the editor publish dialog's translation opt-in, the same power the
+ // hub modal has: whether the workspace may PRODUCE a courtesy translation,
+ // the locale it would be produced in, and the primary client's preferred
+ // language for the nudge. A failed config read reads as off, which is what
+ // an unreachable config and an unset one look like to the person on this page.
+ let courtesyTranslationEnabled = false;
+ if (aiCfgRes?.ok) {
+  const aiCfgBody = (await aiCfgRes.json().catch(() => null)) as { data?: { courtesyTranslationEnabled?: boolean } } | null;
+  courtesyTranslationEnabled = aiCfgBody?.data?.courtesyTranslationEnabled ?? false;
+ }
+ const clientLocale = typeof inspection.clientLocale === "string" ? inspection.clientLocale : null;
  // Returned values are written into the page source: the snapshot goes once (top-level), and no token.
  const inspectionRow: Record<string, unknown> = { ...inspection };
  delete inspectionRow.templateSnapshot;
- return { inspection: inspectionRow, schema, results, resultId, ratingLevels, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, viewer, outboundCoolingWindow, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage, nextPublishIsAmendment, reportState: deriveReportState(data), initialLayout: layoutFromCookieHeader(request.headers.get("cookie")) };
+ return { inspection: inspectionRow, schema, results, resultId, ratingLevels, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, viewer, outboundCoolingWindow, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage, nextPublishIsAmendment, courtesyTranslationEnabled, courtesyTranslationLocale: COURTESY_TRANSLATION_LOCALE, clientLocale, reportState: deriveReportState(data), initialLayout: layoutFromCookieHeader(request.headers.get("cookie")) };
 }

@@ -1750,6 +1750,9 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  onPublish={(markComplete, extras) => { void publishFlow.publish(markComplete, extras, autoSign); }}
  autoSign={autoSign}
  onAutoSignToggle={handleAutoSignToggle}
+ courtesyTranslationEnabled={data.courtesyTranslationEnabled ?? false}
+ courtesyTranslationLocale={data.courtesyTranslationLocale ?? "es-419"}
+ clientPrefersTranslation={data.clientLocale === (data.courtesyTranslationLocale ?? "es-419")}
  />
  {/* Inspector sign modal */}
  <SignModal

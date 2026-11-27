@@ -31,6 +31,7 @@ vi.mock("~/lib/api-client.server", () => ({
         tags: { index: { $get: () => ok([]) } },
         sessionContext: { context: { $get: () => ok({ branding: { tenantSlug: "co" }, videoProvider: "r2", collabEditing: true }) } },
         defectCategories: { "defect-categories": { $get: () => ok([]) } },
+        integrationsAi: { config: { $get: () => ok({ courtesyTranslationEnabled: false }) } },
     }),
 }));
 
