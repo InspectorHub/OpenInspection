@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Modal, Button, Banner, buttonClasses, useActionLatch } from "@core/shared-ui";
+import { Modal, Button, Banner, buttonClasses, useActionLatch, Checkbox, Textarea } from "@core/shared-ui";
 import { m } from "../../i18n";
 import { formatShapedDateTime } from "../../shared/format-date";
 import { useFieldDataSource } from "../../context";
@@ -55,9 +55,25 @@ export interface PublishModalProps {
  autoSign: boolean;
  /** Handler for the auto-sign checkbox. */
  onAutoSignToggle: (checked: boolean) => void;
+ /**
+  * #506 — whether this workspace may PRODUCE a courtesy translation (#23).
+  * The opt-in renders only when it may, same power the hub modal has.
+  * Offering a control the server would refuse is the "a page must never offer
+  * an action the API refuses" rule, and here the refusal costs a publish's
+  * worth of confusion.
+  */
+ courtesyTranslationEnabled?: boolean;
+ /** The locale a translation would be produced in, e.g. `es-419`. */
+ courtesyTranslationLocale?: string;
+ /**
+  * True when the client's own preferred language is the one a translation
+  * would be produced in. A NUDGE and nothing more: it never pre-ticks the
+  * box, because producing a translation spends money.
+  */
+ clientPrefersTranslation?: boolean;
 }
 
-export function PublishModal({ open, inspectionId, progress, status, publishError, isSubmitting, onClose, onPublish, autoSign, onAutoSignToggle, isAmendment, noticeChoice = false, unchangedSinceVersion = null, coolingUnlockAtMs }: PublishModalProps) {
+export function PublishModal({ open, inspectionId, progress, status, publishError, isSubmitting, onClose, onPublish, autoSign, onAutoSignToggle, isAmendment, noticeChoice = false, unchangedSinceVersion = null, coolingUnlockAtMs, courtesyTranslationEnabled = false, courtesyTranslationLocale = "es-419", clientPrefersTranslation = false }: PublishModalProps) {
  // The order lifecycle does not gate publishing (report and order axes are
  // independent). When the on-site work is not yet marked complete, offer an
  // advisory choice — do both, or just publish — but never block.
@@ -102,16 +118,21 @@ export function PublishModal({ open, inspectionId, progress, status, publishErro
  const [summary, setSummary] = useState("");
  // Unchecked every time the dialog opens: telling a client is a decision made for THIS revision.
  const [notifyClient, setNotifyClient] = useState(false);
+ // #506 — unchecked every time the dialog opens, for the same reason the
+ // notify box is: producing a translation spends money, and a default that
+ // spends it is a decision the product made on somebody's behalf.
+ const [translate, setTranslate] = useState(false);
  const extras = (): PublishExtras => ({
   ...(isAmendment && summary.trim() ? { summary: summary.trim() } : {}),
   ...(noticeChoice && notifyClient ? { notifyClient: true } : {}),
+  ...(courtesyTranslationEnabled && translate ? { translateTo: courtesyTranslationLocale } : {}),
  });
  /**
   * What THIS submission was, held in state so the receipt cannot lag: the order reads as published straight after a
   * first publish, so the live props no longer say what was submitted. `null` until something is submitted.
   */
  const [submitted, setSubmitted] = useState<{ choice: boolean; notify: boolean } | null>(null);
- useEffect(() => { if (!open) setNotifyClient(false); }, [open]);
+ useEffect(() => { if (!open) { setNotifyClient(false); setTranslate(false); } }, [open]);
  const [receiptOpen, setReceiptOpen] = useState(false);
  // Two clicks in one frame both run before `isSubmitting` has rendered. The caller can also decline
  // before it submits (the human check is dismissed), which never raises `isSubmitting`, so the latch
@@ -231,43 +252,54 @@ export function PublishModal({ open, inspectionId, progress, status, publishErro
  </div>
  )}
  {isAmendment && (
- <label className="mt-4 block">
- {/* The hub's own publish dialog asks this in these exact words; reusing its
-     keys is what keeps the two from asking differently-worded versions of one
-     question about the same row. */}
- <span className="block text-[12px] font-medium text-ih-fg-2 mb-1">
- {m.inspections_hub_publish_summary_label()}
- </span>
- <textarea
-  value={summary}
-  onChange={(e) => setSummary(e.target.value)}
-  rows={3}
-  maxLength={500}
-  placeholder={m.inspections_hub_publish_summary_ph()}
-  className="w-full rounded-lg border border-ih-border bg-ih-bg-card px-2.5 py-1.5 text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:border-ih-primary focus:ring-1 focus:ring-ih-primary"
- />
- </label>
+  <div className="mt-4">
+   {/* The hub's own publish dialog asks this in these exact words; reusing its
+       keys is what keeps the two from asking differently-worded versions of one
+       question about the same row. The shared Textarea is what keeps the two
+       from RENDERING it differently: same label, same radius. */}
+   <Textarea
+    label={m.inspections_hub_publish_summary_label()}
+    value={summary}
+    onChange={(e) => setSummary(e.target.value)}
+    rows={3}
+    maxLength={500}
+    placeholder={m.inspections_hub_publish_summary_ph()}
+   />
+  </div>
  )}
  {noticeChoice && (
- <label className="mt-4 flex items-center gap-2 text-[12px] font-medium text-ih-fg-2 cursor-pointer select-none">
- <input
-  type="checkbox"
-  checked={notifyClient}
-  onChange={(e) => setNotifyClient(e.target.checked)}
-  className="h-3.5 w-3.5 rounded border-ih-border-strong text-ih-primary"
- />
- {m.editor_publish_notify_client()}
- </label>
+  <div className="mt-4">
+   <Checkbox
+    label={m.editor_publish_notify_client()}
+    checked={notifyClient}
+    onChange={(e) => setNotifyClient(e.target.checked)}
+   />
+  </div>
  )}
- <label className="mt-4 flex items-center gap-2 text-[12px] font-medium text-ih-fg-3 cursor-pointer select-none">
- <input
-  type="checkbox"
-  checked={autoSign}
-  onChange={(e) => onAutoSignToggle(e.target.checked)}
-  className="h-3.5 w-3.5 rounded border-ih-border-strong text-ih-primary"
- />
- {m.editor_publish_autosign()}
- </label>
+ <div className="mt-4">
+  <Checkbox
+   label={m.editor_publish_autosign()}
+   checked={autoSign}
+   onChange={(e) => onAutoSignToggle(e.target.checked)}
+  />
+ </div>
+ {/* #506 — the per-publish opt-in, same power the hub modal has. DEFAULT OFF,
+     and a checkbox rather than a default because producing a translation spends
+     money and the decision stays with whoever incurs it. */}
+ {courtesyTranslationEnabled && (
+  <div className="mt-4">
+   <Checkbox
+    label={m.courtesy_translation_publish_optin()}
+    checked={translate}
+    onChange={(e) => setTranslate(e.target.checked)}
+   />
+   {/* The nudge. A fact about the recipient, stated once, next to the control
+       it is relevant to — never a pre-ticked box. */}
+   {clientPrefersTranslation && (
+    <p className="text-[12px] text-ih-fg-3 mt-1 ml-6">{m.courtesy_translation_publish_nudge()}</p>
+   )}
+  </div>
+ )}
  </Modal>
  <Modal
  open={receiptOpen}

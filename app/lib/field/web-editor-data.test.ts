@@ -20,7 +20,8 @@ describe("editorDataFromLoader", () => {
         const data = editorDataFromLoader(loaderPayload({ resultId: null, nextPublishIsAmendment: true, unitInspectionMode: "per_unit" }));
         expect(Object.keys(data).sort()).toEqual(
             [
-                "commercialPresets", "compliance", "defectCategories", "initialLayout", "inspection", "nextPublishIsAmendment",
+                "clientLocale", "commercialPresets", "compliance", "courtesyTranslationEnabled", "courtesyTranslationLocale",
+                "defectCategories", "initialLayout", "inspection", "nextPublishIsAmendment",
                 "outboundCoolingWindow", "pcaNarrative", "ratingLevels", "reopenedForEditing", "relianceText", "resultId", "results",
                 "revisionStatus", "schema", "statutoryCoverage", "statutoryDetails", "tagLibrary", "templateSnapshot",
                 "unitInspectionMode", "unitProgress", "units",

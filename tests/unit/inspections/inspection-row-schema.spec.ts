@@ -30,7 +30,7 @@ describe('the documented inspection record keys', () => {
     });
 
     it('keep the computed keys apart from the columns', () => {
-        expect([...INSPECTION_COMPUTED_KEYS].sort()).toEqual(['clientPhone', 'signedByClient']);
+        expect([...INSPECTION_COMPUTED_KEYS].sort()).toEqual(['clientLocale', 'clientPhone', 'signedByClient']);
         for (const key of INSPECTION_COMPUTED_KEYS) {
             expect(COLUMNS.has(key), key).toBe(false);
             expect(documented, key).not.toContain(key);

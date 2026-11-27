@@ -7,7 +7,7 @@
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
     "files": 167,
-    "dollarMethods": 604,
+    "dollarMethods": 606,
     "apiWorker": 11
   },
   "fanOut": {
@@ -224,7 +224,7 @@
       "apiWorker": 0
     },
     "app/routes/inspection-edit/loader.server.ts": {
-      "dollarMethods": 11,
+      "dollarMethods": 12,
       "apiWorker": 0
     },
     "app/routes/inspection-repair-requests.tsx": {
@@ -240,7 +240,7 @@
       "apiWorker": 0
     },
     "app/routes/inspector-portal.tsx": {
-      "dollarMethods": 24,
+      "dollarMethods": 25,
       "apiWorker": 1
     },
     "app/routes/invoices.tsx": {

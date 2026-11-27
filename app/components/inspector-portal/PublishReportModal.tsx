@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Link, type useFetcher } from "react-router";
 import { useHumanGatedSubmit } from "~/components/OutboundVerification";
-import { Modal, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Modal, Button, Checkbox, Textarea } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import { m } from "~/paraglide/messages";
 
@@ -12,23 +13,32 @@ const FORM_ID = "ih-publish-report-form";
 
 export function PublishReportModal({
   open,
-  agreementRequired,
-  paymentRequired,
   isAmendment,
+  noticeChoice = false,
   courtesyTranslationEnabled,
   courtesyTranslationLocale,
   clientPrefersTranslation,
+  autoSign,
+  orderCompleted,
   blockingCount,
   fetcher,
   submitting,
   error,
   onClose,
+  onPublishSubmit,
 }: {
   open: boolean;
-  agreementRequired: boolean;
-  paymentRequired: boolean;
   /** IA-40 — this publish creates versionNumber > 1; ask what changed. */
   isAmendment: boolean;
+  /**
+   * #484 — whether the server will honour the notice choice for this publish:
+   * the report was reopened with "Edit and republish" (in progress, published
+   * once). Separate from `isAmendment`, which only decides whether the dialog
+   * asks what changed: a republish after a retract has earlier versions but is
+   * a fresh delivery the automation rules decide, so it offers no choice. Same
+   * name and meaning as the editor's PublishModal prop.
+   */
+  noticeChoice?: boolean;
   /**
    * #23 — whether this workspace may PRODUCE a courtesy translation.
    *
@@ -49,6 +59,19 @@ export function PublishReportModal({
    */
   clientPrefersTranslation: boolean;
   /**
+   * #506 — whether the inspector signature is auto-applied on publish, the
+   * stored flag the box defaults from. Same choice the editor's PublishModal
+   * offers, in the same words (`editor_publish_autosign`); the action PATCHes
+   * it before publishing, so ticking here signs THIS publish.
+   */
+  autoSign: boolean;
+  /**
+   * #506 — whether the on-site work is already marked complete. When it is
+   * not, the footer offers "Mark complete and publish" beside "Publish
+   * report", mirroring the editor modal's two-button footer.
+   */
+  orderCompleted: boolean;
+  /**
    * How many items the report-status gate still counts as unresolved.
    *
    * SHOWN, NEVER ENFORCED. The hub card beside the Publish button already
@@ -60,17 +83,35 @@ export function PublishReportModal({
    * precondition: an inspector may have good reason to publish with an item
    * left open, so the count informs and the decision stays theirs.
    *
-   * A count and not a list because a count is all the hub has: its payload
-   * carries `{ ready, blockingCount }`. The defects themselves come from a
-   * separate endpoint the editor calls.
+   * A count and not a list because the list lives one step earlier: the
+   * Publish button runs the readiness endpoint on demand and shows the
+   * editor's PublishGateModal with the defects before this modal ever opens.
    */
   blockingCount: number;
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
   submitting: boolean;
   error: string | undefined;
   onClose: () => void;
+  /**
+   * Item 3 — what this submit is, reported while the form still knows. The
+   * banner cannot recover it after the publish: the loader revalidates and
+   * the report is no longer "editing again", so `noticeChoice` is false by
+   * the time the confirmation renders. The human gate re-fires the submit
+   * via requestSubmit, so this runs twice with the same values; the second
+   * run is the real one.
+   */
+  onPublishSubmit?: (choice: { offered: boolean; notified: boolean }) => void;
 }) {
   const gatedSubmit = useHumanGatedSubmit();
+  // #506 — which footer button submitted this form. React STATE, not the
+  // submitter's name/value: the human gate re-fires the submit with a bare
+  // requestSubmit(), so a submitter value would be lost on the real submit.
+  // State is safe where an imperative write was not: a click is a discrete
+  // event, so React flushes the update synchronously before the browser's
+  // default submit action runs — and the gate's macrotask before the re-fire
+  // leaves further margin. (A ref + onClick write was tried first and the
+  // probe showed the value never moved: the write raced the submit.)
+  const [markComplete, setMarkComplete] = useState(false);
   return (
     <Modal
       open={open}
@@ -78,21 +119,31 @@ export function PublishReportModal({
       title={m.hub_publish_title()}
       footer={
         <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
-          >
+          <Button variant="ghost" size="sm" onClick={onClose}>
             {m.common_cancel()}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
             type="submit"
             form={FORM_ID}
-            {...pendingProps(submitting)}
-            className={`px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60 ${PENDING_CLASS}`}
+            pending={submitting}
+            onClick={() => setMarkComplete(false)}
           >
             {submitting ? m.hub_publish_pending() : m.hub_publish_submit()}
-          </button>
+          </Button>
+          {!orderCompleted && (
+            <Button
+              variant="secondary"
+              size="sm"
+              type="submit"
+              form={FORM_ID}
+              pending={submitting}
+              onClick={() => setMarkComplete(true)}
+            >
+              {submitting ? m.hub_publish_pending() : m.editor_publish_mark_complete_and_publish()}
+            </Button>
+          )}
         </>
       }
     >
@@ -100,9 +151,18 @@ export function PublishReportModal({
         id={FORM_ID}
         method="post"
         className="space-y-3"
-        onSubmit={gatedSubmit}
+        onSubmit={(e) => {
+          onPublishSubmit?.({
+            offered: noticeChoice,
+            notified: new FormData(e.currentTarget).get("notifyClient") === "on",
+          });
+          // `gatedSubmit` returns a promise (the human gate is async); the
+          // form's own submit already happened — nothing awaits it here.
+          void gatedSubmit(e);
+        }}
       >
         <input type="hidden" name="intent" value="publish" />
+        <input type="hidden" name="markComplete" value={markComplete ? "true" : "false"} />
         {blockingCount > 0 && (
           <p className="rounded-md border border-ih-watch bg-ih-watch-bg px-3 py-2 text-[12px] text-ih-watch-fg">
             {m.hub_publish_unresolved({ count: blockingCount })}
@@ -120,26 +180,47 @@ export function PublishReportModal({
             Dropping the switches silently would leave the question they asked
             unanswered, so the answer — and the address that decides it — is said
             plainly instead. Sentence, not a disabled control: there is nothing
-            here to operate. */}
-        <p
-          data-testid="publish-notify-automation"
-          className="rounded-md border border-ih-border bg-ih-bg-muted px-3 py-2 text-[12px] text-ih-fg-2"
-        >
-          {m.hub_publish_notify_automation()}{" "}
-          <Link to="/settings/automations" className="font-bold text-ih-primary hover:underline">
-            {m.hub_publish_notify_automation_link()}
-          </Link>
-        </p>
+            here to operate.
+            #484 — one choice is back, for revisions only: the server now
+            honours `notifyClient` on an amendment (it decides whether the
+            `report.amended` rules fire at all), so a revision offers the same
+            unchecked-by-default box the editor's PublishModal does. A first
+            publish, and a republish after a retract, keep the sentence above:
+            the rules decide, and there is no box to tick. */}
+        {noticeChoice ? (
+          <>
+            <p className="rounded-md border border-ih-border bg-ih-bg-muted px-3 py-2 text-[12px] text-ih-fg-2">
+              {m.report_publish_body_delivery_amendment()}
+            </p>
+            <Checkbox
+              name="notifyClient"
+              label={m.editor_publish_notify_client()}
+              defaultChecked={false}
+            />
+          </>
+        ) : (
+          <p
+            data-testid="publish-notify-automation"
+            className="rounded-md border border-ih-border bg-ih-bg-muted px-3 py-2 text-[12px] text-ih-fg-2"
+          >
+            {m.hub_publish_notify_automation()}{" "}
+            <Link to="/settings/automations" className="font-bold text-ih-primary hover:underline">
+              {m.hub_publish_notify_automation_link()}
+            </Link>
+          </p>
+        )}
 
-        <ToggleRow
-          name="requireSignature"
-          label={m.hub_publish_require_signature()}
-          defaultChecked={agreementRequired}
-        />
-        <ToggleRow
-          name="requirePayment"
-          label={m.hub_publish_require_payment()}
-          defaultChecked={paymentRequired}
+        {/* #506 — the signature/payment gate checkboxes are GONE. They posted
+            requireSignature/requirePayment, which the publish endpoint accepts
+            but never uses (the validation schema says so outright), so ticking
+            them changed nothing about what the client must do before viewing
+            — a dead control in the F79 shape. The gates are set by GateToggle
+            on the hub card beside the Publish button, which is the control
+            that actually writes them, with its own permission rule. */}
+        <Checkbox
+          name="autoSignOnPublish"
+          label={m.editor_publish_autosign()}
+          defaultChecked={autoSign}
         />
 
         {/* #23 — the per-publish opt-in. DEFAULT OFF, and it is a checkbox
@@ -149,16 +230,12 @@ export function PublishReportModal({
             having to guess from a boolean. */}
         {courtesyTranslationEnabled && (
           <div>
-            <label className="flex items-center gap-2.5 text-[13px] text-ih-fg-1 cursor-pointer">
-              <input
-                type="checkbox"
-                name="translateTo"
-                value={courtesyTranslationLocale}
-                defaultChecked={false}
-                className="rounded border-ih-border text-ih-primary focus:ring-ih-primary"
-              />
-              <span>{m.courtesy_translation_publish_optin()}</span>
-            </label>
+            <Checkbox
+              name="translateTo"
+              value={courtesyTranslationLocale}
+              label={m.courtesy_translation_publish_optin()}
+              defaultChecked={false}
+            />
             {/* The nudge. A fact about the recipient, stated once, next to the
                 control it is relevant to — never a pre-ticked box. */}
             {clientPrefersTranslation && (
@@ -170,45 +247,17 @@ export function PublishReportModal({
         )}
 
         {isAmendment && (
-          <label className="block">
-            <span className="block text-[13px] font-medium text-ih-fg-1 mb-1">
-              {m.inspections_hub_publish_summary_label()}
-            </span>
-            <textarea
-              name="summary"
-              rows={3}
-              maxLength={500}
-              placeholder={m.inspections_hub_publish_summary_ph()}
-              className="w-full rounded-md border border-ih-border bg-ih-bg-card px-2.5 py-1.5 text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:border-ih-primary focus:ring-1 focus:ring-ih-primary"
-            />
-          </label>
+          <Textarea
+            label={m.inspections_hub_publish_summary_label()}
+            name="summary"
+            rows={3}
+            maxLength={500}
+            placeholder={m.inspections_hub_publish_summary_ph()}
+          />
         )}
 
         {error && <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>}
       </fetcher.Form>
     </Modal>
-  );
-}
-
-/** A labeled checkbox row for the publish modal toggles (DS tokens). */
-function ToggleRow({
-  name,
-  label,
-  defaultChecked,
-}: {
-  name: string;
-  label: string;
-  defaultChecked: boolean;
-}) {
-  return (
-    <label className="flex items-center gap-2.5 text-[13px] text-ih-fg-1 cursor-pointer">
-      <input
-        type="checkbox"
-        name={name}
-        defaultChecked={defaultChecked}
-        className="rounded border-ih-border text-ih-primary focus:ring-ih-primary"
-      />
-      <span>{label}</span>
-    </label>
   );
 }

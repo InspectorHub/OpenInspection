@@ -45,6 +45,13 @@ describe("encodeCommand golden FormData", () => {
         expect(enc({ type: "publish" })).toEqual([["intent", "publish"]]);
     });
 
+    // #506 — the translation opt-in rides the publish command as the locale,
+    // and is left out when absent (the action reads absent as "no").
+    it("encodes translateTo as the locale, and leaves it out when absent", () => {
+        expect(enc({ type: "publish", translateTo: "es-419" })).toEqual([["intent", "publish"], ["translateTo", "es-419"]]);
+        expect(enc({ type: "publish" })).toEqual([["intent", "publish"]]);
+    });
+
     it("encodes each sample to the action field names and strings", () => {
         const golden: Record<keyof typeof SAMPLES, Array<[string, string]>> = {
             complete: [["intent", "complete"]],

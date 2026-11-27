@@ -14,17 +14,35 @@
  * this surface can actually know — the report is published — and names the
  * authority that decides the rest, which is the same thing the publish dialog
  * says before the act.
+ *
+ * Item 3 — one exception, for amendments the choice was offered for: the
+ * server DOES honour `notifyClient` there (it decides whether the
+ * `report.amended` rules fire at all), so the banner restates which way the
+ * submitted choice went, in the editor receipt's own words. A first publish,
+ * and a republish after a retract, keep the single sentence: no choice was
+ * offered, so there is nothing to restate.
  */
 import { useState } from "react";
 import { Banner } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
-export function PublishNotice({ show }: { show: boolean }) {
+/** What the publish submit chose, snapshotted by the modal at submit time. */
+export interface PublishNoticeChoice {
+    /** The amendment notice box was offered for this publish. */
+    offered: boolean;
+    /** The inspector ticked it. */
+    notified: boolean;
+}
+
+export function PublishNotice({ show, notice }: { show: boolean; notice?: PublishNoticeChoice | null }) {
     const [dismissed, setDismissed] = useState(false);
     if (!show || dismissed) return null;
     return (
         <Banner tone="success" dismissible onDismiss={() => setDismissed(true)}>
             {m.inspections_hub_publish_ok()}
+            {notice?.offered && (
+                <> {" "}{notice.notified ? m.report_publish_receipt_amendment_notified() : m.report_publish_receipt_amendment_not_notified()}</>
+            )}
         </Banner>
     );
 }
