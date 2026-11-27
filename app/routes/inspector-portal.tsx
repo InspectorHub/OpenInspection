@@ -64,6 +64,13 @@ import {
   handleReportDelete,
   handleReportTranslation,
 } from "~/lib/inspection-order-actions";
+import {
+  handleSaveSettings,
+  handleSetCover,
+  handleUploadCover,
+  handleCropCover,
+} from "~/lib/inspection-settings-actions";
+import { InspectionSettingsCard } from "~/components/inspector-portal/InspectionSettingsCard";
 import { ScheduleCard } from "~/components/inspector-portal/ScheduleCard";
 import { ServicesCard, type CatalogService } from "~/components/inspector-portal/ServicesCard";
 import { ReportsCard, type ReportRow } from "~/components/inspector-portal/ReportsCard";
@@ -420,6 +427,14 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   // the schedule modal, the order-details modal, the base-price modal and the
   // two delivery-gate switches: they all PATCH the same row.
   if (intent === "save-order") return handleSaveOrder(api, id, formData);
+
+  // #529 — the report settings (template, required defect fields, appearance
+  // profile, cover photo) moved here from the report editor's settings sheet.
+  // Same PATCH row, own allow-list: see inspection-settings-actions.
+  if (intent === "save-settings") return handleSaveSettings(api, id, formData);
+  if (intent === "set-cover") return handleSetCover(api, id, formData);
+  if (intent === "upload-cover") return handleUploadCover(api, id, formData);
+  if (intent === "crop-cover") return handleCropCover(api, id, formData);
   if (intent === "service-add") return handleServiceAdd(api, id, formData);
   if (intent === "service-price") return handleServicePrice(api, id, formData);
   if (intent === "service-remove") return handleServiceRemove(api, id, formData);
@@ -1220,6 +1235,9 @@ export default function InspectionHubPage() {
             />
           )}
         </Card>
+        {/* #529 — the report settings (template, required defect fields, appearance profile, cover photo)
+            moved here from the report editor's settings sheet; the editor no longer has a settings entry. */}
+        <InspectionSettingsCard inspectionId={inspection.id} canEdit={canEditReports} />
         {/* 7. Invoice — getting paid for it. IA-87 ②: the amount was display
             only; the base price is editable here when nothing outranks it. */}
         <InvoiceCard

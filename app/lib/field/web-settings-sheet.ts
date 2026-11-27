@@ -1,18 +1,21 @@
 /**
- * The web host's `resources.settingsSheet`: what the inspection settings sheet reads when it opens, over the
- * BFF resource route `/resources/inspection-settings-sheet` (one call that bundles the inspection row, the
- * template list and the cover-picker photos). The appearance profiles are the host's own list, added here.
+ * What the hub's Settings card reads when it opens (#529 — the editor's settings sheet is gone, and the card
+ * on `/inspections/:id` is the only reader now), over the BFF resource route `/resources/inspection-settings-sheet`
+ * (one call that bundles the inspection row, the template list and the cover-picker photos). The appearance
+ * profiles are the host's own list, added here.
  *
  * Never throws. `null` means the host could not read it (a failed request, a session-expiry redirect, a
  * non-JSON answer); an answered-but-empty sheet (no token) is what the route itself answers and is passed on.
  */
-import type { FieldResources } from "@core/field-ui/data-source";
 import type { SettingsSheetData } from "@core/field-ui/data-source-types";
 import { CLIENT_PROFILE_LIST } from "~/lib/report-style/profiles-client";
 
 const SETTINGS_SHEET_ROUTE = "/resources/inspection-settings-sheet";
 
-type SettingsSheet = NonNullable<FieldResources["settingsSheet"]>;
+/** What the settings loader answers: the same shape the removed sheet read. */
+export interface SettingsSheet {
+    load(inspectionId: string): Promise<SettingsSheetData | null>;
+}
 
 export function createWebSettingsSheet(fetchImpl: typeof fetch = (input, init) => fetch(input, init)): SettingsSheet {
     return {
