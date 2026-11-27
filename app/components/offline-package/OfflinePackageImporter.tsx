@@ -4,8 +4,10 @@ import { IMPORT_LIMIT_CEILINGS, type ImportOptions } from "@core/offline-package
 import { ConfirmImportDialog } from "~/components/offline-package/ConfirmImportDialog";
 import { ImportProgressPanel } from "~/components/offline-package/ImportProgressPanel";
 import { ImportResultPanel } from "~/components/offline-package/ImportResultPanel";
+import { LeftoverPackageCard } from "~/components/offline-package/LeftoverPackageCard";
 import { PackagePreview } from "~/components/offline-package/PackagePreview";
 import { useOfflinePackageImport } from "~/hooks/useOfflinePackageImport";
+import type { LeftoverStore } from "~/lib/offline-package-leftovers";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -20,15 +22,17 @@ import { m } from "~/paraglide/messages";
  * package's own `tenantId` is compared to it and never used as an identity.
  */
 export function OfflinePackageImporter({
-    tenantId, locale, timeZone, importOptions,
+    tenantId, locale, timeZone, importOptions, leftoverStore,
 }: {
     tenantId: string;
     locale: string;
     timeZone: string;
     /** Test seam: lets a spec skip the real waits between retries. */
     importOptions?: ImportOptions;
+    /** Test seam: the slot the leftovers are kept in. Defaults to IndexedDB. */
+    leftoverStore?: LeftoverStore;
 }) {
-    const { state, choose, reset, start, bytes } = useOfflinePackageImport(importOptions);
+    const { state, choose, reset, start, bytes, leftover, discardLeftover } = useOfflinePackageImport(importOptions, tenantId, leftoverStore);
     const [confirming, setConfirming] = useState(false);
     const latch = useActionLatch(state.kind === "running");
 
@@ -39,6 +43,9 @@ export function OfflinePackageImporter({
 
     return (
         <div className="space-y-ih-list">
+            {state.kind === "idle" && leftover && (
+                <LeftoverPackageCard leftover={leftover} onDiscard={discardLeftover} />
+            )}
             {state.kind === "idle" && (
                 <Card className="p-5 space-y-4">
                     <h2 className="text-[15px] font-bold text-ih-fg-1">{m.offline_import_choose_heading()}</h2>

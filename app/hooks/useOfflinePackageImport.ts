@@ -15,11 +15,12 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    IMPORT_LIMIT_CEILINGS, PackageFormatError, readPackageSummary, runImport,
+    extractHeldBackPackage, IMPORT_LIMIT_CEILINGS, PackageFormatError, readPackageSummary, runImport,
     type ImportOptions, type ImportReport, type PackageSummary,
 } from "@core/offline-package";
 import { formatFileSize } from "@core/shared-ui";
 import { sendOfflinePackage } from "~/lib/offline-package-send";
+import { indexedDbLeftoverStore, type LeftoverPackage, type LeftoverStore } from "~/lib/offline-package-leftovers";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -53,7 +54,12 @@ function refusalForFile(file: { name: string; size: number }): string | null {
     return null;
 }
 
-export function useOfflinePackageImport(options: ImportOptions = {}) {
+export function useOfflinePackageImport(
+    options: ImportOptions = {},
+    tenantId?: string,
+    /** Test seam: the slot the leftovers are kept in. Defaults to IndexedDB. */
+    leftoverStore?: LeftoverStore,
+) {
     const [state, setState] = useState<ImportState>(IDLE);
     // The package bytes can be 24 MiB; they stay out of React state so a re-render never copies them.
     const bytes = useRef<Uint8Array | null>(null);
@@ -62,6 +68,32 @@ export function useOfflinePackageImport(options: ImportOptions = {}) {
     const summaryRef = useRef<PackageSummary | null>(null);
     const optionsRef = useRef(options);
     optionsRef.current = options;
+    // Same as `optionsRef`: `start` is a `[]`-deps callback, so the tenant it
+    // saves leftovers under is read through a ref, not captured at first render.
+    const tenantIdRef = useRef(tenantId);
+    tenantIdRef.current = tenantId;
+    // #485 — the leftovers of the last import with anything held back, kept
+    // past a reload in the store above. The store is fixed at first render:
+    // swapping it mid-page would orphan whatever the previous one held.
+    const storeRef = useRef(leftoverStore ?? indexedDbLeftoverStore());
+    const [leftover, setLeftover] = useState<LeftoverPackage | null>(null);
+
+    // A leftover from another company is not this page's to offer: the slot
+    // is per browser profile, and the download would only fail to import.
+    useEffect(() => {
+        let live = true;
+        void storeRef.current.read().then((saved) => {
+            if (live && saved && (tenantId === undefined || saved.tenantId === tenantId)) setLeftover(saved);
+        });
+        return () => {
+            live = false;
+        };
+    }, [tenantId]);
+
+    const discardLeftover = useCallback(() => {
+        void storeRef.current.clear();
+        setLeftover(null);
+    }, []);
 
     const choose = useCallback(async (file: File) => {
         bytes.current = null;
@@ -108,6 +140,23 @@ export function useOfflinePackageImport(options: ImportOptions = {}) {
                         : s);
                 },
             });
+            // #485 — keep the leftovers past a reload: the extracted held-back
+            // package is the recovery copy, and it is small (only what was left
+            // behind). A clean import clears the slot. Keeping it must never
+            // fail the import itself, so every failure here is swallowed.
+            if (report.heldBack.length > 0) {
+                try {
+                    const ids = report.heldBack.map((h) => h.id);
+                    const saved: LeftoverPackage = { bytes: extractHeldBackPackage(zip, ids), ids, tenantId: tenantIdRef.current ?? "", savedAt: Date.now() };
+                    await storeRef.current.save(saved);
+                    setLeftover(saved);
+                } catch {
+                    // No recovery copy kept; the in-memory download still works this visit.
+                }
+            } else {
+                void storeRef.current.clear();
+                setLeftover(null);
+            }
             setState({ kind: "done", fileName, summary, report });
         } catch (error) {
             // `runImport` rejects only for a package it cannot read; nothing was sent.
@@ -126,5 +175,5 @@ export function useOfflinePackageImport(options: ImportOptions = {}) {
         return () => window.removeEventListener("beforeunload", warn);
     }, [running]);
 
-    return { state, choose, reset, start, bytes };
+    return { state, choose, reset, start, bytes, leftover, discardLeftover };
 }

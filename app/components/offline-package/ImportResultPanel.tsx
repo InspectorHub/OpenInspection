@@ -1,6 +1,7 @@
 import { Banner, Button, Card, StatCard } from "@core/shared-ui";
 import type { ImportReport } from "@core/offline-package";
 import { HeldBackList } from "~/components/offline-package/HeldBackList";
+import { attentionOpText, attentionReasonText } from "~/lib/offline-package-copy";
 import { formatNumber } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 
@@ -66,11 +67,11 @@ export function ImportResultPanel({
                         {report.needsAttention.map((row) => (
                             <li key={row.idempotencyKey} className="px-3 py-2.5">
                                 <p className="text-[13px] font-semibold text-ih-fg-1 break-all">
-                                    {m.offline_import_attention_row({ op: row.op, id: row.inspectionId })}
+                                    {m.offline_import_attention_row({ op: attentionOpText(row.op), id: row.inspectionId })}
                                 </p>
                                 <p className="text-[12px] text-ih-fg-3 mt-0.5">
                                     {m.offline_import_attention_status({ status: row.status })}
-                                    {row.reason ? ` - ${m.offline_import_attention_reason({ reason: row.reason })}` : ""}
+                                    {row.reason ? ` - ${m.offline_import_attention_reason({ reason: attentionReasonText(row.reason) })}` : ""}
                                 </p>
                             </li>
                         ))}

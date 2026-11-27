@@ -10,6 +10,7 @@ import type { ImportOptions } from "@core/offline-package";
 import { OfflinePackageImporter } from "~/components/offline-package/OfflinePackageImporter";
 import { makeCase } from "../../../tests/unit/helpers/offline-package-cases";
 import { confirmedFor } from "../../../tests/unit/helpers/offline-package-harness";
+import type { LeftoverStore } from "~/lib/offline-package-leftovers";
 
 export type Answer = { status: number; body: unknown };
 // i18n-literal-ok: a test-only type naming the "throw" sentinel, not text a person reads
@@ -45,8 +46,8 @@ export function fileOf(bytes: Uint8Array | string, name = "export.zip"): File {
     return new File([bytes as BlobPart], name, { type: "application/zip" });
 }
 
-export function renderPage(tenantId = "tenant-1") {
-    return render(<OfflinePackageImporter tenantId={tenantId} locale="en" timeZone="UTC" importOptions={NO_WAIT} />);
+export function renderPage(tenantId = "tenant-1", leftoverStore?: LeftoverStore) {
+    return render(<OfflinePackageImporter tenantId={tenantId} locale="en" timeZone="UTC" importOptions={NO_WAIT} leftoverStore={leftoverStore} />);
 }
 
 export async function choose(file: File) {
@@ -70,9 +71,9 @@ export async function confirmImport() {
     });
 }
 
-export async function runToResult(pack: { zip: Uint8Array }, respond: Respond) {
+export async function runToResult(pack: { zip: Uint8Array }, respond: Respond, leftoverStore?: LeftoverStore) {
     const net = stubNetwork(respond);
-    renderPage();
+    renderPage("tenant-1", leftoverStore);
     await choose(fileOf(pack.zip));
     await confirmImport();
     await screen.findByTestId("offline-package-result");
