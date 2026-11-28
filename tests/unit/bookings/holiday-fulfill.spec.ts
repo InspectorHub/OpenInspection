@@ -26,8 +26,8 @@ vi.mock('../../../server/lib/rate-limit', () => ({
 
 const TENANT_ID = 'aaaaaaaa-0000-0000-0000-0000000000h1';
 const TENANT_SLUG = 'holiday-fulfill';
-/** Thanksgiving 2026 — Thursday. */
-const THANKSGIVING = '2026-11-26';
+/** Thanksgiving 2027 — Thursday. */
+const THANKSGIVING = '2027-11-25';
 
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
 // Background work is settled at teardown by the helper. Hand-rolled stubs here

@@ -41,9 +41,9 @@ vi.mock('../../../server/lib/rate-limit', () => ({
  */
 const TENANT_ID = 'aaaaaaaa-0000-0000-0000-0000000000d1';
 const TENANT_SLUG = 'date-bounds';
-/** 2020-01-02 and 2026-11-26 are both Thursdays — the one day this tenant works. */
+/** 2020-01-02 and 2027-11-25 are both Thursdays — the one day this tenant works. */
 const PAST_THURSDAY = '2020-01-02';
-const FUTURE_THURSDAY = '2026-11-26';
+const FUTURE_THURSDAY = '2027-11-25';
 
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
 const FAKE_EXEC_CTX = makeExecutionContext().ctx;
