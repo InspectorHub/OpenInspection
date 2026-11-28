@@ -212,6 +212,8 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  const saveStatusRef = useRef(state.saveStatus);
  saveStatusRef.current = state.saveStatus;
  const collab = useResultsDoc(String(data.inspection.id), () => { drainRef.current(); if (saveStatusRef.current === "saved-local") state.setSaveStatus("saved"); }, liveWhenReadOnly || !pageReadOnly, pageReadOnly ? "read-only" : "editable");
+ // The collab doc has the server's state, so a scope switch needs no fetch. Also the gate useFindings uses to hold doc writes until the first sync.
+ const collabSynced = Boolean(collab?.synced) && collab?.lineageHold !== true; // a held connection (stale copy not backed up) is not syncing
  // #478 — the blocking recovery notice for a discarded local copy (see useDiscardedCopyNotice).
  const discardedCopy = useDiscardedCopyNotice(collab);
  // Read-only: the document is still read, projected and synced, but no write helper is ever handed it. A Yjs map `set`
@@ -239,9 +241,9 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  setDirty: state.setDirty,
  setSaveStatus: state.setSaveStatus,
  inspectionId: String(state.inspection.id),
-    // #181 — every write routes through the Y.Doc. The doc is briefly null on
-    // the SSR / first-paint window before the connection initialises.
-    collab: writeDoc ? { doc: writeDoc } : undefined,
+    // #181 — every write routes through the Y.Doc. The doc is briefly null on the SSR / first-paint window before the connection initialises.
+    // `synced` holds doc writes in useFindings until the first sync lands (early-edit race).
+    collab: writeDoc ? { doc: writeDoc, synced: collabSynced } : undefined,
     // Phase U (Batch C1) — scope every read/write to the active unit (null = _default).
     activeUnitId,
  });
@@ -457,10 +459,6 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  // self-loads its data on open via CostItemsHost, so it doesn't need
  // anything threaded through the (already very large) inspection-edit loader.
  const [costItemsOpen, setCostItemsOpen] = useState(false);
-
- // When the collab doc has synced, `readResultMap` already holds EVERY scope's
- // findings (the DO hydrated the full D1 blob), so a scope switch needs no fetch.
- const collabSynced = Boolean(collab?.synced) && collab?.lineageHold !== true; // a held connection (stale copy not backed up) is not syncing
 
  // Scope switch is fetch-if-missing, tracked in useScopeLoader (which owns the
  // merged/in-flight bookkeeping + the overlapping-load race). This wrapper

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ResultMap } from "../data-source-types";
 import {
   findingKey,
@@ -6,6 +6,13 @@ import {
   type AttachedRepairItem,
 } from "./findings/shared";
 import { buildCollabFindingsApi, type CollabFindingsApi } from "../collab/collab-findings-api";
+
+/**
+ * How long the pre-sync write queue waits for the first collab sync before
+ * flushing into the local doc anyway (dead-socket backstop — see below).
+ * Exported for tests; the editor never tunes it.
+ */
+export const PRE_SYNC_FLUSH_TIMEOUT_MS = 10_000;
 
 // Re-exported so existing imports (`~/hooks/useFindings`) keep resolving. The
 // type/helper definitions live in ./findings/shared; consumers and tests see
@@ -29,6 +36,18 @@ export {
  * connects are now QUEUED here and flushed through the live API the moment
  * the doc arrives, and while they wait the indicator reads "saving" — never
  * "saved". A write that has not reached the server is never reported as saved.
+ *
+ * Early-edit race — the same queue covers the window AFTER the doc connects
+ * but BEFORE the first collab sync completes. A write in that window seeds
+ * the finding's structure locally (getOrSeedItem) while the server seeds the
+ * identical structure from the template, and the Yjs merge keeps ONE seed
+ * subtree (higher clientID wins) and silently drops the other's edits — a
+ * coin flip on random clientIDs. So a connected-but-unsynced doc is treated
+ * like the pre-connect window: writes queue here and flush once the first
+ * sync lands, when the doc holds the server-seeded structure. `setNotes` is
+ * the exception: it is the optimistic keystroke echo (React state only, no
+ * doc write), so it applies immediately and typing never freezes while doc
+ * writes wait.
  */
 export function useFindings(
   results: ResultMap,
@@ -43,6 +62,25 @@ export function useFindings(
   // the re-renders between first paint and the doc connecting.
   const pendingWritesRef = useRef<Array<(api: CollabFindingsApi) => void>>([]);
   const doc = options.collab?.doc ?? null;
+  // Early-edit race (see above): a connected-but-unsynced doc queues writes
+  // exactly like a missing doc. `synced` is optional — a caller that does not
+  // pass it keeps the old behaviour (live writes as soon as the doc exists).
+  const collabSynced = options.collab?.synced ?? true;
+  // Dead-socket backstop: if the first sync never arrives (offline, or the
+  // socket never opens), the queue must still reach the local doc — otherwise
+  // an offline user's edits live only in React state and vanish on reload.
+  // Ten seconds is well past a healthy handshake and short enough that an
+  // offline edit lands in the doc promptly. Flushing on a slow-but-alive
+  // connection could still meet the losing seed, but a >10s first sync is
+  // pathological; the normal path flushes on sync.
+  const [syncTimedOut, setSyncTimedOut] = useState(false);
+  useEffect(() => {
+    if (!doc || collabSynced) return;
+    setSyncTimedOut(false);
+    const timer = setTimeout(() => setSyncTimedOut(true), PRE_SYNC_FLUSH_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [doc, collabSynced]);
+  const ready = doc !== null && (collabSynced || syncTimedOut);
 
   // Composite-key-preferred read helper (shared by the collab API and the
   // pre-connect fallback below). Phase U: resolve the composite key under the
@@ -62,12 +100,13 @@ export function useFindings(
     [results, sectionIdForItem, activeUnitId],
   );
 
-  // Flush the queued writes through the live API once the doc exists. Runs
-  // only when there is something queued; the flush reports 'saved-local'
+  // Flush the queued writes through the live API once the doc is ready (it
+  // exists AND the first sync landed, or the sync-timeout backstop fired).
+  // Runs only when there is something queued; the flush reports 'saved-local'
   // (in the doc, not yet server-confirmed) and the editor promotes it to
   // 'saved' on the collab sync step.
   useEffect(() => {
-    if (!doc) return;
+    if (!doc || !ready) return;
     const queued = pendingWritesRef.current;
     if (queued.length === 0) return;
     pendingWritesRef.current = [];
@@ -83,19 +122,29 @@ export function useFindings(
     setDirty(true);
     setSaveStatus("saved-local");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc]);
+  }, [doc, ready]);
 
-  // #181 — collab is the only write path. Once the doc is live, return the pure
-  // collab write API (every write goes to the doc via the binding).
-  if (options.collab?.doc) {
-    return buildCollabFindingsApi(options.collab.doc, {
-      getResult,
-      sectionIdForItem,
-      setResults,
-      setDirty,
-      setSaveStatus,
-      activeUnitId,
-    });
+  // The doc-built API (only when the doc exists). The live path returns it
+  // 1:1; the pre-sync fallback borrows ONLY its setNotes — the optimistic
+  // keystroke echo, which touches React state and never the doc — so typing
+  // never freezes while doc writes wait for the sync.
+  const docApi = doc
+    ? buildCollabFindingsApi(doc, {
+        getResult,
+        sectionIdForItem,
+        setResults,
+        setDirty,
+        setSaveStatus,
+        activeUnitId,
+      })
+    : null;
+
+  // #181 — collab is the only write path. Once the doc is live AND synced,
+  // return the pure collab write API (every write goes to the doc via the
+  // binding). Before the first sync the fallback below queues doc writes
+  // instead (early-edit race — see above).
+  if (ready && docApi) {
+    return docApi;
   }
 
   // Pre-connect window (SSR / first paint, before the doc connects). Reads
@@ -118,7 +167,14 @@ export function useFindings(
   const fallback: CollabFindingsApi = {
     getResult,
     setRating: (sectionId, itemId, rating) => queueWrite((api) => api.setRating(sectionId, itemId, rating)),
-    setNotes: (sectionId, itemId, notes) => queueWrite((api) => api.setNotes(sectionId, itemId, notes)),
+    // setNotes is the optimistic keystroke echo (React state only, no doc
+    // write): apply it immediately when the doc exists so typing never
+    // freezes while doc writes wait for the sync. Before the doc connects
+    // there is nothing to echo into yet, so it queues like any other write.
+    setNotes: (sectionId, itemId, notes) => {
+      if (docApi) docApi.setNotes(sectionId, itemId, notes);
+      else queueWrite((api) => api.setNotes(sectionId, itemId, notes));
+    },
     commitNotes: (sectionId, itemId, notes) => queueWrite((api) => api.commitNotes(sectionId, itemId, notes)),
     setItemValue: (sectionId, itemId, value) => queueWrite((api) => api.setItemValue(sectionId, itemId, value)),
     setItemAttribute: (sectionId, itemId, attributeId, value) => queueWrite((api) => api.setItemAttribute(sectionId, itemId, attributeId, value)),

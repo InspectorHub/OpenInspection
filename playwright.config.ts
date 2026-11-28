@@ -92,7 +92,7 @@ export default defineConfig({
         // seeded against real D1 by globalSetup, no self-seed needed:
         {
             name: 'browser-collab',
-            testMatch: /collab-(editing|offline)\.spec\.ts$/,
+            testMatch: /collab-(editing|offline|early-edit)\.spec\.ts$/,
             // Logs in as the shared admin@autotest.com that the `api` project
             // seeds — depend on it so ordering is deterministic and the project
             // is runnable in isolation (otherwise login 401s: no workspace).
