@@ -26,6 +26,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Unused API routes that no client called: `PUT /api/event-types/:id`, `DELETE /api/event-types/:id`, `POST /api/event-types/seed`, `GET /api/events/upcoming`, `GET /api/calendar/connections/:id/calendars`, `GET /api/inspections/{id}/full`, `GET /api/inspections/{id}/sign-status`, the `statusFlags` object on dashboard rows, `POST /api/auth/setup/skip` and `POST /api/auth/onboarding/flag`. Missing default event types are filled in by `POST /api/admin/data/install-bundled-content`; the signed state of an inspection is still returned as `signedByClient` by the inspection read.
 * The unreachable `feature-disabled` page and its translation strings.
 
+## [2.9.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.8.0...openinspection-v2.9.0) (2026-11-28)
+
+
+### Features
+
+* **collab:** surface a discarded local copy as a notice with its backup state ([f09ab2d](https://github.com/InspectorHub/OpenInspection/commit/f09ab2d476cd502a64b6315be4413ba3ac6daaba))
+* **editor:** let an inspection be downloaded for offline use ([5679416](https://github.com/InspectorHub/OpenInspection/commit/5679416beee24c9d3c7967a1869bd60231dc10f7)), closes [#476](https://github.com/InspectorHub/OpenInspection/issues/476)
+* **editor:** show a recovery notice and restore path when sync discards local work ([7f55e68](https://github.com/InspectorHub/OpenInspection/commit/7f55e68d1445c2fb7baa7b20e822e3d7f3a66043))
+* **editor:** show a recovery notice and restore path when sync discards local work ([547545b](https://github.com/InspectorHub/OpenInspection/commit/547545b608be2abe207875856a9af9e6cacf5c3c))
+* **hub,editor:** show inspection history and publish gates, queue offline defect photos, split saved states, add download for offline ([8d4d184](https://github.com/InspectorHub/OpenInspection/commit/8d4d184e6f9c5aa551e7a31ca1360d380c888b0f))
+* **hub:** show the inspection history on the hub ([6581f56](https://github.com/InspectorHub/OpenInspection/commit/6581f5657d61ce324b443a0a449d892db88288f7)), closes [#528](https://github.com/InspectorHub/OpenInspection/issues/528)
+
+
+### Bug Fixes
+
+* **editor:** correct the discarded-copy notice type import and Spanish possessives ([f36697c](https://github.com/InspectorHub/OpenInspection/commit/f36697c39f518bf75ddefb5f23e82bb68bab227d))
+* **editor:** never report a write as saved before the server confirms it ([6c3592c](https://github.com/InspectorHub/OpenInspection/commit/6c3592c70cbffa8dab2fb26ec1d374e5e7275c22)), closes [#477](https://github.com/InspectorHub/OpenInspection/issues/477)
+* **editor:** queue defect photos in the web media store ([0966a08](https://github.com/InspectorHub/OpenInspection/commit/0966a08aec164f90b417b6d484b65a5d1eb106ee)), closes [#475](https://github.com/InspectorHub/OpenInspection/issues/475)
+* **editor:** queue offline defect and burst photos instead of losing them ([5dfc3ca](https://github.com/InspectorHub/OpenInspection/commit/5dfc3cacd4f6a38f810717a46dc216ace761dfff)), closes [#475](https://github.com/InspectorHub/OpenInspection/issues/475)
+* **hub:** show the actual publish-gate state in the publish modal ([5a1ad2b](https://github.com/InspectorHub/OpenInspection/commit/5a1ad2b008f6f945b2f397a139cee78c6f80cfc5)), closes [#497](https://github.com/InspectorHub/OpenInspection/issues/497)
+* **hub:** use the existing Spanish translation for "Inspection history" ([7a4e96f](https://github.com/InspectorHub/OpenInspection/commit/7a4e96f38e4abb6cffc11211131c4ab81933c3bc))
+
 ## [2.8.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.7.0...openinspection-v2.8.0) (2026-11-27)
 
 
