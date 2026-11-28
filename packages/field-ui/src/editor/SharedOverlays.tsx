@@ -309,7 +309,7 @@ export function SharedOverlays({
  <DiscardedCopyNotice
   notice={discardedNotice}
   inspectionId={inspectionId}
-  doc={collabDoc}
+  doc={collabDoc ?? null}
   currentResults={state.results as unknown as ResultsProjection}
   onDismiss={onDismissDiscardedNotice}
  />

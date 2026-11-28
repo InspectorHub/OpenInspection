@@ -5,7 +5,7 @@ import { projectResults } from "../../shared/results-doc";
 import type { ResultsProjection } from "../../shared/results-doc.types";
 import type { InspectionDateTimeFormat } from "../../shared/format-date";
 import { diffProjections, type FindingDiff } from "../../shared/snapshot-diff";
-import type { DiscardedCopyNotice } from "../results-doc-connection";
+import type { DiscardedCopyNotice } from "../../collab/results-doc-connection-types";
 import { useFieldDataSource } from "../../context";
 import { compositeKeysOnly, formatRelativeTime } from "./VersionHistoryPanel";
 import { pruneRecoveredField, useCompareRecovery } from "./use-compare-recovery";

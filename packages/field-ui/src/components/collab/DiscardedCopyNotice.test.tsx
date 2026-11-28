@@ -9,7 +9,7 @@ import * as Y from "yjs";
 import { FieldDataSourceProvider } from "../../context";
 import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-data-source";
 import { applyItemPatch, projectResults, seedResultsDoc } from "../../shared/results-doc";
-import type { DiscardedCopyNotice as DiscardedCopyNoticeData } from "../results-doc-connection";
+import type { DiscardedCopyNotice as DiscardedCopyNoticeData } from "../../collab/results-doc-connection-types";
 import { DiscardedCopyNotice } from "./DiscardedCopyNotice";
 
 let container: HTMLDivElement | null = null;

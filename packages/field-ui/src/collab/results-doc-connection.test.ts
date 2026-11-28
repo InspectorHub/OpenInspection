@@ -359,7 +359,7 @@ describe('a discarded local copy (#478)', () => {
         FakeSocket.instances = [];
         const host = makeHost();
         const notices: DiscardedCopyNotice[] = [];
-        const { handle, destroy } = connectResultsDoc('insp-478-empty', {
+        const { destroy } = connectResultsDoc('insp-478-empty', {
             WebSocketImpl: WS,
             persistence: host.persistence,
             wsUrl: host.wsUrl,
