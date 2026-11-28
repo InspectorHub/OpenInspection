@@ -1,4 +1,5 @@
 import type * as Y from 'yjs';
+import type { DiscardedCopyNotice } from './collab/results-doc-connection';
 import type { DateFormat, TimeFormat } from './shared/display-prefs';
 import type { PublishReadiness } from './shared/types';
 import type { CommandData, CommandResult, FieldCommand } from './commands';
@@ -199,13 +200,22 @@ export interface ResultsDocHandle {
   synced: () => boolean;
   held?: () => boolean; // true while a stale offline copy could not be backed up: not syncing, retrying (lineage guard)
   locked?: () => boolean; // true once the server closed the socket because the report is published (no reconnect follows)
+  /** #478 — the last local copy the connection discarded, if any (see `DiscardedCopyNotice`); the editor shows a recovery notice from it. */
+  discarded?: () => DiscardedCopyNotice | undefined;
   destroy(): void;
 }
 
 export interface CollabConnector {
   /** Open a results document: local persistence first, then the network. */
-  connect(inspectionId: string, opts: { onChange?: () => void; onSynced?: () => void }): ResultsDocHandle;
+  connect(inspectionId: string, opts: { onChange?: () => void; onSynced?: () => void; onDiscarded?: (notice: DiscardedCopyNotice) => void }): ResultsDocHandle;
   purge(inspectionId: string): Promise<void>;
+  /**
+   * #478 — read the one backup slot the lineage guard kept for the last
+   * discarded copy (`update` is the full Yjs state, `atMs` when it was saved),
+   * or null when the slot is empty. Absent on a host whose lineage store has
+   * no readable slot: the editor then offers no review/restore path.
+   */
+  readDiscardedBackup?: (inspectionId: string) => Promise<{ update: Uint8Array; atMs: number } | null>;
 }
 
 export type { FieldUrls, PhotoSize } from './field-urls';

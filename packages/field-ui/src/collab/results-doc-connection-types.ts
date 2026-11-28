@@ -19,6 +19,28 @@ export interface ResultsDocHandle {
     locked?: boolean;
     /** True while a stale offline copy could not be backed up and so was neither discarded nor synced; the connection retries on its next open. */
     lineageHold?: boolean;
+    /**
+     * #478 — the last local copy the connection discarded (lineage mismatch or a
+     * server version restore). Set when the discard happens so the editor can
+     * show a recovery notice naming what was lost; absent until the first
+     * discard. Only the latest discard is kept — the backup slot holds one copy.
+     */
+    discarded?: DiscardedCopyNotice;
+}
+
+/**
+ * #478 — what a discard took from this device, for the recovery notice.
+ * `itemCount` is the number of findings the discarded copy held (0 means
+ * nothing was lost); `backedUp` says whether the host kept that copy in the
+ * one backup slot, so the notice knows whether it can offer a review/restore
+ * path. `atMs` is when the discard happened on this device.
+ */
+export interface DiscardedCopyNotice {
+    /** Why the copy was dropped: the server held another history, or a version restore replaced it. */
+    kind: 'lineage' | 'restore';
+    atMs: number;
+    itemCount: number;
+    backedUp: boolean;
 }
 
 /** What a persistence store handed back by the host must offer. */
@@ -69,6 +91,13 @@ export interface ConnectOptions {
      * the collab socket is healthy again.
      */
     onSynced?: () => void;
+    /**
+     * #478 — called each time the connection discards the device's local copy
+     * (a lineage mismatch or a server version restore), with what was lost.
+     * The editor shows a blocking recovery notice from it; the handle also
+     * carries the latest notice as `discarded`, so a late reader sees it too.
+     */
+    onDiscarded?: (notice: DiscardedCopyNotice) => void;
     /**
      * The lineage guard's per-inspection store (see `results-doc-lineage.ts`). Omitted means no guard: the connection hands
      * its local state back whatever generation the server announces, as before the guard existed.

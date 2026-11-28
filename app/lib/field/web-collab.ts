@@ -18,7 +18,7 @@ import type { OfflinePurgeHost } from "@core/field-ui/collab/offline-purge";
 import type { CollabConnector } from "@core/field-ui/data-source";
 import type { ResultsDocHost } from "@core/field-ui/collab/use-results-doc";
 import { webMediaStore } from "./web-media-store";
-import { discardedDbName, lineageDbName, webLineageStore } from "./web-lineage-store";
+import { discardedDbName, lineageDbName, readDiscardedStore, webLineageStore } from "./web-lineage-store";
 
 /**
  * Delete an IndexedDB database by name, resolving once the delete settles.
@@ -127,6 +127,7 @@ export const webCollabConnector: CollabConnector = {
                 opts.onChange?.();
             },
             ...(opts.onSynced ? { onSynced: opts.onSynced } : {}),
+            ...(opts.onDiscarded ? { onDiscarded: opts.onDiscarded } : {}),
         });
         return {
             get doc() {
@@ -136,10 +137,17 @@ export const webCollabConnector: CollabConnector = {
             synced: () => handle.synced,
             locked: () => handle.locked === true,
             held: () => handle.lineageHold === true,
+            discarded: () => handle.discarded,
             destroy,
         };
     },
     async purge(inspectionId) {
         await purgeInspectionOfflineData(inspectionId, webOfflinePurgeHost);
+    },
+    // #478 — the one backup slot the lineage guard kept, read back for the
+    // editor's review/restore path. Null when the slot is empty (or unreadable).
+    async readDiscardedBackup(inspectionId) {
+        const slot = await readDiscardedStore(inspectionId);
+        return slot === null ? null : { update: slot.update, atMs: slot.atMs };
     },
 };

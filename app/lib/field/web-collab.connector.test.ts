@@ -88,4 +88,22 @@ describe("webCollabConnector", () => {
         if (connection.handle) connection.handle.lineageHold = true;
         expect(live.held?.()).toBe(true);
     });
+
+    it("passes onDiscarded through and reports the latest discarded copy live (#478)", () => {
+        const onDiscarded = vi.fn();
+        const live = webCollabConnector.connect("insp-478", { onDiscarded });
+        expect(live.discarded?.()).toBeUndefined();
+        const notice = { kind: "lineage" as const, atMs: 1700000000000, itemCount: 3, backedUp: true };
+        connection.opts!.onDiscarded!(notice);
+        expect(onDiscarded).toHaveBeenCalledTimes(1);
+        expect(onDiscarded).toHaveBeenCalledWith(notice);
+        if (connection.handle) connection.handle.discarded = notice;
+        expect(live.discarded?.()).toEqual(notice);
+    });
+
+    it("reads the discarded-copy backup slot, or null when it is empty (#478)", async () => {
+        // fake-indexeddb is not loaded here, so the slot read resolves to
+        // "nothing there" — the positive path lives in web-lineage-store.test.ts.
+        await expect(webCollabConnector.readDiscardedBackup!("insp-none")).resolves.toBeNull();
+    });
 });

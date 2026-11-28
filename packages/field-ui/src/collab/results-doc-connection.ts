@@ -22,7 +22,7 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { reconnectDelayMs } from './results-doc-backoff';
-import { MSG_GENERATION, backUpStale, judgeLineage, judgementBasis, readFrameGeneration, topUpBackup, type DiscardedStoreInfo } from './results-doc-lineage';
+import { MSG_GENERATION, backUpStale, countFindings, judgeLineage, judgementBasis, readFrameGeneration, topUpBackup, type DiscardedStoreInfo } from './results-doc-lineage';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ export function resultsDocName(inspectionId: string): string {
     return 'results-' + inspectionId;
 }
 
-export type { ResultsDocHandle, ResultsDocPersistence, ConnectOptions } from './results-doc-connection-types';
+export type { ResultsDocHandle, ResultsDocPersistence, ConnectOptions, DiscardedCopyNotice } from './results-doc-connection-types';
 import type { ResultsDocHandle, ConnectOptions } from './results-doc-connection-types';
 
 /** WebSocket close code the results document uses for "this report is published" (the socket twin of HTTP 409 REPORT_PUBLISHED). */
@@ -199,19 +199,32 @@ export function connectResultsDoc(
         restoring = true;
         let aborted = false;
         let saved: Uint8Array | null = null;
+        // #478 — what this discard takes, named before anything is torn down: the
+        // notice needs the finding count and the time, and the backup slot needs
+        // the store info of whichever path brought us here.
         const oldDoc = doc;
+        const discardedAtMs = Date.now();
+        const discardedItemCount = countFindings(oldDoc);
+        let backupInfo: DiscardedStoreInfo | null = null;
         try {
-            // (0) Detach the forwarder FIRST, then (a discard only) back the stale store up in the same tick, so nothing lands between the
-            // two. If the backup cannot be written the discard is abandoned: the store stays, nothing is sent, the socket is reopened.
+            // (0) Detach the forwarder FIRST, then back the stale store up in the same tick, so nothing lands between the
+            // two. A lineage discard whose backup cannot be written is abandoned: the store stays, nothing is sent, the socket is reopened.
+            // A restore (no discard info) has no such veto — the server already replaced the history, so a failed backup is
+            // best-effort and the resync goes ahead; the notice then says no backup was kept.
             doc.off('update', docUpdateHandler);
-            if (discard && lineage) {
-                try { saved = await backUpStale(lineage, oldDoc, discard); } catch {
-                    console.error('Results document: the stale offline copy could not be backed up, so it was kept and not synced; will retry.', { inspectionId });
-                    aborted = true;
-                    bindDoc();
-                    Object.assign(handle, { synced: false, lineageHold: true });
-                    opts.onChange?.(handle);
-                    return;
+            if (lineage && discardedItemCount > 0) {
+                backupInfo = discard ?? { storedGen: storedGen ?? '', serverGen: newGen ?? '' };
+                try { saved = await backUpStale(lineage, oldDoc, backupInfo); } catch {
+                    if (discard) {
+                        console.error('Results document: the stale offline copy could not be backed up, so it was kept and not synced; will retry.', { inspectionId });
+                        aborted = true;
+                        bindDoc();
+                        Object.assign(handle, { synced: false, lineageHold: true });
+                        opts.onChange?.(handle);
+                        return;
+                    }
+                    console.error('Results document: the local copy replaced by a restore could not be backed up; continuing with the resync.', { inspectionId });
+                    backupInfo = null;
                 }
             }
             if (destroyed) return;
@@ -223,7 +236,7 @@ export function connectResultsDoc(
             // (2) Clear local IndexedDB so the rebuilt doc starts empty (best-effort: a failed clear never wedges the resync).
             await Promise.resolve(oldPersistence.clearData?.()).catch(() => { /* ignore */ });
             if (destroyed) return;
-            if (discard && lineage) await topUpBackup(lineage, oldDoc, discard, saved); // edits typed while the store was torn down
+            if (backupInfo && lineage) await topUpBackup(lineage, oldDoc, backupInfo, saved); // edits typed while the store was torn down
             if (newGen !== null && lineage) { storedGen = docGen = newGen; await lineage.write(newGen).catch(warnLineage); }
             if (destroyed) return;
             // (3) Fresh doc + fresh persistence, re-wired and published.
@@ -238,7 +251,16 @@ export function connectResultsDoc(
             handle.doc = freshDoc;
             handle.synced = false; // not yet synced with the restored remote state
             // persistenceSynced stays true: the fresh store is empty, and we resync via step1 on the open socket.
+            // #478 — name what was discarded before the resync: the notice (and any late reader of the handle)
+            // says how many findings the dropped copy held and whether the backup slot kept it.
+            handle.discarded = {
+                kind: discard ? 'lineage' : 'restore',
+                atMs: discardedAtMs,
+                itemCount: discardedItemCount,
+                backedUp: saved !== null,
+            };
             opts.onChange?.(handle);
+            opts.onDiscarded?.(handle.discarded);
 
             // (4) Re-pull the authoritative restored state on the open socket.
             sendStep1();
