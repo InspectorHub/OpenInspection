@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.1](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.12.0...field-ui-v0.12.1) (2026-11-28)
+
+
+### Bug Fixes
+
+* **editor:** queue doc writes until the first collab sync lands ([bf9ca82](https://github.com/InspectorHub/OpenInspection/commit/bf9ca82f0a4e916f6a00d01c5a2ac5691a3898ac))
+* **editor:** queue doc writes until the first collab sync lands ([2075392](https://github.com/InspectorHub/OpenInspection/commit/2075392ec52d07a2b159a8e6dfd64aa812e02743))
+
 ## [0.12.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.11.0...field-ui-v0.12.0) (2026-11-28)
 
 
