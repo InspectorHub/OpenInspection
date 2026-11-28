@@ -6,12 +6,12 @@
  * editor relies on: the read path, the inert pre-connect window, and the live-doc write path.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import * as Y from 'yjs';
 import { readResultMap } from '../collab/results-binding';
 import type { ResultMap } from '../data-source-types';
 import { findingKey } from './findings/shared';
-import { useFindings } from './useFindings';
+import { PRE_SYNC_FLUSH_TIMEOUT_MS, useFindings } from './useFindings';
 
 const options = (overrides: Partial<Parameters<typeof useFindings>[2]> = {}) => ({
   sectionIdForItem: (itemId: string) => (itemId.startsWith('i') ? 's1' : null),
@@ -84,6 +84,84 @@ describe('useFindings (results, setResults, options)', () => {
     expect(readResultMap(doc)[findingKey(null, 's1', 'i1')]?.notes).toBe('Cracked flashing');
     expect(setSaveStatus).toHaveBeenCalledWith('saved-local');
     expect(setSaveStatus).not.toHaveBeenCalledWith('saved');
+  });
+
+  // Early-edit race — with a live doc that has NOT synced yet, doc writes
+  // queue (they must not seed a competing structure before the server's
+  // step2 arrives) and flush once the first sync lands.
+  it('with a live doc that has not synced yet, writes queue and flush once it syncs', () => {
+    const doc = new Y.Doc();
+    const setSaveStatus = vi.fn();
+    const renderOpts = (synced: boolean) => ({
+      sectionIdForItem: (itemId: string) => (itemId.startsWith('i') ? 's1' : null),
+      setDirty: vi.fn(),
+      setSaveStatus,
+      inspectionId: 'insp-1',
+      collab: { doc, synced },
+    });
+    const { result, rerender } = renderHook(
+      ({ synced }: { synced: boolean }) => useFindings({}, vi.fn(), renderOpts(synced)),
+      { initialProps: { synced: false } },
+    );
+    result.current.setRating('s1', 'i1', 'good');
+    result.current.commitNotes('s1', 'i1', 'Cracked flashing');
+    expect(readResultMap(doc)[findingKey(null, 's1', 'i1')]).toBeUndefined();
+    expect(setSaveStatus).toHaveBeenCalledWith('saving');
+    rerender({ synced: true });
+    expect(readResultMap(doc)[findingKey(null, 's1', 'i1')]?.rating).toBe('good');
+    expect(readResultMap(doc)[findingKey(null, 's1', 'i1')]?.notes).toBe('Cracked flashing');
+    expect(setSaveStatus).toHaveBeenCalledWith('saved-local');
+    expect(setSaveStatus).not.toHaveBeenCalledWith('saved');
+  });
+
+  // Early-edit race — the keystroke echo must not wait for the sync: typing
+  // before the first sync still shows in the textarea immediately.
+  it('before the first sync, setNotes still echoes immediately', () => {
+    const doc = new Y.Doc();
+    const setResults = vi.fn();
+    const { result } = renderHook(() =>
+      useFindings({}, setResults, {
+        sectionIdForItem: (itemId: string) => (itemId.startsWith('i') ? 's1' : null),
+        setDirty: vi.fn(),
+        setSaveStatus: vi.fn(),
+        inspectionId: 'insp-1',
+        collab: { doc, synced: false },
+      }),
+    );
+    result.current.setNotes('s1', 'i1', 'Cracked');
+    expect(setResults).toHaveBeenCalled();
+    const updater = setResults.mock.calls[0][0] as (prev: ResultMap) => ResultMap;
+    expect(updater({})[findingKey(null, 's1', 'i1')]?.notes).toBe('Cracked');
+    // The echo is React state only: nothing reached the doc yet.
+    expect(readResultMap(doc)[findingKey(null, 's1', 'i1')]).toBeUndefined();
+  });
+
+  // Dead-socket backstop — if the first sync never arrives, the queue still
+  // reaches the local doc after PRE_SYNC_FLUSH_TIMEOUT_MS.
+  it('if the first sync never arrives, the queue flushes on the timeout', () => {
+    vi.useFakeTimers();
+    try {
+      const doc = new Y.Doc();
+      const setSaveStatus = vi.fn();
+      const { result } = renderHook(() =>
+        useFindings({}, vi.fn(), {
+          sectionIdForItem: (itemId: string) => (itemId.startsWith('i') ? 's1' : null),
+          setDirty: vi.fn(),
+          setSaveStatus,
+          inspectionId: 'insp-1',
+          collab: { doc, synced: false },
+        }),
+      );
+      result.current.commitNotes('s1', 'i1', 'Cracked flashing');
+      expect(readResultMap(doc)[findingKey(null, 's1', 'i1')]).toBeUndefined();
+      act(() => {
+        vi.advanceTimersByTime(PRE_SYNC_FLUSH_TIMEOUT_MS);
+      });
+      expect(readResultMap(doc)[findingKey(null, 's1', 'i1')]?.notes).toBe('Cracked flashing');
+      expect(setSaveStatus).toHaveBeenCalledWith('saved-local');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // #477 — with a live doc, a save flush reports "saved on this device":
