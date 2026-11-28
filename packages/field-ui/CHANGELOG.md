@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.12.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.11.0...field-ui-v0.12.0) (2026-11-28)
+
+
+### Features
+
+* **collab:** surface a discarded local copy as a notice with its backup state ([f09ab2d](https://github.com/InspectorHub/OpenInspection/commit/f09ab2d476cd502a64b6315be4413ba3ac6daaba))
+* **editor:** show a recovery notice and restore path when sync discards local work ([7f55e68](https://github.com/InspectorHub/OpenInspection/commit/7f55e68d1445c2fb7baa7b20e822e3d7f3a66043))
+* **editor:** show a recovery notice and restore path when sync discards local work ([547545b](https://github.com/InspectorHub/OpenInspection/commit/547545b608be2abe207875856a9af9e6cacf5c3c))
+
+
+### Bug Fixes
+
+* **editor:** correct the discarded-copy notice type import and Spanish possessives ([f36697c](https://github.com/InspectorHub/OpenInspection/commit/f36697c39f518bf75ddefb5f23e82bb68bab227d))
+
 ## [0.11.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.10.1...field-ui-v0.11.0) (2026-11-27)
 
 

@@ -1,6 +1,6 @@
 {
   ".": "2.9.0",
-  "packages/field-ui": "0.11.0",
+  "packages/field-ui": "0.12.0",
   "packages/offline-package": "0.2.1",
   "packages/data-package": "0.1.1"
 }
