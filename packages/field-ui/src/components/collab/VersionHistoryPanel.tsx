@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type * as Y from "yjs";
 import { Modal, pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
-import { applyItemPatch } from "../../shared/results-doc";
 import type { ResultsProjection } from "../../shared/results-doc.types";
-import { diffProjections, type FindingDiff, type ScalarField } from "../../shared/snapshot-diff";
+import { diffProjections, type FindingDiff } from "../../shared/snapshot-diff";
+import { pruneRecoveredField, useCompareRecovery } from "./use-compare-recovery";
 import { VersionCompare } from "./VersionCompare";
 import { useReturnFocusAfterCompare } from "./useReturnFocusAfterCompare";
 import { useFieldDataSource } from "../../context";
@@ -51,18 +51,6 @@ export interface VersionHistoryPanelProps {
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
-/** The scalar fields written via `applyItemPatch`; guards the recover write.
- *  No estimateMin / estimateMax: recovering an old version must not be a way to
- *  put a repair price back into a live document. */
-const SCALAR_FIELD_SET = new Set<ScalarField>([
-    "rating",
-    "notes",
-    "value",
-    "recommendation",
-    "followupStatus",
-    "followupNotes",
-]);
-
 /** Human label for a snapshot's capture reason (surfaces the pre-merge boundary). */
 function reasonLabel(reason: SnapshotReason | undefined, byUserId: string | null): string {
     if (reason === "connect") return m.editor_collab_autosaved_before_reconnect();
@@ -108,7 +96,7 @@ export function formatRelativeTime(
  * keys, which match a snapshot projection's keys; the bare-itemId aliases would
  * otherwise appear as spurious "added" findings.
  */
-function compositeKeysOnly(results: ResultsProjection): ResultsProjection {
+export function compositeKeysOnly(results: ResultsProjection): ResultsProjection {
     const out: ResultsProjection = {};
     for (const [key, value] of Object.entries(results)) {
         if (key.split(":").length >= 3) out[key] = value;
@@ -189,39 +177,19 @@ export function VersionHistoryPanel({
     // #181 PR-H — recover a single OLD scalar into the LIVE doc. The finding key
     // is the composite `unit:section:item`; `applyItemPatch` writes the scalar
     // CRDT field directly (one helper covers all 8 scalars). Live doc → DO persist.
+    const { recoverField } = useCompareRecovery(doc);
     const handleRecoverField = useCallback(
         (findingKey: string, field: string, value: unknown) => {
-            if (!doc) return;
-            if (!SCALAR_FIELD_SET.has(field as ScalarField)) return;
-            applyItemPatch(doc, findingKey, field as ScalarField, value);
+            if (!recoverField(findingKey, field, value)) return;
             // Reflect the recovery: the recovered field now matches current, so it
             // drops out of the diff on the next compare. Recompute against live.
             if (currentResults) {
                 // The live doc bind updates currentResults asynchronously; do a local
                 // optimistic prune so the recovered row disappears immediately.
-                setCompareDiffs((prev) =>
-                    prev
-                        .map((d) =>
-                            d.findingKey === findingKey
-                                ? {
-                                      ...d,
-                                      scalarChanges: d.scalarChanges.filter(
-                                          (c) => c.field !== field,
-                                      ),
-                                  }
-                                : d,
-                        )
-                        .filter(
-                            (d) =>
-                                d.scalarChanges.length > 0 ||
-                                d.nestedChanged ||
-                                d.itemAdded ||
-                                d.itemRemoved,
-                        ),
-                );
+                setCompareDiffs((prev) => pruneRecoveredField(prev, findingKey, field));
             }
         },
-        [doc, currentResults],
+        [recoverField, currentResults],
     );
 
     const loadSnapshots = useCallback(async () => {

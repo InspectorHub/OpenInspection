@@ -1,5 +1,7 @@
 import type { ComponentProps } from "react";
 import { VersionHistoryPanel } from "../components/collab/VersionHistoryPanel";
+import { DiscardedCopyNotice } from "../components/collab/DiscardedCopyNotice";
+import type { DiscardedCopyNotice as DiscardedCopyNoticeData } from "../collab/results-doc-connection";
 import { AddGroupInstanceHost } from "../components/statutory/AddGroupInstanceHost";
 import { BurstCamera } from "../components/editor/BurstCamera";
 import { PhotoAnnotator } from "../components/media-studio/PhotoAnnotator";
@@ -87,6 +89,9 @@ export interface SharedOverlaysProps {
   /* Version history, library, pickers */
   versionHistoryOpen: boolean;
   setVersionHistoryOpen: (open: boolean) => void;
+  /** #478 — the latest discarded local copy, or null when there is none to show (no findings lost, or already dismissed). */
+  discardedNotice: DiscardedCopyNoticeData | null;
+  onDismissDiscardedNotice: () => void;
   serverComments: ComponentProps<typeof CommentLibraryDrawer>["serverComments"];
   onInsert: ComponentProps<typeof CommentLibraryDrawer>["onInsert"];
   tagPickerOpen: boolean;
@@ -119,7 +124,7 @@ export interface SharedOverlaysProps {
 export function SharedOverlays({
   state, caps, structure, coverWrites, comments, statutoryInstance, statutoryGroups, collabDoc, inspectionId,
   phone, streamCustomerSubdomain, onReload, handleBurstCommit, studio, photoOps, addingToGroup, setAddingToGroup,
-  versionHistoryOpen, setVersionHistoryOpen, serverComments, onInsert, tagPickerOpen, setTagPickerOpen,
+  versionHistoryOpen, setVersionHistoryOpen, discardedNotice, onDismissDiscardedNotice, serverComments, onInsert, tagPickerOpen, setTagPickerOpen,
   presetTags, toggleTag, showUnitsSurface, unitsManagerOpen, setUnitsManagerOpen, units, unitInspectionMode,
   costItemsOpen, setCostItemsOpen,
 }: SharedOverlaysProps) {
@@ -299,6 +304,15 @@ export function SharedOverlays({
   }}
  />
  )}
+
+ {/* #478 — the blocking notice for a discarded local copy (lineage mismatch or version restore), with its review/restore path. */}
+ <DiscardedCopyNotice
+  notice={discardedNotice}
+  inspectionId={inspectionId}
+  doc={collabDoc}
+  currentResults={state.results as unknown as ResultsProjection}
+  onDismiss={onDismissDiscardedNotice}
+ />
 
  {/* #181 — Version history panel (collab Phase 4). Only reachable when the
      collabEditing flag is on (the trigger button is gated in EditorHeader).

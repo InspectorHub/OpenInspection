@@ -328,12 +328,19 @@ a document built from the database (see `docs/operate/durable-object-jurisdictio
   recognised by its first frame being a sync frame, and the connection behaves as it did before.
 - **Offline edits on a discarded store.** They live in the same IndexedDB store and are dropped with it. The connection first
   saves the full Yjs state of what it discards into ONE backup slot (`results-discarded-<id>`: the update, both ids, the
-  time), overwritten by the next discard, never read automatically, and removed with the inspection's other offline data.
-  Support can recover edits by applying that update to a scratch document. Photos waiting in the offline media queue are
-  separate and are not touched.
+  time), overwritten by the next discard, and removed with the inspection's other offline data. The editor reads the slot
+  back for the discard notice (see below); support can also recover edits by applying that update to a scratch document.
+  Photos waiting in the offline media queue are separate and are not touched.
+- **The inspector is told (#478).** A discard — a lineage mismatch or a version restore — raises a blocking notice in the
+  editor naming the time and how many findings the dropped copy held, with a one-tap review: the backup diffed against the
+  current report, per-value recovery, and a whole-backup restore that merges the backup back into the live doc, then re-writes
+  each differing scalar as a fresh edit so the backup's values win deterministically rather than by CRDT clock order. A restore
+  backs the local copy up the same way a mismatch does; when the backup could not be written the notice says no backup was
+  kept. A discard that held no findings shows nothing.
 - **A backup that cannot be written** (storage full or blocked) abandons the discard: the store is kept, no new id is
   recorded, nothing is sent (the handle reports `lineageHold`), and the socket is reopened with the usual backoff to retry.
-  The offline copy is never cleared without its backup.
+  The offline copy is never cleared without its backup. The exception is a version restore: the server already replaced
+  the history, so a failed backup does not stop the resync — the notice then says no backup was kept.
 - **The server checks too.** A client that holds a recorded id reports it on the socket upgrade (`?gen=<id>`). If it is not the
   id the object holds, the object sends the generation frame only (no step 1), then closes the socket with code 4410, and any
   frame still arriving on it is dropped, so that socket can never write. A client that follows the protocol treats the frame as a
