@@ -293,7 +293,7 @@ describe('lineage guard: frame order and compatibility', () => {
 });
 
 describe('lineage guard: restore frames', () => {
-    it('records the generation a restore frame carries and does not back up (a deliberate restore)', async () => {
+    it('records the generation a restore frame carries and backs the local copy up (#478: a restore also drops offline work the restored version does not hold)', async () => {
         const w = world({ bytes: staleStoreBytes(), gen: 'gen-old-0001' });
         const { socket, destroy } = await connected(w);
         socket.push(genFrame('gen-old-0001'));
@@ -302,7 +302,12 @@ describe('lineage guard: restore frames', () => {
         await settle();
         expect(w.cleared()).toBe(1);
         expect(w.lineage.gen).toBe('gen-restored-3');
-        expect(w.lineage.discarded).toHaveLength(0);
+        expect(w.lineage.discarded).toHaveLength(1);
+        expect(w.lineage.discarded[0]?.storedGen).toBe('gen-old-0001');
+        expect(w.lineage.discarded[0]?.serverGen).toBe('gen-restored-3');
+        const copy = new Y.Doc();
+        Y.applyUpdate(copy, w.lineage.discarded[0]?.update ?? new Uint8Array());
+        expect(photoKeys(copy)).toEqual(['STALE1', 'STALE2']);
         destroy();
     });
 

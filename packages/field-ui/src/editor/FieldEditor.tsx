@@ -27,6 +27,7 @@ import { attachPhotoBatch } from "../hooks/attachPhotoBatch";
 import { useReportCoverWrites } from "../hooks/useReportCoverWrites";
 import { usePresence } from "../hooks/usePresence";
 import { useResultsDoc } from "../collab/use-results-doc";
+import { useDiscardedCopyNotice } from "../collab/use-discarded-copy-notice";
 import { useMediaDrain } from "../hooks/useMediaDrain";
 import { addOfflinePhotos } from "../collab/offline-photo-batch";
 import { collectPhotoKeys, coreOfflineUrls, downloadForOffline, offlineCopyStatus, type OfflineCopyStatus } from "../offline/download-for-offline";
@@ -211,6 +212,8 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  const saveStatusRef = useRef(state.saveStatus);
  saveStatusRef.current = state.saveStatus;
  const collab = useResultsDoc(String(data.inspection.id), () => { drainRef.current(); if (saveStatusRef.current === "saved-local") state.setSaveStatus("saved"); }, liveWhenReadOnly || !pageReadOnly, pageReadOnly ? "read-only" : "editable");
+ // #478 — the blocking recovery notice for a discarded local copy (see useDiscardedCopyNotice).
+ const discardedCopy = useDiscardedCopyNotice(collab);
  // Read-only: the document is still read, projected and synced, but no write helper is ever handed it. A Yjs map `set`
  // does not pass through `doc.transact`, so withholding the document is the one guard that cannot be bypassed.
  const writeDoc = readOnly ? null : collab?.doc ?? null;
@@ -1867,6 +1870,8 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  setAddingToGroup={setAddingToGroup}
  versionHistoryOpen={versionHistoryOpen}
  setVersionHistoryOpen={setVersionHistoryOpen}
+ discardedNotice={discardedCopy.notice}
+ onDismissDiscardedNotice={discardedCopy.dismiss}
  serverComments={serverComments}
  onInsert={onInsert}
  tagPickerOpen={tagPickerOpen}

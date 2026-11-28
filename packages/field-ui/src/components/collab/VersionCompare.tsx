@@ -35,6 +35,10 @@ export interface VersionCompareProps {
     onRestoreWhole?: () => void;
     /** Disables the action buttons while a write/restore is in flight. */
     busy?: boolean;
+    /** Heading override; defaults to the version-compare heading. */
+    title?: string;
+    /** Footer-note override; defaults to the version-compare note. A caller whose restore MERGES rather than replaces must say so here. */
+    footerNote?: string;
 }
 
 /** Render an arbitrary scalar value as a short, readable string for the diff cell. */
@@ -59,6 +63,8 @@ export function VersionCompare({
     onRecoverField,
     onRestoreWhole,
     busy = false,
+    title,
+    footerNote,
 }: VersionCompareProps) {
     // Escape closes (unless busy) — mirrors the editor's other custom modals.
     useLayer(open, { onEscape: () => { if (!busy) onClose(); } });
@@ -103,7 +109,7 @@ export function VersionCompare({
                     </span>
                     <div className="flex-1 min-w-0">
                         <h2 id="version-compare-title" className="text-base font-bold text-ih-fg-1">
-                            {m.editor_collab_compare_versions()}
+                            {title ?? m.editor_collab_compare_versions()}
                         </h2>
                         <p className="text-xs text-ih-fg-3 mt-0.5">
                             <span className="font-semibold text-ih-fg-2">{fromLabel}</span>
@@ -224,7 +230,7 @@ export function VersionCompare({
                 {/* Footer — whole-version restore */}
                 <footer className="border-t border-ih-border px-6 py-4 flex items-center gap-3 flex-wrap">
                     <p className="text-[11px] text-ih-fg-3 flex-1 leading-snug min-w-[220px]">
-                        {m.editor_collab_footer_desc()}
+                        {footerNote ?? m.editor_collab_footer_desc()}
                     </p>
                     <button
                         type="button"

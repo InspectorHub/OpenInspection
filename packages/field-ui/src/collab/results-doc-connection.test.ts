@@ -4,17 +4,20 @@
  * browser globals, so they also prove the module runs without a DOM.
  */
 import { describe, it, expect, vi } from 'vitest';
-import type * as Y from 'yjs';
+import * as Y from 'yjs';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import {
     connectResultsDoc,
     resultsDocName,
+    type DiscardedCopyNotice,
     type ResultsDocPersistence,
 } from './results-doc-connection';
+import type { DiscardedStoreInfo, ResultsDocLineageFactory } from './results-doc-lineage';
 
 const MSG_SYNC = 0;
 const MSG_RESTORE = 2;
+const MSG_GENERATION = 4;
 
 class FakeSocket extends EventTarget {
     static instances: FakeSocket[] = [];
@@ -49,6 +52,68 @@ function restoreFrame(): Uint8Array {
     const enc = encoding.createEncoder();
     encoding.writeVarUint(enc, MSG_RESTORE);
     return encoding.toUint8Array(enc);
+}
+
+/** The server's first frame: the generation byte + the history id as a varstring. */
+function generationFrame(gen: string): Uint8Array {
+    const enc = encoding.createEncoder();
+    encoding.writeVarUint(enc, MSG_GENERATION);
+    encoding.writeVarString(enc, gen);
+    return encoding.toUint8Array(enc);
+}
+
+/** A fake lineage store: one recorded generation + the backup slot it was asked to write. */
+function makeLineage(initial: string | null, failSave = false): { factory: ResultsDocLineageFactory; saved: Array<{ update: Uint8Array; info: DiscardedStoreInfo }> } {
+    let gen = initial;
+    const saved: Array<{ update: Uint8Array; info: DiscardedStoreInfo }> = [];
+    const factory: ResultsDocLineageFactory = () => ({
+        read: async () => gen,
+        write: async (g: string) => { gen = g; },
+        saveDiscarded: async (update: Uint8Array, info: DiscardedStoreInfo) => {
+            if (failSave) throw new Error('backup slot unavailable');
+            saved.push({ update, info });
+        },
+    });
+    return { factory, saved };
+}
+
+/** Two findings in the local doc, under composite keys. */
+function seedFindings(doc: Y.Doc): void {
+    const results = doc.getMap('results');
+    doc.transact(() => {
+        const a = new Y.Map();
+        a.set('rating', 'NI');
+        results.set('unit-1:sec-1:item-1', a);
+        const b = new Y.Map();
+        b.set('rating', 'D');
+        results.set('unit-1:sec-1:item-2', b);
+    });
+}
+
+async function connectedWithFindings(opts: { lineage?: ReturnType<typeof makeLineage> } = {}): Promise<{
+    handle: ReturnType<typeof connectResultsDoc>['handle'];
+    destroy: () => void;
+    socket: FakeSocket;
+    notices: DiscardedCopyNotice[];
+    saved: Array<{ update: Uint8Array; info: DiscardedStoreInfo }>;
+}> {
+    FakeSocket.instances = [];
+    const host = makeHost();
+    const notices: DiscardedCopyNotice[] = [];
+    const conn = connectResultsDoc('insp-478', {
+        WebSocketImpl: WS,
+        persistence: host.persistence,
+        wsUrl: host.wsUrl,
+        ...(opts.lineage ? { lineage: opts.lineage.factory } : {}),
+        onDiscarded: (n) => notices.push(n),
+    });
+    host.release();
+    await tick();
+    seedFindings(conn.handle.doc);
+    await tick();
+    const socket = FakeSocket.instances[0];
+    if (!socket) throw new Error('socket was not opened');
+    return { ...conn, socket, notices, saved: opts.lineage?.saved ?? [] };
 }
 
 function step1Count(sent: Uint8Array[]): number {
@@ -246,3 +311,102 @@ describe('a report that is published', () => {
     });
 });
 
+
+describe('a discarded local copy (#478)', () => {
+    it('a lineage mismatch discards, backs up, and names what was lost', async () => {
+        const lin = makeLineage('gen-old-0001');
+        const { handle, destroy, socket, notices, saved } = await connectedWithFindings({ lineage: lin });
+        const firstDoc = handle.doc;
+
+        socket.push(generationFrame('gen-new-0002'));
+        await tick(10);
+
+        expect(notices).toHaveLength(1);
+        expect(notices[0]).toMatchObject({ kind: 'lineage', itemCount: 2, backedUp: true });
+        expect(typeof notices[0]?.atMs).toBe('number');
+        expect(handle.discarded).toEqual(notices[0]);
+        // The backup slot holds the discarded copy: it round-trips with both findings.
+        expect(saved).toHaveLength(1);
+        expect(saved[0]?.info).toEqual({ storedGen: 'gen-old-0001', serverGen: 'gen-new-0002' });
+        const copy = new Y.Doc();
+        Y.applyUpdate(copy, saved[0]?.update ?? new Uint8Array());
+        expect(copy.getMap('results').size).toBe(2);
+        // The doc was rebuilt and the resync re-pulled on the same socket.
+        // Exactly one step1: the pre-judgement one is held back until the
+        // generation frame is judged, so only the post-discard step1 goes out.
+        expect(handle.doc).not.toBe(firstDoc);
+        expect(step1Count(socket.sent)).toBe(1);
+        destroy();
+    });
+
+    it('a version restore backs the local copy up too, and says so', async () => {
+        const lin = makeLineage('gen-aaaaaaa1');
+        const { handle, destroy, socket, notices, saved } = await connectedWithFindings({ lineage: lin });
+
+        socket.push(restoreFrame());
+        await tick(10);
+
+        expect(notices).toHaveLength(1);
+        expect(notices[0]).toMatchObject({ kind: 'restore', itemCount: 2, backedUp: true });
+        expect(handle.discarded).toEqual(notices[0]);
+        expect(saved).toHaveLength(1);
+        expect(saved[0]?.info.storedGen).toBe('gen-aaaaaaa1');
+        expect(handle.doc.getMap('results').size).toBe(0);
+        destroy();
+    });
+
+    it('a restore of an empty local copy still reports, with nothing backed up', async () => {
+        FakeSocket.instances = [];
+        const host = makeHost();
+        const notices: DiscardedCopyNotice[] = [];
+        const { destroy } = connectResultsDoc('insp-478-empty', {
+            WebSocketImpl: WS,
+            persistence: host.persistence,
+            wsUrl: host.wsUrl,
+            onDiscarded: (n) => notices.push(n),
+        });
+        host.release();
+        await tick();
+        const socket = FakeSocket.instances[0];
+        if (!socket) throw new Error('socket was not opened');
+
+        socket.push(restoreFrame());
+        await tick(10);
+
+        expect(notices).toHaveLength(1);
+        expect(notices[0]).toMatchObject({ kind: 'restore', itemCount: 0, backedUp: false });
+        destroy();
+    });
+
+    it('a restore whose backup fails still resyncs, and the notice says no backup was kept', async () => {
+        const lin = makeLineage('gen-aaaaaaa1', true);
+        const { handle, destroy, socket, notices, saved } = await connectedWithFindings({ lineage: lin });
+        const firstDoc = handle.doc;
+
+        socket.push(restoreFrame());
+        await tick(10);
+
+        expect(saved).toHaveLength(0);
+        expect(notices).toHaveLength(1);
+        expect(notices[0]).toMatchObject({ kind: 'restore', itemCount: 2, backedUp: false });
+        // No veto on the restore path: the doc was rebuilt and the resync went ahead.
+        expect(handle.doc).not.toBe(firstDoc);
+        expect(handle.lineageHold).not.toBe(true);
+        destroy();
+    });
+
+    it('(control) a lineage discard whose backup fails keeps the copy and reports no discard', async () => {
+        const lin = makeLineage('gen-old-0001', true);
+        const { handle, destroy, socket, notices } = await connectedWithFindings({ lineage: lin });
+        const firstDoc = handle.doc;
+
+        socket.push(generationFrame('gen-new-0002'));
+        await tick(10);
+
+        expect(notices).toHaveLength(0);
+        expect(handle.discarded).toBeUndefined();
+        expect(handle.lineageHold).toBe(true);
+        expect(handle.doc).toBe(firstDoc);
+        destroy();
+    });
+});

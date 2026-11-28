@@ -17,6 +17,7 @@
 
 import * as Y from 'yjs';
 import * as decoding from 'lib0/decoding';
+import { isMetaKey } from '../shared/finding-key';
 
 /** Framing byte of the generation frame (mirrors `MSG_GENERATION` in the Durable Object module). */
 export const MSG_GENERATION = 4;
@@ -74,6 +75,22 @@ export function readFrameGeneration(decoder: decoding.Decoder): string | null {
 /** True when the document holds any finding: an empty store has nothing worth a backup. */
 function holdsResults(doc: Y.Doc): boolean {
     return doc.getMap('results').size > 0;
+}
+
+/**
+ * How many findings a doc holds, for the #478 discard notice. The same
+ * predicate `projectResults` uses: an entry is a finding when it is a Y.Map
+ * under a non-meta key. A finding key is usually composite
+ * (`unit:section:item`), but a document may also hold bare item ids (older
+ * stores, test seeds), so the shape of the key cannot decide — only the
+ * meta-key rule can.
+ */
+export function countFindings(doc: Y.Doc): number {
+    let n = 0;
+    doc.getMap('results').forEach((value, key) => {
+        if (value instanceof Y.Map && !isMetaKey(key)) n += 1;
+    });
+    return n;
 }
 
 /**
