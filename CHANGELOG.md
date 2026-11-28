@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Unused API routes that no client called: `PUT /api/event-types/:id`, `DELETE /api/event-types/:id`, `POST /api/event-types/seed`, `GET /api/events/upcoming`, `GET /api/calendar/connections/:id/calendars`, `GET /api/inspections/{id}/full`, `GET /api/inspections/{id}/sign-status`, the `statusFlags` object on dashboard rows, `POST /api/auth/setup/skip` and `POST /api/auth/onboarding/flag`. Missing default event types are filled in by `POST /api/admin/data/install-bundled-content`; the signed state of an inspection is still returned as `signedByClient` by the inspection read.
 * The unreachable `feature-disabled` page and its translation strings.
 
+## [2.9.1](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.9.0...openinspection-v2.9.1) (2026-11-28)
+
+
+### Bug Fixes
+
+* **editor:** queue doc writes until the first collab sync lands ([bf9ca82](https://github.com/InspectorHub/OpenInspection/commit/bf9ca82f0a4e916f6a00d01c5a2ac5691a3898ac))
+* **editor:** queue doc writes until the first collab sync lands ([2075392](https://github.com/InspectorHub/OpenInspection/commit/2075392ec52d07a2b159a8e6dfd64aa812e02743))
+
 ## [2.9.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.8.0...openinspection-v2.9.0) (2026-11-28)
 
 
